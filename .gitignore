@@ -1,0 +1,38 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime artefacts (T-008)
+data/
+outputs/
+
+# Review decks (T-008)
+*.pptx
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Local caches and model weights
+.cache/
+.huggingface/
+*.onnx
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Claude local permission log (machine-specific)
+.claude/settings.local.json
