@@ -1,0 +1,856 @@
+{
+  "description": "Retrieval gold set built from the project's own hand-curated literature review (PROJECT_PLAN.md §5.2). Primary gate for TASKLIST T-212: Recall@20 >= 0.80.",
+  "source_documents": [
+    "LITERATURE_REVIEW.md",
+    "PAPER_ANALYSIS.md",
+    "PAPER_DEEP_DIVE.md"
+  ],
+  "resolved_count": 35,
+  "unresolved_count": 0,
+  "papers": [
+    {
+      "doi": "10.1002/jrsm.1715",
+      "openalex_id": "https://openalex.org/W4392791588",
+      "title": "Can large language models replace humans in systematic reviews? Evaluating GPT ‐4's efficacy in screening and extracting data from peer‐reviewed and grey literature in multiple languages",
+      "year": 2024,
+      "venue": "Research Synthesis Methods",
+      "type": "review",
+      "is_preprint": false,
+      "cited_by_count": 225,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1002/jrsm.1715",
+      "authors": [
+        "Qusai Khraisha",
+        "S. Van Put",
+        "Johanna Kappenberg",
+        "Azza Warraitch",
+        "Kristin Hadfield"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1007/s10462-024-10844-w",
+      "openalex_id": "https://openalex.org/W4400454376",
+      "title": "Towards the automation of systematic reviews using natural language processing, machine learning, and deep learning: a comprehensive review",
+      "year": 2024,
+      "venue": "Artificial Intelligence Review",
+      "type": "review",
+      "is_preprint": false,
+      "cited_by_count": 74,
+      "is_oa": true,
+      "oa_url": "https://link.springer.com/content/pdf/10.1007/s10462-024-10844-w.pdf",
+      "authors": [
+        "Regina Ofori-Boateng",
+        "Magaly Aceves‐Martins",
+        "Nirmalie Wiratunga",
+        "Carlos Francisco Moreno‐García"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1007/s10462-024-10902-3",
+      "openalex_id": "https://openalex.org/W4401667275",
+      "title": "Artificial intelligence for literature reviews: opportunities and challenges",
+      "year": 2024,
+      "venue": "Artificial Intelligence Review",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 212,
+      "is_oa": true,
+      "oa_url": "https://link.springer.com/content/pdf/10.1007/s10462-024-10902-3.pdf",
+      "authors": [
+        "F. J. Bolaños",
+        "Angelo A. Salatino",
+        "Francesco Osborne",
+        "Enrico Motta"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1007/s10462-026-11605-7",
+      "openalex_id": "https://openalex.org/W4402854593",
+      "title": "Retrieval-augmented generation for natural language processing: a survey",
+      "year": 2026,
+      "venue": "Artificial Intelligence Review",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 18,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1007/s10462-026-11605-7",
+      "authors": [
+        "Shangyu Wu",
+        "Ying Xiong",
+        "Yufei Cui",
+        "Haolun Wu",
+        "Can Chen",
+        "Ye Yuan",
+        "Lianming Huang",
+        "Xue Liu"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1007/s11704-024-40231-1",
+      "openalex_id": "https://openalex.org/W4393065402",
+      "title": "A survey on large language model based autonomous agents",
+      "year": 2024,
+      "venue": "Frontiers of Computer Science",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 1437,
+      "is_oa": true,
+      "oa_url": "https://link.springer.com/content/pdf/10.1007/s11704-024-40231-1.pdf",
+      "authors": [
+        "Lei Wang",
+        "Chen Ma",
+        "Xueyang Feng",
+        "Zeyu Zhang",
+        "Hao Yang",
+        "Jingsen Zhang",
+        "Zhiyuan Chen",
+        "Jiakai Tang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1007/s44336-024-00009-2",
+      "openalex_id": "https://openalex.org/W4403203873",
+      "title": "A survey on LLM-based multi-agent systems: workflow, infrastructure, and challenges",
+      "year": 2024,
+      "venue": "Vicinagearth.",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 332,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1007/s44336-024-00009-2",
+      "authors": [
+        "Xinyi Li",
+        "S. Wang",
+        "Siqi Zeng",
+        "Yu Wu",
+        "Yi Yang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1016/j.ipm.2025.104369",
+      "openalex_id": "https://openalex.org/W4413962949",
+      "title": "Towards evidence-aware retrieval-augmented generation via self-corrective chain-of-thought",
+      "year": 2025,
+      "venue": "Information Processing & Management",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 13,
+      "is_oa": false,
+      "oa_url": null,
+      "authors": [
+        "Youlan Li",
+        "Wenjun Ke",
+        "Jiajun Liu",
+        "Peng Wang",
+        "Jianghan Liu",
+        "Yao He"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1016/j.nlp.2025.100179",
+      "openalex_id": "https://openalex.org/W7081955927",
+      "title": "A synergistic multi-stage RAG architecture for boosting context relevance in data science literature",
+      "year": 2025,
+      "venue": "Natural Language Processing Journal",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 2,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1016/j.nlp.2025.100179",
+      "authors": [
+        "Ahmet Yasin Aytar",
+        "Kamer Kaya",
+        "Kemal Kılıç"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1038/s41467-024-45563-x",
+      "openalex_id": "https://openalex.org/W4391836235",
+      "title": "Structured information extraction from scientific text with large language models",
+      "year": 2024,
+      "venue": "Nature Communications",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 672,
+      "is_oa": true,
+      "oa_url": "https://www.nature.com/articles/s41467-024-45563-x.pdf",
+      "authors": [
+        "John Dagdelen",
+        "Alexander Dunn",
+        "Sang‐Hoon Lee",
+        "Nicholas Walker",
+        "Andrew Rosen",
+        "Gerbrand Ceder",
+        "Kristin A. Persson",
+        "Anubhav Jain"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1093/bioinformatics/btae238",
+      "openalex_id": "https://openalex.org/W4400128031",
+      "title": "Improving medical reasoning through retrieval and self-reflection with retrieval-augmented large language models",
+      "year": 2024,
+      "venue": "Bioinformatics",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 121,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1093/bioinformatics/btae238",
+      "authors": [
+        "Minbyul Jeong",
+        "Jiwoong Sohn",
+        "Mujeen Sung",
+        "Jaewoo Kang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1093/bioinformatics/btae420",
+      "openalex_id": "https://openalex.org/W4400031865",
+      "title": "Assessing citation integrity in biomedical publications: corpus annotation and NLP models",
+      "year": 2024,
+      "venue": "Bioinformatics",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 8,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1093/bioinformatics/btae420",
+      "authors": [
+        "M. Janina Sarol",
+        "Shufan Ming",
+        "Shruthan Radhakrishna",
+        "Jodi Schneider",
+        "Halil Kilicoglu"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1093/jamiaopen/ooae021",
+      "openalex_id": "https://openalex.org/W4392226889",
+      "title": "Retrieval augmented scientific claim verification",
+      "year": 2024,
+      "venue": "JAMIA Open",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 8,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1093/jamiaopen/ooae021",
+      "authors": [
+        "Hao Liu",
+        "Ali Soroush",
+        "Jordan G. Nestor",
+        "Elizabeth Park",
+        "Betina Idnay",
+        "Yilu Fang",
+        "Jane Y Pan",
+        "Stan Liao"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1109/jstsp.2025.3579203",
+      "openalex_id": "https://openalex.org/W4411232405",
+      "title": "A Review of Faithfulness Metrics for Hallucination Assessment in Large Language Models",
+      "year": 2025,
+      "venue": "IEEE Journal of Selected Topics in Signal Processing",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 23,
+      "is_oa": true,
+      "oa_url": "https://bura.brunel.ac.uk/handle/2438/31364",
+      "authors": [
+        "Ben Malin",
+        "Tatiana Kalganova",
+        "Nikolaos V. Boulgouris"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1109/tccn.2025.3528892",
+      "openalex_id": "https://openalex.org/W4406321977",
+      "title": "AutoHMA-LLM: Efficient Task Coordination and Execution in Heterogeneous Multi-Agent Systems Using Hybrid Large Language Models",
+      "year": 2025,
+      "venue": "IEEE Transactions on Cognitive Communications and Networking",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 45,
+      "is_oa": false,
+      "oa_url": null,
+      "authors": [
+        "Tingting Yang",
+        "Ping Feng",
+        "Qixin Guo",
+        "Jindi Zhang",
+        "Xiufeng Zhang",
+        "Jiahong Ning",
+        "Xinghan Wang",
+        "Zhongyang Mao"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1109/tkde.2025.3608716",
+      "openalex_id": "https://openalex.org/W4414116775",
+      "title": "Atomic Fact Decomposition Helps Attributed Question Answering",
+      "year": 2025,
+      "venue": "IEEE Transactions on Knowledge and Data Engineering",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 2,
+      "is_oa": false,
+      "oa_url": null,
+      "authors": [
+        "Zhichao Yan",
+        "Jiapu Wang",
+        "Jiaoyan Chen",
+        "Xiaoli Li",
+        "Jiye Liang",
+        "Ru Li",
+        "Jeff Z. Pan"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1145/3543507.3583505",
+      "openalex_id": "https://openalex.org/W4367046742",
+      "title": "CitationSum: Citation-aware Graph Contrastive Learning for Scientific Paper Summarization",
+      "year": 2023,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 18,
+      "is_oa": true,
+      "oa_url": "https://dl.acm.org/doi/pdf/10.1145/3543507.3583505",
+      "authors": [
+        "Zheheng Luo",
+        "Qianqian Xie",
+        "Sophia Ananiadou"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1145/3701228",
+      "openalex_id": "https://openalex.org/W4403560390",
+      "title": "CRUD-RAG: A Comprehensive Chinese Benchmark for Retrieval-Augmented Generation of Large Language Models",
+      "year": 2024,
+      "venue": "ACM Transactions on Information Systems",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 95,
+      "is_oa": false,
+      "oa_url": null,
+      "authors": [
+        "Yuanjie Lyu",
+        "Zhiyu Li",
+        "Simin Niu",
+        "Feiyu Xiong",
+        "Bo Tang",
+        "Wenjin Wang",
+        "Hao Wu",
+        "Huanyong Liu"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1145/3703155",
+      "openalex_id": "https://openalex.org/W4404534210",
+      "title": "A Survey on Hallucination in Large Language Models: Principles, Taxonomy, Challenges, and Open Questions",
+      "year": 2024,
+      "venue": "ACM Transactions on Information Systems",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 1920,
+      "is_oa": false,
+      "oa_url": null,
+      "authors": [
+        "Lei Huang",
+        "Weijiang Yu",
+        "Weitao Ma",
+        "Weihong Zhong",
+        "Zhangyin Feng",
+        "Haotian Wang",
+        "Qianglong Chen",
+        "Weihua Peng"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1145/3777378",
+      "openalex_id": "https://openalex.org/W4416379250",
+      "title": "Graph Retrieval-Augmented Generation: A Survey",
+      "year": 2025,
+      "venue": "ACM Transactions on Information Systems",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 95,
+      "is_oa": false,
+      "oa_url": null,
+      "authors": [
+        "Boci Peng",
+        "Yun Zhu",
+        "Yongchao Liu",
+        "Xiaohe Bo",
+        "Haizhou Shi",
+        "Chuntao Hong",
+        "Yan Zhang",
+        "Siliang Tang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1145/3805774",
+      "openalex_id": "https://openalex.org/W4394947112",
+      "title": "A Survey on Retrieval-Augmented Text Generation for Large Language Models",
+      "year": 2026,
+      "venue": "ACM Computing Surveys",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 46,
+      "is_oa": true,
+      "oa_url": "https://doi.org/10.1145/3805774",
+      "authors": [
+        "Yizheng Huang",
+        "Jimmy Xiangji Huang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1162/coli.a.16",
+      "openalex_id": "https://openalex.org/W4412158322",
+      "title": "🧜Siren’s Song in the AI Ocean: A Survey on Hallucination in Large Language Models",
+      "year": 2025,
+      "venue": "Computational Linguistics",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 204,
+      "is_oa": true,
+      "oa_url": "https://direct.mit.edu/coli/article-pdf/doi/10.1162/coli.a.16/2535477/coli.a.16.pdf",
+      "authors": [
+        "Yue Zhang",
+        "Yafu Li",
+        "Leyang Cui",
+        "Cai Deng",
+        "Lemao Liu",
+        "Tingchen Fu",
+        "Xinting Huang",
+        "Enbo Zhao"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    },
+    {
+      "doi": "10.1162/tacl_a_00530",
+      "openalex_id": "https://openalex.org/W4317898419",
+      "title": "Improving the Domain Adaptation of Retrieval Augmented Generation (RAG) Models for Open Domain Question Answering",
+      "year": 2023,
+      "venue": "Transactions of the Association for Computational Linguistics",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 306,
+      "is_oa": true,
+      "oa_url": "https://direct.mit.edu/tacl/article-pdf/doi/10.1162/tacl_a_00530/2067834/tacl_a_00530.pdf",
+      "authors": [
+        "Shamane Siriwardhana",
+        "Rivindu Weerasekera",
+        "Elliott Wen",
+        "Tharindu Kaluarachchi",
+        "Rajib Rana",
+        "Suranga Nanayakkara"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.1186/s12859-025-06159-4",
+      "openalex_id": "https://openalex.org/W4410806538",
+      "title": "Valsci: an open-source, self-hostable literature review utility for automated large-batch scientific claim verification using large language models",
+      "year": 2025,
+      "venue": "BMC Bioinformatics",
+      "type": "article",
+      "is_preprint": false,
+      "cited_by_count": 7,
+      "is_oa": true,
+      "oa_url": "https://bmcbioinformatics.biomedcentral.com/counter/pdf/10.1186/s12859-025-06159-4",
+      "authors": [
+        "Brice Edelman",
+        "Jeffrey Skolnick"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2023.emnlp-main.398",
+      "openalex_id": "https://openalex.org/W4389520670",
+      "title": "Enabling Large Language Models to Generate Text with Citations",
+      "year": 2023,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 177,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2023.emnlp-main.398.pdf",
+      "authors": [
+        "Tianyu Gao",
+        "H. W. Yen",
+        "Jiatong Yu",
+        "Danqi Chen"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2023.emnlp-main.455",
+      "openalex_id": "https://openalex.org/W4389519050",
+      "title": "CiteBench: A Benchmark for Scientific Citation Text Generation",
+      "year": 2023,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 2,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2023.emnlp-main.455.pdf",
+      "authors": [
+        "Martin Funkquist",
+        "Ilia Kuznetsov",
+        "Yufang Hou",
+        "Iryna Gurevych"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2023.emnlp-main.741",
+      "openalex_id": "https://openalex.org/W4389519598",
+      "title": "FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation",
+      "year": 2023,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 315,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2023.emnlp-main.741.pdf",
+      "authors": [
+        "Sewon Min",
+        "Kalpesh Krishna",
+        "Xinxi Lyu",
+        "Mike Lewis",
+        "Wen-tau Yih",
+        "Pang Wei Koh",
+        "Mohit Iyyer",
+        "Luke Zettlemoyer"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2023.findings-acl.418",
+      "openalex_id": "https://openalex.org/W4385570853",
+      "title": "SciReviewGen: A Large-scale Dataset for Automatic Literature Review Generation",
+      "year": 2023,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 4,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2023.findings-acl.418.pdf",
+      "authors": [
+        "Tetsu Kasanishi",
+        "Masaru Isonuma",
+        "Junichiro Mori",
+        "Ichiro Sakata"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2024.acl-long.810",
+      "openalex_id": "https://openalex.org/W4402684050",
+      "title": "ChatDev: Communicative Agents for Software Development",
+      "year": 2024,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 323,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2024.acl-long.810.pdf",
+      "authors": [
+        "Chen Qian",
+        "Wei Liu",
+        "Hongzhang Liu",
+        "Nuo Chen",
+        "Yufan Dang",
+        "Jiahao Li",
+        "Cheng Yang",
+        "Weize Chen"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2024.eacl-demo.16",
+      "openalex_id": "https://openalex.org/W4411630045",
+      "title": "RAGAs: Automated Evaluation of Retrieval Augmented Generation",
+      "year": 2024,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 402,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2024.eacl-demo.16.pdf",
+      "authors": [
+        "Shahul Es",
+        "Jithin James",
+        "Luis Espinosa-Anke",
+        "Steven Schockaert"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2024.emnlp-main.813",
+      "openalex_id": "https://openalex.org/W4404782899",
+      "title": "Chain-of-Note: Enhancing Robustness in Retrieval-Augmented Language Models",
+      "year": 2024,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 46,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2024.emnlp-main.813.pdf",
+      "authors": [
+        "Wenhao Yu",
+        "Hongming Zhang",
+        "Xiaoman Pan",
+        "Peixin Cao",
+        "Kaixin Ma",
+        "Jian Li",
+        "Hongwei Wang",
+        "Dong Yu"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2024.naacl-long.389",
+      "openalex_id": "https://openalex.org/W4401042753",
+      "title": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity",
+      "year": 2024,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 198,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2024.naacl-long.389.pdf",
+      "authors": [
+        "Soyeong Jeong",
+        "Jinheon Baek",
+        "Sukmin Cho",
+        "Sung Ju Hwang",
+        "Jong Moon Park"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2024.sdp-1.9",
+      "openalex_id": "https://openalex.org/W4402683352",
+      "title": "Cited Text Spans for Scientific Citation Text Generation",
+      "year": 2024,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 3,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2024.sdp-1.9.pdf",
+      "authors": [
+        "Xiangci Li",
+        "Yi‐Hui Lee",
+        "Jessica Ouyang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2025.acl-srw.32",
+      "openalex_id": "https://openalex.org/W4412889429",
+      "title": "Question Decomposition for Retrieval-Augmented Generation",
+      "year": 2025,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 10,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2025.acl-srw.32.pdf",
+      "authors": [
+        "Paul Ammann",
+        "Jonas Golde",
+        "Alan Akbik"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2025.emnlp-main.136",
+      "openalex_id": "https://openalex.org/W4416037063",
+      "title": "SurveyGen: Quality-Aware Scientific Survey Generation with Large Language Models",
+      "year": 2025,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 4,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2025.emnlp-main.136.pdf",
+      "authors": [
+        "Tong Bao",
+        "Mir Tafseer Nayeem",
+        "Davood Rafiei",
+        "Chengzhi Zhang"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md",
+        "PAPER_ANALYSIS.md",
+        "PAPER_DEEP_DIVE.md"
+      ]
+    },
+    {
+      "doi": "10.18653/v1/2025.findings-acl.264",
+      "openalex_id": "https://openalex.org/W4412888613",
+      "title": "LongCite: Enabling LLMs to Generate Fine-grained Citations in Long-Context QA",
+      "year": 2025,
+      "venue": null,
+      "type": "conference-paper",
+      "is_preprint": false,
+      "cited_by_count": 11,
+      "is_oa": true,
+      "oa_url": "https://aclanthology.org/2025.findings-acl.264.pdf",
+      "authors": [
+        "Jiajie Zhang",
+        "Yushi Bai",
+        "Xin Lv",
+        "Wanjun Gu",
+        "Danqing Liu",
+        "Minhao Zou",
+        "Shulin Cao",
+        "Lei Hou"
+      ],
+      "found_in": [
+        "LITERATURE_REVIEW.md"
+      ]
+    }
+  ],
+  "unresolved": []
+}

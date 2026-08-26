@@ -1,0 +1,4 @@
+t002 - yes there is a Kaggle account with gpu access
+t005 - base paper confirm
+t006 - yes done
+t007 - it is amust to have human-in-the-loop training

@@ -4,6 +4,8 @@
 >
 > **Two-agent workflow.** **Claude Code plans, specifies, reviews and integrates. Cursor (Groq) writes the code.** Every task below is written so it can be handed to Cursor as a self-contained unit of work with a hard acceptance test.
 >
+> **Companion documents:** `TRAINING_SPEC.md` (both fine-tuned models — verifier and reranker — and why the generative agents are not trained), `DB_SCHEMA.md` (the Postgres run registry), `PROJECT_PLAN.md` (scope), `SESSION_CONTEXT.md` (constraints and literature findings).
+>
 > Created 2026-08-25. Update the checkboxes in place; do not rewrite the file.
 
 ---
@@ -14,8 +16,8 @@
 |---|---|
 | Plan written | 2026-08-06 (30-day plan, Day 1 = 2026-08-07) |
 | Today | **2026-08-25** |
-| Target submission | **~2026-09-05** |
-| Days actually remaining | **11** |
+| Target submission | **~2026-09-07** (was ~09-05; +2 days authorised 2026-08-25 to integrate SciReviewGen) |
+| Days actually remaining | **13** |
 | Code written so far | **Zero.** No `src/`, no `pyproject.toml`, no `.py` file anywhere in the folder. |
 
 **The 30-day plan is no longer executable as written.** Nineteen of its thirty days are gone and none of them produced code. What exists is planning, literature, design and two graded decks.
@@ -24,16 +26,96 @@ This file is therefore **not** the 30-day plan re-typed. It is a compressed 11-d
 
 | Cut now | Was | Why |
 |---|---|---|
-| SciReviewGen integration | `PROJECT_PLAN.md §5.3` | Access request has multi-day latency. No time. Your own 25-paper bibliography becomes the sole gold set. |
 | Ollama feasibility probe | §6.3 | Already demoted to a footnote. Dead. |
 | DOCX writer | §2.2 | Markdown + PDF-from-Markdown suffices. |
 | 2-annotator Likert + Cohen's κ | §9 | Scheduling cost exceeds its evidentiary value at 11 days. Replaced by the 50-claim spot-check. |
 | Ablations 3 and 4 | §9.4 | Kept only if Phase 7 finishes early. **Ablation 2 is never cut.** |
 | Extraction F1 annotation (10 papers) | §5.4 | Replaced by 5 qualitative examples. |
 
-**Never cut, under any circumstance** — these six are the project: the six agents, the trained verifier, the evidence-inspection panel, ablation 2 (− Verifier), `trace.jsonl`, and the **M1 milestone** (first complete cited survey).
+**Reinstated 2026-08-25: SciReviewGen is back in scope (Phase 3B).** The original cut rested on a premise that turned out to be false — `PROJECT_PLAN.md §5.3` assumed distribution "as preprocessing scripts over S2ORC, historically requiring an AI2 access request with days of latency." **Three ungated public mirrors exist on Hugging Face** (`kejian/SciReviewGen`, `kdercksen/scireviewgen-csv`, `pat-jj/SciReviewGen`), verified downloadable 2026-08-25. There is no access request and no lead time. Two days were authorised for the integration; the schedule absorbs them at the back (§13).
+
+**Never cut, under any circumstance** — these seven are the project: the six agents, the trained **verifier** (the reranker fine-tune in Phase 3C is a *second* trained model and is explicitly droppable — see T-335), the evidence-inspection panel, ablation 2 (− Verifier), `trace.jsonl`, the **M1 milestone** (first complete cited survey), the **SciReviewGen verifier cross-check (T-325)**, and — as of the 2026-08-25 decision — **Human-in-the-Loop (T-609)**.
 
 > If M1 has not landed by **2026-08-31**, stop building forward and stabilise what exists. A working four-agent pipeline that produces a cited survey beats a half-wired six-agent graph that runs nothing.
+
+---
+
+## 0.1 Model policy — HARD RULE, no exceptions ★
+
+**Only free, open-weight models. No paid models, no paid tiers, no trial credits, at any point in this project.**
+
+This is Constraint 1 from `SESSION_CONTEXT.md §2` and it is not negotiable. If a task cannot be done on the allowlist below, the task gets descoped — the budget does not get raised.
+
+### Allowlist — verified live on 2026-08-25
+
+Every generative agent (Planner, Extractor, Critic, Writer) runs on one of these. All are **open-weight** models on a **free tier**, so the project is $0 by construction rather than by discipline.
+
+| Model | Provider | Weights | Verified | Use for |
+|---|---|---|---|---|
+| `gemma-4-31b-it` | Google AI Studio | open | ✅ HTTP 200, extracted correctly | **Primary candidate** — all four agents |
+| `gemma-4-26b-a4b-it` | Google AI Studio | open (MoE, ~4B active) | ⚠️ HTTP 200 but returned `{}` on the extraction probe | Speed fallback only; re-test before use |
+| `openai/gpt-oss-120b` | Groq | open (Apache 2.0) | ✅ HTTP 200 | **Primary backup** — largest free open-weight option |
+| `openai/gpt-oss-20b` | Groq | open (Apache 2.0) | not yet probed | Lightweight fallback |
+| `qwen/qwen3.6-27b` | Groq | open | ✅ HTTP 200 | Second backup / bake-off arm |
+
+*Despite the name, `openai/gpt-oss-*` are OpenAI's **open-weight** releases served free by Groq. They are not the paid OpenAI API.*
+
+### Forbidden — do not call, do not put in a config, do not benchmark against
+
+`gpt-4o`, `gpt-4o-mini`, `gpt-4*`, `o1/o3/o4`, Claude API models, `gemini-*-pro`, `deep-research-*`, and every other metered endpoint. **`RESEARCHGPT_SPEC.md §10.1` still names `gpt-4o-mini` and `gpt-4o` in `configs/default.yaml` — that config is from before the $0 constraint existed and must not be copied verbatim (see T-106).**
+
+Proprietary free-tier models (`gemini-3.6-flash` and friends) are $0 today, but they are **not open-weight**, so a tier change can strand the project mid-build. They are permitted only as a temporary unblock, must be logged in the trace when used, and must never be the model reported in the paper.
+
+### Enforcement, not good intentions
+
+- **T-104 (`core/llm.py`) hard-fails on any model outside the allowlist.** The list lives in one constant in that file. A model not in it raises before any HTTP request is made. This is the whole enforcement mechanism — see T-104's acceptance criterion.
+- The allowlist constant is the single source of truth. `configs/default.yaml` may only name models that appear in it.
+- Every `trace.jsonl` LLM event records the model name, so the paper's "which model produced this" question is answerable from the run log.
+
+### Measured consequence — Gemma ignores `responseSchema`
+
+Probed 2026-08-25: Gemma on the Gemini API accepts `generationConfig.responseSchema` but **does not honour it**. It returns markdown-fenced JSON (a leading space and a trailing ```` ``` ````), not native structured output, and `gemma-4-26b-a4b-it` ignored the content entirely and returned `{}`.
+
+This is not a blocker — it is a known cost of the $0 rule, and the plan already budgets for it (`SPEC §14`, retry-with-repair max 2). It has two consequences:
+
+1. **T-404 (Extractor) needs a fence-stripping + repair layer**, not a bare `json.loads`. Assume fenced output is the normal case, not the error case.
+2. **T-004's bake-off is now the decisive test**, not a formality. It measures clean-parse rate across the allowlist, which is exactly the property `PROJECT_PLAN.md §6.2` says to choose on.
+
+### Local models — already free, unchanged
+
+Embeddings (`bge-small-en-v1.5`), reranking (`ms-marco-MiniLM-L-6-v2`) and the fine-tuned verifier (`deberta-v3-small`, ONNX int8) all run on local CPU at $0 with no API involved. Training is on Kaggle's free GPU quota. **Do not run Gemma locally** — a 7B+ model on CPU-only hardware is 3–8 tokens/sec, hours per run, and `PROJECT_PLAN.md §6.3` already ruled it out as non-viable. The free *tier* is what makes $0 work here, not local inference.
+
+---
+
+## 0.2 Latency budget and mandatory source — decided 2026-08-25
+
+### Latency is not a constraint. Correctness is.
+
+**Decision: a full run may take ~30 minutes. Optimise for output quality, never for speed.**
+
+What this changes:
+
+| Decision | Was | Now |
+|---|---|---|
+| **T-004 bake-off criterion** | latency-led (`gpt-oss-120b` 3.1s beat `gemma-4-31b-it` 84.5s) | **quality-led** — decide on clean-parse rate and extraction correctness. Latency is a tiebreaker only. |
+| **T-307 verifier escalation** | escalate to `deberta-v3-base` only if small scored poorly | **escalate readily.** `PROJECT_PLAN.md §4.2` already said *"trade latency, not accuracy — the verifier is the graded component"*; that trade is now nearly free. |
+| **T-213 embedding escalation** | `bge-small` → `bge-base` only if recall was short | Cheap: measured 2.13 min for 3,000 chunks, so `bge-base` costs ~6 min. Take it if T-212 is anywhere near the gate. |
+| **Semantic Scholar** | cut as *"rate-limited"* | **Reinstated (T-214).** Patient backoff was the blocker; patience is now free. |
+
+What this does **not** change:
+
+- **`requests_per_minute` and the response cache stay.** These defend the free-tier *request budget*, which is a hard quota, not a speed setting. Rate limits still bind.
+- **`max_papers=25` for ablations stays** — that was about request budget, not wall clock (`PROJECT_PLAN.md §6.2`).
+- **`gpt-oss-120b` stays primary for now.** Even with latency relaxed, `gemma-4-31b-it` at 84.5s × ~70 Extractor calls is **~1.6 h for extraction alone** — roughly 3× the stated 30-minute tolerance. It remains a legitimate T-004 candidate if it wins on quality, but it is not free.
+- **T-610 (pre-baked demo run) stays.** Its value was never only speed — it removes any live-network dependency from the viva. Reframe the justification as demo *reliability*, not latency.
+
+### OpenAlex or Semantic Scholar is mandatory
+
+**Requirement satisfied: OpenAlex is already the primary source** (`configs/default.yaml`, T-201) and is keyless, reliable and rich in venue/OA metadata.
+
+**Semantic Scholar is additionally reinstated as T-214**, because both decks claim it. Measured 2026-08-25: it appears on **8 slides of `PWP1 - Review 2 - DSC06.pptx`** — including the architecture (7) and MCD (8) slides that get explained to the committee — while OpenAlex appears on one. Building the connector makes the deck true, exactly as Phase 6B does for its PostgreSQL claim.
+
+**Measured S2 behaviour, keyless (2026-08-25):** 1 of 4 rapid requests succeeded; with exponential backoff, 2 of 3 queries succeeded and one failed after 6 attempts. It is **usable but unreliable without a key**, so T-214 is best-effort and degradable — never a hard dependency. It does return **abstracts directly** (no de-inversion needed, unlike OpenAlex) and rich `externalIds` (DOI, ArXiv, DBLP, PubMed), which strengthens T-203 dedup.
 
 ---
 
@@ -69,6 +151,7 @@ Groq's free models are fast and weak on long-horizon reasoning. Treat them accor
 5. **Never let it touch `core/llm.py` caching or the graph routing logic** after the first draft — those are where silent breakage hides.
 6. **Read every diff.** Groq will invent library APIs that do not exist. Assume hallucinated imports until proven otherwise.
 7. **No `# TODO` merges.** A task is done or it is not.
+8. **Cursor must not edit `TASKLIST.md`, `configs/`, or anything under `handoffs/`.** *Learned the hard way on 2026-08-25: Cursor wrote back a stale copy of `TASKLIST.md` it had read earlier in its session and silently reverted five completed Claude-owned tasks and their notes.* Cursor reports what it finished; **Claude Code ticks the boxes.** If a handoff needs a checkbox changed, that is a Claude Code edit.
 
 ### Task handoff template (paste into Cursor)
 
@@ -102,13 +185,26 @@ DO NOT: add features, refactor other files, or change function signatures.
 
 Nothing in Phase 1 starts until this phase closes. Budget: 2 hours.
 
-- [ ] **T-001** 👤 ⛔ Register **Google AI Studio (Gemini) free tier** and **Groq** API keys. Record both in `.env`. *Done when: both keys return a completion from a curl one-liner.*
-- [ ] **T-002** 👤 ⛔ Confirm the **Kaggle** account has GPU quota available this week (Settings → phone verified → GPU hours remaining). *Done when: quota ≥ 5 h confirmed.*
-- [ ] **T-003** 👤 Create a Hugging Face account + read token (needed for `allenai/scifact` and `deberta-v3-small`). *Done when: `huggingface-cli whoami` succeeds.*
-- [ ] **T-004** 🧠 Run the 30-minute **JSON-reliability bake-off**: same Extractor prompt, 5 papers, Gemini vs Groq, count clean Pydantic parses. Pick the primary on parse reliability, **not benchmark scores**. *Done when: a winner is recorded at the top of `configs/default.yaml` with the parse counts as a comment.* (`PROJECT_PLAN.md §6.2`)
-- [ ] **T-005** 👤 **Confirm the base-paper switch with Dr. Govinda Rao**: Aytar et al. → SurveyGen (Bao et al., EMNLP 2025). *Rationale in `SESSION_CONTEXT.md §5.1`. This is the highest-value 10-minute conversation left in the project.*
-- [ ] **T-006** 👤 Confirm which **MCD notation** the rubric means — UML component diagram or classical Yourdon/Constantine structure chart. Both are already prepared in `diagrams/`; they need different slide-12 text.
-- [ ] **T-007** 👤 **Decide: does Human-in-the-Loop stay in Objective 2?** It is on PPT slide 5 and in both diagrams. Keeping it costs ~half a day (T-609). Dropping it means editing the objective and both diagrams. **Recommendation: keep it** — it is cheap, it is already drawn, and it is the answer to "what stops a wrong claim getting through?"
+- [x] **T-001** 👤 ⛔ Register **Google AI Studio (Gemini) free tier** and **Groq** API keys. Record both in `.env`. *Done when: both keys return a completion from a curl one-liner.* Verified 2026-08-25: both keys authenticate and return completions on **open-weight** models — `gemma-4-31b-it` (Google) and `openai/gpt-oss-120b` / `qwen/qwen3.6-27b` (Groq). **The model names in `PROJECT_PLAN.md` and `RESEARCHGPT_SPEC.md` are stale and some are paid** — `gemini-2.0-flash` is retired, Groq no longer serves `llama-3.3-70b-versatile`, and the spec's `gpt-4o-mini`/`gpt-4o` are forbidden outright. **Use §0.1's allowlist and nothing else.**
+- [x] **T-002** 👤 ⛔ Confirm the **Kaggle** account has GPU quota available this week (Settings → phone verified → GPU hours remaining). *Done when: quota ≥ 5 h confirmed.* **Confirmed 2026-08-25 (`decsions.txt.txt`): Kaggle account with GPU access exists.** Phase 3 (verifier, T-303) and Phase 3C (reranker, T-332) are unblocked.
+- [x] **T-003** 👤 Create a Hugging Face account + read token (needed for `allenai/scifact` and `deberta-v3-small`). *Done when: `huggingface-cli whoami` succeeds.* Verified 2026-08-25: token authenticates (HTTP 200, user `24f2000010`).
+- [x] **T-004** 🧠 ★ Run the **JSON-reliability bake-off across the §0.1 allowlist only**: same Extractor prompt, 5 papers, four arms — `gemma-4-31b-it`, `gemma-4-26b-a4b-it`, `openai/gpt-oss-120b`, `qwen/qwen3.6-27b`. Count clean Pydantic parses **after** fence-stripping, and count how many needed a repair pass. Pick the primary on **parse reliability and extraction correctness** — see §0.2, latency is now only a tiebreaker. *This is now a decisive test rather than a formality: Gemma ignores `responseSchema` (§0.1), so parse reliability genuinely varies across the allowlist.* *Done when: a winner and its parse/repair counts are recorded as a comment at the top of `configs/default.yaml`, and the losing arms' failure modes are noted in one line each.* ✅ **COMPLETE 2026-08-25.** 5 real gold-set abstracts per arm through the real prompt and real client. Full table in `configs/default.yaml`; raw data in `eval/bakeoff_t004.json`.
+
+  | arm | parse | valid | fields | echo | avg lat | verdict |
+  |---|---|---|---|---|---|---|
+  | `openai/gpt-oss-120b` | 100% | 100% | 4.6/8 | **0** | 26.6s | **PRIMARY** |
+  | `qwen/qwen3.6-27b` | 100% | 100% | 7.0/8 | **2/5** | 41.8s | rejected |
+  | `gemma-4-31b-it` | — | — | — | — | — | disqualified (latency) |
+  | `gemma-4-26b-a4b-it` | — | — | — | — | — | disqualified (no text part) |
+
+  **The decision turned on a failure mode a pass/fail test would have missed.** qwen populates more fields — but it echoed the literal schema placeholder `"string"` into `datasets`/`metrics` on **2 of 5 papers (40%)**. That parses, validates, *and silently injects fabricated content into a hallucination-graded pipeline* — precisely what `SPEC §14.2` forbids. Its 7.0/8 field score is itself inflated by the echo: excluding those rows it scores **6.33/8**. gpt-oss echoed 0/5. **Reliability beat coverage.**
+
+  ⚠️ **Known weakness of the winner:** gpt-oss populates only **4.6/8** content fields. Most likely a *prompt* problem, not a model problem — `extractor_v1.md` ships 3 few-shot examples against the ~20 Dagdelen et al. measured as the stabilisation point. **T-404 must expand the few-shots and re-run this bake-off; expect the field count to rise.**
+
+  ⚠️ **Latency reality check against §0.2's ~30 min tolerance:** 26.6s/paper × ~70 papers ≈ **31 min for the extraction stage alone**, so the first full run will sit at 30–40 min end to end. The response cache makes re-runs free. Groq latency is highly variable under load (measured 3.8s–55s within one arm) — do not treat single-sample timings as stable. (`PROJECT_PLAN.md §6.2`)
+- [x] **T-005** 👤 ✅ **APPROVED 2026-08-25 (`decsions.txt.txt`, clarified in session): base paper switches Aytar et al. → SurveyGen (Bao et al., EMNLP 2025, DOI `10.18653/v1/2025.emnlp-main.136`).** Unblocks T-801. *Consequences: the Introduction now quotes the base paper's own authors stating your problem — "fully automatic survey generation still suffers from low citation quality and limited critical analysis" — rather than you asserting it; low citation quality → your Verifier, limited critical analysis → your four-field schema. Dropping GROBID also stops being a deviation to defend, since that was Aytar's dependency, not SurveyGen's.*
+- [x] **T-006** 👤 ✅ **DECIDED 2026-08-25: UML component diagram.** Use `diagrams/02_module_connectivity_diagram.drawio` with `02_MODULE_CONNECTIVITY_DIAGRAM_EXPLAINED.md` as the slide-12 script. ⚠️ **Slide 12 must therefore describe «subsystem» packages and provided/required interfaces — NOT the ○/● coupling notation, which only applies to the structure-chart version** (`SESSION_CONTEXT.md §7.2`). The Yourdon/Constantine alternative in `ARCHITECTURE_REVIEW.md` is now dead; do not present it.
+- [x] **T-007** 👤 **DECIDED 2026-08-25 (`decsions.txt.txt`): Human-in-the-Loop is MANDATORY.** It stays in Objective 2, on PPT slide 5, and in both diagrams. **Consequence: T-609 is now a required deliverable, not a conditional one, and HITL moves onto the never-cut list.** The Sep 4 kill switch has been amended accordingly — Panel 4 can no longer be dropped wholesale, because it is the surface HITL lives on.
 - [x] **T-008** 🧠 `git init`, `.gitignore`, first commit of the existing markdown and diagrams. *Done when: `git log` shows one commit and `data/`, `outputs/`, `.env`, `*.pptx` are ignored.* Done 2026-08-25: repo initialised; `.gitignore` covers `data/`, `outputs/`, `.env`, `*.pptx`; first commit is the planning artefacts plus `.env.example`.
 
 ---
@@ -117,15 +213,15 @@ Nothing in Phase 1 starts until this phase closes. Budget: 2 hours.
 
 Everything else sits on this. **Do not let Cursor improvise here** — Claude Code writes the schemas, Cursor fills the bodies.
 
-- [ ] **T-101** 🧠 Author `pyproject.toml` + the directory scaffold per `RESEARCHGPT_SPEC.md §10`, minus the cut modules (`docx_writer.py`, `ragas_runner.py`, `notebooks/`). *Done when: `pip install -e .` succeeds and `import researchgpt` works.*
-- [ ] **T-102** 🧠 Write `src/researchgpt/core/models.py` — all Pydantic models from `SPEC §8`. **Claude Code writes this by hand.** Every other module imports from it; a wrong shape here costs a day downstream. *Done when: `Paper`, `Chunk`, `Insight`, `Claim`, `Verdict`, `CritiqueDecision`, `RunConfig` all instantiate and round-trip through `.model_dump_json()`.*
-- [ ] **T-103** 🧠 Write `src/researchgpt/graph/state.py` — the LangGraph state per `SPEC §8.1`, with reducers. **Claude Code writes this by hand.** *Done when: a dummy two-node graph merges partial state updates correctly.*
-- [ ] **T-104** ⌨️ ★ ⛔ `src/researchgpt/core/llm.py` — the LLM adapter, with **all four** of: prompt-hash disk cache, requests-per-minute throttle, exponential backoff on 429, and a rate-limit guardrail that aborts loudly instead of looping silently. *This is the highest-leverage file in the build (`PROJECT_PLAN.md §6.2`) — every dev re-run after the first costs zero API requests.* **Claude Code reviews it line by line; Cursor does not touch it again afterwards.** *Done when: calling the same prompt twice issues exactly one HTTP request, and a simulated 429 storm aborts with a named exception rather than hanging.*
-- [ ] **T-105** ⌨️ `src/researchgpt/core/config.py` — YAML loader → `RunConfig`, with env-var overrides. *Done when: `load_config("configs/default.yaml")` returns a validated `RunConfig` and an unknown key raises.*
-- [ ] **T-106** 🧠 `configs/default.yaml` — revised from `SPEC §10.1` for the CPU/$0 reality: `bge-small-en-v1.5`, `ms-marco-MiniLM-L-6-v2`, `sources: [openalex, arxiv]`, `max_papers: 60` (25 for ablations), no `max_cost_usd`. *Done when: it loads clean through T-105.*
-- [ ] **T-107** ⌨️ ★ `src/researchgpt/core/logging.py` — the `trace.jsonl` writer. Append-only, one JSON object per agent event: `{ts, run_id, agent, event, payload, iteration}`. *Free today, impossible to retrofit. Every figure in the report comes from this file.* *Done when: a three-event dummy run produces a parseable `trace.jsonl`.*
-- [ ] **T-108** ⌨️ `src/researchgpt/cli.py` — Typer stub: `researchgpt --version`, `researchgpt run --question "..." --max-papers N`. *Done when: `researchgpt --version` prints.*
-- [ ] **T-109** 🧠 `src/researchgpt/core/prompts/` — one versioned file per agent, each with the header comment required by `SPEC §14.4`. Bodies may be stubs today; the **Extractor prompt must be real** — structured output stabilises at ~20 few-shot examples and is malformed below ~10 (`SESSION_CONTEXT.md §5.10`).
+- [x] **T-101** 🧠 Author `pyproject.toml` + the directory scaffold per `RESEARCHGPT_SPEC.md §10`, minus the cut modules (`docx_writer.py`, `ragas_runner.py`, `notebooks/`). *Done when: `pip install -e .` succeeds and `import researchgpt` works.* **Done 2026-08-25.** Deps split into optional extras (`retrieval`/`graph`/`verify`/`api`/`scireviewgen`). **Environment risk cleared:** `onnxruntime`, `chromadb`, `sentence-transformers`, `langgraph` and `torch` all resolve on this machine's Python 3.14.6 — the ONNX verifier path (T-304) is viable.
+- [x] **T-102** 🧠 Write `src/researchgpt/core/models.py` — all Pydantic models from `SPEC §8`. **Claude Code writes this by hand.** Every other module imports from it; a wrong shape here costs a day downstream. *Done when: `Paper`, `Chunk`, `Insight`, `Claim`, `Verdict`, `CritiqueDecision`, `RunConfig` all instantiate and round-trip through `.model_dump_json()`.* **Done 2026-08-25, verified.** Deviations from SPEC §8: `Paper.text_availability` added (T-204/T-505); `RunConfig` + nested models added; **`ALLOWED_MODELS` lives here, not in `llm.py`** — dependency-free module, so a forbidden model fails at **config-load time**. Verified: `gpt-4o`, `gpt-4o-mini`, `gemini-3.6-flash` all rejected by `RunConfig`.
+- [x] **T-103** 🧠 Write `src/researchgpt/graph/state.py` — the LangGraph state per `SPEC §8.1`, with reducers. **Claude Code writes this by hand.** *Done when: a dummy two-node graph merges partial state updates correctly.* **Done 2026-08-25, verified on a real compiled LangGraph.** **Accumulate** (`add`): `papers`, `chunks`, `retrieval_log`, `decision_log`, `human_overrides`. **Replace**: `paper_insights`, `verified_claims`, `iteration`, plan fields. **Merge**: `artefacts`. *Consequence for T-403: papers/chunks accumulate, so the Retriever must dedupe by id — the reducer will not.* Added beyond SPEC §8.1: `run_id`, `decision_log`, `human_overrides`, `PLAN_FIELDS`.
+- [x] **T-104** ⌨️ ★ ⛔ `src/researchgpt/core/llm.py` — the LLM adapter, with **all four** of: prompt-hash disk cache, requests-per-minute throttle, exponential backoff on 429, and a rate-limit guardrail that aborts loudly instead of looping silently. *This is the highest-leverage file in the build (`PROJECT_PLAN.md §6.2`) — every dev re-run after the first costs zero API requests.* **Claude Code reviews it line by line; Cursor does not touch it again afterwards.** **It also owns the §0.1 model allowlist**: a single `ALLOWED_MODELS` constant, checked before any HTTP request is constructed, raising on anything outside it. That check is the project's entire defence against accidentally billing a paid endpoint — there is no second line of defence. *Done when: calling the same prompt twice issues exactly one HTTP request; a simulated 429 storm aborts with a named exception rather than hanging; and `model="gpt-4o-mini"` raises before any network call is made.* Done 2026-08-25 via `handoffs/phase1.md`: cache / allowlist / RateLimitExceeded / extract_json / Google `thought`-part skip all verified in `tests/test_phase1_acceptance.py`.
+- [x] **T-105** ⌨️ `src/researchgpt/core/config.py` — YAML loader → `RunConfig`, with env-var overrides. *Done when: `load_config("configs/default.yaml")` returns a validated `RunConfig` and an unknown key raises.* Done 2026-08-25: YAML + `RESEARCHGPT__REVIEW__MAX_PAPERS` + forbidden-model ValidationError verified.
+- [x] **T-106** 🧠 `configs/default.yaml` — revised from `SPEC §10.1` for the CPU/$0 reality: `bge-small-en-v1.5`, `ms-marco-MiniLM-L-6-v2`, `sources: [openalex, arxiv]`, `max_papers: 60` (25 for ablations), no `max_cost_usd`. **Do not copy `SPEC §10.1`'s `llm:` block — it names `gpt-4o-mini` and `gpt-4o`, both forbidden under §0.1.** Name only the T-004 winner and one allowlisted backup. *Done when: it loads clean through T-105 and every model it names passes T-104's allowlist check.* **Done 2026-08-25**, and **revised after the T-004 smoke measurement**: primary is now `openai/gpt-oss-120b`, not `gemma-4-31b-it`. See the measurement table in the file header. **T-004 still owes the 5-paper clean-parse-rate run.**
+- [x] **T-107** ⌨️ ★ `src/researchgpt/core/logging.py` — the `trace.jsonl` writer. Append-only, one JSON object per agent event: `{ts, run_id, agent, event, payload, iteration}`. *Free today, impossible to retrofit. Every figure in the report comes from this file.* *Done when: a three-event dummy run produces a parseable `trace.jsonl`.* Done 2026-08-25: three-event dummy + non-serialisable payload fallback verified.
+- [x] **T-108** ⌨️ `src/researchgpt/cli.py` — Typer stub: `researchgpt --version`, `researchgpt run --question "..." --max-papers N`. *Done when: `researchgpt --version` prints.* Done 2026-08-25: `version` prints `0.1.0`; `run -q test` writes `run_start`/`run_end` to `trace.jsonl`.
+- [x] **T-109** 🧠 `src/researchgpt/core/prompts/` — one versioned file per agent, each with the header comment required by `SPEC §14.4`. Bodies may be stubs today; the **Extractor prompt must be real** — structured output stabilises at ~20 few-shot examples and is malformed below ~10 (`SESSION_CONTEXT.md §5.10`). **Done 2026-08-25:** `extractor_v1.md` (real; verified end-to-end producing a valid `PaperInsight` from a live call), plus `planner_v1.md` (**hardened 2026-08-25 with two measured constraints: queries must be 3–5 terms because OpenAlex ANDs them, and must mix broad with specific because targeted queries measurably out-recall topical ones**), `critic_v1.md`, `writer_v1.md` stubs. ⚠️ **Ships 3 few-shot examples, not 20** — T-404 must expand before Extractor output is trusted for a real run.
 
 ---
 
@@ -133,19 +229,32 @@ Everything else sits on this. **Do not let Cursor improvise here** — Claude Co
 
 Bad retrieval silently poisons grounding, which is the graded criterion. This phase is where Cursor earns its keep — the connectors are mechanical.
 
-- [ ] **T-201** ⌨️ `tools/search_sources.py` — **OpenAlex** connector. Use the `title_and_abstract.search` filter with a hard date window; plain `search=` sorted by citations returns irrelevant high-citation medical papers (`SESSION_CONTEXT.md §9`). Return `Paper` objects. *Done when: a query returns ≥20 deduped `Paper`s carrying DOI, venue, year and OA link.*
-- [ ] **T-202** ⌨️ Same file — **arXiv** connector via the Atom API. *Done when: it returns `Paper`s with `arxiv_id` and a PDF URL.*
-- [ ] **T-203** ⌨️ DOI-based dedup + `data/metadata_db.py` (SQLite). *Done when: the same paper arriving from both sources collapses to one row.*
-- [ ] **T-204** ⌨️ `tools/pdf_loader.py` — OA PDF fetch + PyMuPDF text extraction with a section-header regex. Set `text_availability` = `full` | `abstract_only`. *Done when: 10 OA PDFs parse and one paywalled paper degrades to `abstract_only` without crashing.*
-- [ ] **T-205** ⌨️ `data/chunker.py` — section-aware first, then recursive character split at 1200/200. **Must preserve `start_char`/`end_char`** — grounding depends on it. Never merge across papers. *Done when: every chunk's offsets slice the original text back out exactly.*
-- [ ] **T-206** ⌨️ `data/embeddings.py` — `BAAI/bge-small-en-v1.5` on CPU, batched. *Done when: 3,000 chunks embed in under 5 minutes on this machine and the wall time lands in the trace.*
-- [ ] **T-207** ⌨️ `data/vectorstore.py` — Chroma persistent collection. *Done when: a dense k=30 query returns chunks with metadata intact.*
-- [ ] **T-208** ⌨️ `data/bm25_index.py` — `rank_bm25` over the same chunks. *Done when: sparse k=30 returns results.*
-- [ ] **T-209** ⌨️ `tools/hybrid_retriever.py` — RRF fusion, `score = Σ 1/(60 + rank_i)`. *Done when: the fused ranking differs from both inputs and is stable across runs.*
-- [ ] **T-210** ⌨️ `tools/reranker.py` — `cross-encoder/ms-marco-MiniLM-L-6-v2` on CPU → top-12. **Measure and log per-query latency.** *Done when: top-12 is sensible on three hand-checked queries and the latency is in the trace.* ⚠️ Ammann et al. warn their gains "rely on a strong, domain-aligned cross-encoder reranker" — yours is a 22M MiniLM, so **measure reranking's contribution separately** (`SESSION_CONTEXT.md §5.6`).
-- [ ] **T-211** ⌨️ Venue tiering in `metadata_db`, from OpenAlex venue metadata. *Done when: papers carry a tier label usable as a ranking feature.*
-- [ ] **T-212** 🧠 ★ **Retrieval eval against your own 25-paper bibliography** (`PROJECT_PLAN.md §5.2`). *Done when: Recall@20 is measured. **Gate: ≥ 0.80.** If it misses, spend T-213 on it — do not build agents on bad retrieval.* Use **F2, not F1**, for screening: recall matters more than precision when discarding papers (`SESSION_CONTEXT.md §5.10`).
-- [ ] **T-213** 🧠 **Buffer — retrieval quality fixes only.** First escalation if recall is short: `bge-small` → `bge-base` (~109M). Bi-encoders embed once and cache, so size costs ingestion time, not per-query time. *Do not spend this buffer on features.*
+- [x] **T-201** ⌨️ 📋 `tools/search_sources.py` — **OpenAlex** connector. ⚠️ **Verified 2026-08-25: OpenAlex has no `abstract` field** — only `abstract_inverted_index`, which must be de-inverted — and `doi` arrives as a full URL needing normalisation. Both are pinned in `handoffs/phase2.md`. Use the `title_and_abstract.search` filter with a hard date window; plain `search=` sorted by citations returns irrelevant high-citation medical papers (`SESSION_CONTEXT.md §9`). Return `Paper` objects. *Done when: a query returns ≥20 deduped `Paper`s carrying DOI, venue, year and OA link.*
+- [x] **T-202** ⌨️ 📋 Same file — **arXiv** connector via the Atom API. ⚠️ **Verified 2026-08-25: `http://export.arxiv.org` returns HTTP 301 with an empty body — HTTPS plus `follow_redirects=True` is mandatory.** Also: arXiv entries usually carry **no** `<arxiv:doi>`, so the dedup key is the synthetic `10.48550/arxiv.<id>` with the version suffix stripped. *Done when: it returns `Paper`s with `arxiv_id` and a PDF URL.*
+- [x] **T-203** ⌨️ 📋 DOI-based dedup + `data/metadata_db.py` (SQLite). *Done when: the same paper arriving from both sources collapses to one row.*
+- [x] **T-204** ⌨️ 📋 `tools/pdf_loader.py` — OA PDF fetch + PyMuPDF text extraction with a section-header regex. Set `text_availability` = `full` | `abstract_only`. *Done when: 10 OA PDFs parse and one paywalled paper degrades to `abstract_only` without crashing.*
+- [x] **T-205** ⌨️ 📋 `data/chunker.py` — section-aware first, then recursive character split at 1200/200. **Must preserve `start_char`/`end_char`** — grounding depends on it. Never merge across papers. *Done when: every chunk's offsets slice the original text back out exactly.* ✅ **Independently re-verified by Claude Code 2026-08-25** on 17.6 KB of sectioned text: `text[start:end] == c.text` for all 20 chunks, **100% character coverage**, all 5 sections preserved, sizes 223–1200. *This was the file that could have silently poisoned every evidence span in Phase 5; it is correct.*
+- [x] **T-206** ⌨️ 📋 `data/embeddings.py` — `BAAI/bge-small-en-v1.5` on CPU, batched. *Done when: 3,000 chunks embed in under 5 minutes on this machine and the wall time lands in the trace.* ✅ **Verified on REALISTIC 1,200-char chunks: 13.7–23.5 chunks/s → 3,000 chunks in 2.1–3.6 min** (the range is CPU contention from concurrent jobs). The plan's <5 min assertion holds. ⚠️ **Cursor's suite reported "3,000 chunks in 8.5s", but it embedded 65-character strings — ~26× optimistic. Do not quote that number.** The acceptance criterion has been tightened to name the chunk size. Model loads in 6.0s, dim=384. ⚠️ **BGE needs an asymmetric prefix**: queries get `"Represent this sentence for searching relevant passages: "`, documents get none. Reversing this silently degrades retrieval — pinned in `handoffs/phase2.md`.
+- [x] **T-207** ⌨️ 📋 `data/vectorstore.py` — Chroma persistent collection. *Done when: a dense k=30 query returns chunks with metadata intact.*
+- [x] **T-208** ⌨️ 📋 `data/bm25_index.py` — `rank_bm25` over the same chunks. *Done when: sparse k=30 returns results.*
+- [x] **T-209** ⌨️ 📋 `tools/hybrid_retriever.py` — RRF fusion, `score = Σ 1/(60 + rank_i)`. *Done when: the fused ranking differs from both inputs and is stable across runs.*
+- [x] **T-210** ⌨️ 📋 `tools/reranker.py` — `cross-encoder/ms-marco-MiniLM-L-6-v2` on CPU → top-12. **Measure and log per-query latency.** *Done when: top-12 is sensible on three hand-checked queries and the latency is in the trace.* ✅ **Verified on REALISTIC 1,200-char chunks: 1,335–1,425 ms to rerank 60 candidates.** ⚠️ **Cursor's suite reported 173–194 ms, but it reranked 80-character chunks — ~7× optimistic. Do not quote that number.** (model load 36s on first download, cached after). *Run budget: ~8 sub-questions × up to 3 critic iterations ≈ 24 rerank calls ≈ 32s per run — negligible beside the ~4 min extraction stage, so reranking is not a latency concern.* **This number is the stock baseline T-334 compares the Phase 3C fine-tune against.** ⚠️ Ammann et al. warn their gains "rely on a strong, domain-aligned cross-encoder reranker" — yours is a 22M MiniLM, so **measure reranking's contribution separately** (`SESSION_CONTEXT.md §5.6`).
+- [x] **T-211** ⌨️ 📋 Venue tiering in `metadata_db`, from OpenAlex venue metadata. *Done when: papers carry a tier label usable as a ranking feature.*
+- [ ] **T-214** ⌨️ 📋 ⚠️ **STILL OUTSTANDING after Phase 2** — appended to `handoffs/phase2.md` at 15:58 on 2026-08-25, after Cursor had already read the file; not implemented. Re-issue it. **Semantic Scholar connector** (`tools/search_sources.py`). *Reinstated 2026-08-25 — see §0.2. It is claimed on 8 slides of the Review-2 deck, and the rate-limiting that got it cut is survivable now that latency is free.* `GET https://api.semanticscholar.org/graph/v1/paper/search`, `fields=paperId,externalIds,title,abstract,year,venue,authors,citationCount,isOpenAccess,openAccessPdf`. **Must be best-effort and degradable: on sustained 429s, log and return `[]` so the run continues on OpenAlex + arXiv.** Never a hard dependency. *Advantages over OpenAlex worth exploiting: abstracts come back directly (no de-inversion) and `externalIds` carries DOI + ArXiv + DBLP + PubMed ids, which strengthens T-203 dedup.* *Done when: a query returns ≥5 `Paper`s with populated abstracts; and a forced 429 storm returns `[]` without raising.*
+- [ ] **T-215** 👤 **Apply for a free Semantic Scholar API key** (https://www.semanticscholar.org/product/api — they grant academic keys). *Measured keyless 2026-08-25: only 1 of 4 rapid requests succeeded, and 1 of 3 backoff-retried queries failed entirely. A key removes the problem outright and makes T-214 reliable rather than opportunistic.* Put it in `.env` as `S2_API_KEY`; T-214 must work with or without it.
+- [x] **T-212a** 🧠 ★ **Build the machine-readable gold set.** *Gap found 2026-08-25: T-212's gate depends on "your own 25-paper bibliography", but that bibliography lived only as prose and markdown tables across three documents — no task created a consumable version of it, so the gate had nothing to run against.* **Done:** `src/researchgpt/eval/build_gold_set.py` extracts every DOI from `LITERATURE_REVIEW.md`, `PAPER_ANALYSIS.md` and `PAPER_DEEP_DIVE.md`, resolves each against OpenAlex for canonical title/year/venue/OA status, and writes `eval/gold_sets/own_bibliography.json`. **35 DOIs extracted, 35 resolved, 0 unresolved.** Unresolved entries are recorded rather than dropped — a gold set that silently loses entries produces a recall number wrong in the flattering direction. *Re-runnable, so it feeds T-810's `make reproduce`.*
+- [ ] **T-212** 🧠 ★ **Retrieval eval against your own 25-paper bibliography** (`PROJECT_PLAN.md §5.2`). ⚠️ **GATE CORRECTED 2026-08-25 — the original was unachievable.** `PROJECT_PLAN.md §9.2` and this task both said *"Recall@20 ≥ 0.80"*, but the gold set has **35 papers**, so retrieving 20 caps recall at **20/35 = 0.57**. The gate could never pass as written, and chasing it would have burned the T-213 buffer on a phantom failure. **Corrected gate: `Recall@60 ≥ 0.80`** — 60 is `review.max_papers`, i.e. the corpus the Extractor actually sees, which is what the downstream stages depend on. *Done when: recall of the retrieved corpus (union across search queries, capped at max_papers=60) is measured against `eval/gold_sets/own_bibliography.json`. Report Recall@20 per query as a secondary diagnostic, clearly labelled with its 0.57 ceiling. If Recall@60 misses 0.80, spend T-213 on it — do not build agents on bad retrieval.*
+
+  🔴 **RUN 2026-08-25 — GATE FAILS, but the cause is NOT the retrieval stack.** Recall@60 = 0.029; 13/35 gold papers found across a 447-paper union. **Root cause diagnosed: query shape, not connector quality.**
+  1. **OpenAlex ANDs every term** in `title_and_abstract.search`. Measured: `scientific claim verification evidence entailment SciFact` → **0 results**; `scientific claim verification` → **4,174**. My first eval harness used 5–8 term queries and returned near-nothing — producing a spurious Recall = 0.000 that had nothing to do with Cursor's code.
+  2. **Specific queries massively outperform topical ones.** Measured: **5 targeted queries recovered 7 gold papers that 15 generic topical queries missed entirely.** This matches `SESSION_CONTEXT.md §9`, where the original review needed *"6 thematic clusters and 28 named-system queries"* — mostly *specific* queries.
+  3. **The connectors are verified sound** — every probed gold paper is retrievable from OpenAlex given an appropriately-shaped query.
+
+  ⚠️ **Sequencing consequence: T-212 cannot be meaningfully gated until the Planner (T-402) exists.** Recall is dominated by query generation, and that is the Planner's job. The 15 hand-written queries in `eval/retrieval_eval.py` are a stand-in. **Re-run this gate right after T-402 and treat that as the real Phase 2 gate.**
+
+  ⚠️ **Second flaw, in my own harness, recorded so it is not trusted:** `Recall@60` takes the first 60 DOIs in *insertion order across queries* — arbitrary, because the eval has no ranking stage. **Until it is wired through T-209/T-210, quote recall over the full union (0.371), not Recall@60.** Use **F2, not F1**, for screening: recall matters more than precision when discarding papers (`SESSION_CONTEXT.md §5.10`).
+- [ ] **T-212b** 🧠 **Secondary retrieval eval against SciReviewGen gold sets** (T-324), once Phase 3B lands. Reports Recall@20 at scale (hundreds of chapters) rather than against one 25-paper bibliography. *Treat your own bibliography as the primary gate and this as the breadth check — SciReviewGen is frozen at S2ORC 2020-07-05, so live OpenAlex retrieval will surface post-2020 papers that are correct but score as false positives. **Report that as a measurement artefact, not as a retrieval failure.***
+- [ ] **T-213** 🧠 ★ **Buffer — now has a defined job, not a contingency.** Cheapest first: **(1)** re-run T-212 after T-402 with real Planner queries — highest leverage, costs nothing; **(2)** wire the eval through T-209/T-210 so `Recall@60` ranks instead of using insertion order; **(3)** raise `max_per_source` above 25 and re-measure; **(4)** only then consider `bge-small` → `bge-base`. *Do not escalate the embedding model before fixing the queries — the evidence says query shape dominates, and a model swap would mask that.* **Buffer — retrieval quality fixes only.** First escalation if recall is short: `bge-small` → `bge-base` (~109M). **Cheap under §0.2** — measured 2.13 min for 3,000 chunks with `bge-small`, so `bge-base` costs roughly 6 min. Take it if T-212 lands anywhere near the 0.80 gate rather than exactly at it. Bi-encoders embed once and cache, so size costs ingestion time, not per-query time. *Do not spend this buffer on features.*
 
 ---
 
@@ -153,13 +262,49 @@ Bad retrieval silently poisons grounding, which is the graded criterion. This ph
 
 This is the graded component *and* the required training component. **Start it the moment T-001/T-002 close — it runs unattended while Phase 2 proceeds.**
 
-- [ ] **T-301** ⌨️ Download and inspect `allenai/scifact`; build `(claim, evidence_sentence) → SUPPORT | CONTRADICT | NOT_ENOUGH_INFO` pairs. *Done when: class counts are printed and split sizes recorded.*
-- [ ] **T-302** 🧠 Write the Kaggle training notebook: `microsoft/deberta-v3-small` (~44M) **warm-started from an existing NLI checkpoint, not from scratch**, three-way head, 2–3 epochs, cross-entropy. *Claude Code writes this — the warm-start detail is easy to get wrong and expensive to redo.*
+- [ ] **T-301** ⌨️ Build `(claim, evidence_sentence) → SUPPORT | CONTRADICT | NEI` pairs. ⚠️ **USE `allenai/scifact_entailment`, NOT `allenai/scifact`** — pre-checked 2026-08-25: plain `allenai/scifact` returns **HTTP 501** from the datasets-server, the signature of a **script-based dataset**, which modern `datasets` releases no longer load. `scifact_entailment` is ungated, loads normally, and is *already in entailment form*. **Verified schema:** `claim_id`, `claim` (str), `abstract_id`, `title`, `abstract` (**list of sentences**), `verdict` ∈ `{SUPPORT, CONTRADICT, NEI}`, `evidence` (**list of sentence indices into `abstract`**). Splits: **train 919 / validation 340**. **Pairing rule:** for `SUPPORT`/`CONTRADICT` pair the claim with each sentence named in `evidence`; for `NEI` the evidence list is empty, so sample abstract sentences as the NEI class. *`verdict` is `NEI`, not `NOT_ENOUGH_INFO` — map it explicitly.* ⚠️ **There is no test split, only train and validation.** Hold out from `train` for tuning and keep `validation` untouched as the reported held-out set (T-305). *Done when: class counts and pair counts are printed per split.*
+- [ ] **T-302** 🧠 Write the Kaggle training notebook. ✅ **Warm-start checkpoint verified available 2026-08-25: `cross-encoder/nli-deberta-v3-small`** (ungated, ships safetensors, 475k downloads). Use it rather than bare `microsoft/deberta-v3-small`, which has **no safetensors** and would need a `.bin` load. `cross-encoder/nli-deberta-v3-base` is the verified escalation target for T-307. Three-way head, 2–3 epochs, cross-entropy, fixed seed. *Claude Code writes this — the warm-start detail is easy to get wrong and expensive to redo.*
 - [ ] **T-303** 👤 Run it on Kaggle GPU. *Done when: held-out P/R/F1 per class is printed and the checkpoint downloaded. Expect under an hour.*
 - [ ] **T-304** ⌨️ Export to **ONNX + int8 dynamic quantization** for CPU inference. *Done when: the ONNX model reproduces PyTorch logits within tolerance on 20 held-out examples.*
 - [ ] **T-305** 🧠 ★ **Stock-vs-fine-tuned table** on the same held-out set. *This is the headline result that justifies the training component, and a graded deliverable in its own right.*
-- [ ] **T-306** ⌨️ Measure **per-claim CPU latency** for the int8 model on this machine. *Done when: claims/sec is recorded. A run makes ~1.5–2k forward passes, so even 20/sec is a couple of minutes.*
-- [ ] **T-307** 🧠 **Escalation gate.** If held-out F1 is poor, retrain `deberta-v3-base` (~184M) and quantize harder. **Trade latency, not accuracy** — the verifier is the graded thing.
+- [ ] **T-306** ⌨️ ⚠️ **Run `pip install -e ".[verify]"` before starting.** Pre-checked 2026-08-25: **`sentencepiece` and `protobuf` are MISSING on this machine**, and DeBERTa-v3 uses a SentencePiece tokenizer — without them it fails with a misleading conversion error. **Kaggle ships them, so T-303 is unaffected; only the local steps (T-304/T-306) break.** Both are now in the `verify` extra along with `optimum[onnxruntime]` for the export. Measure **per-claim CPU latency** for the int8 model. *Done when: claims/sec is recorded. A run makes ~1.5–2k forward passes, so even 20/sec is a couple of minutes.*
+- [ ] **T-307** 🧠 **Escalation gate.** If held-out F1 is poor, retrain `deberta-v3-base` (~184M) and quantize harder. **Trade latency, not accuracy** — the verifier is the graded thing. **§0.2 makes this trade nearly free: lean toward escalating rather than defending `small`.** The only real cost is Kaggle time, and both models train in well under an hour.
+
+---
+
+## 5.1 Phase 3B — SciReviewGen integration ★ (parallel data track, Days 2–4: Aug 27–29)
+
+**Reinstated 2026-08-25 by explicit decision, +2 days authorised.** This is a *data* track: it needs no pipeline, no LLM and no API budget, so it runs alongside Phase 2 and the unattended Kaggle training without competing for the critical path. Only T-325 needs the trained verifier.
+
+**Why it earns its place.** `PROJECT_PLAN.md §9.6` names two credibility traps, and the first is fatal if unanswered: *"The groundedness metric is circular. The system enforces groundedness, then measures it. Groundedness = 0.98 proves only that the filter ran."* The prescribed fix is two independent measurements — the 50-claim human spot-check (T-705) **and** the SciReviewGen citing-sentence cross-check. Without this track, T-705's 50 hand-checked claims are the *entire* non-circular evidence base. With it, you add thousands of human-authored claim→evidence pairs that neither you nor your system produced. **That is the difference between "we checked 50 of our own claims" and "we validated against human-written survey text at scale."**
+
+**What the mirror actually contains** (inspected 2026-08-25, `kejian/SciReviewGen`): 84,705 train / 4,410 validation / 4,457 test rows, two columns. `reference` = survey title `<s>` chapter `<s>` cited-paper abstract `<s> BIBnnn </s>`, repeated per cited paper. `target` = the human-written survey chapter, with inline `BIBnnn` citation markers. Both intended uses are recoverable from these two columns by parsing — no S2ORC access needed.
+
+- [ ] **T-320** ⌨️ Download `kejian/SciReviewGen` via the HF token (T-003) into `data/scireviewgen/`. Record split row counts and mirror provenance. *Done when: all five parquet shards load and the row counts match 84,705 / 4,410 / 4,457.*
+- [ ] **T-321** ⌨️ ⛔ `eval/scireviewgen_parser.py` — split `reference` into `(survey_title, chapter_id, [{bib_id, abstract}])` on the `<s>` / `</s>` delimiters. **⚠️ Verify on FULL rows that every `BIBnnn` marker appearing in `target` resolves to a bib block in `reference`.** *I checked this on the datasets-server preview and the API truncates long cells, so the alignment could not be confirmed — it is the one unproven assumption in this track and everything downstream rests on it.* *Done when: bib-resolution rate is measured over ≥500 full rows and printed. **Gate: ≥ 0.95.*** If it is lower, the delimiter parse is wrong — fix the parser, do not silently drop the unresolved markers.
+- [ ] **T-322** ⌨️ ★ `eval/scireviewgen_pairs.py` — emit human-authored claim→evidence pairs to JSONL: for each sentence in `target` containing `BIBnnn`, pair it with that bib's abstract from `reference`. Schema `{claim, evidence, bib_id, survey_title, chapter_id}`. *Done when: a 500-chapter sample yields a JSONL whose pair count and per-chapter distribution are reported.*
+- [ ] **T-323** 🧠 **Sample and QA.** Draw ~200 chapters, hand-inspect 20 pairs. Discard chapters whose bib mapping is ambiguous. *A claim sentence citing three papers is not cleanly attributable to one — decide the rule (drop multi-cite sentences, or pair against the union) and write it down, because it changes what the cross-check measures.*
+- [ ] **T-324** 🧠 **Retrieval gold sets** — chapter topic → query; cited abstracts → gold set. **SciReviewGen carries no DOIs**, so mapping onto live OpenAlex retrieval needs fuzzy title matching. *Done when: the title-match rate onto OpenAlex is measured and reported. This number is itself a limitation to state in the report, not a detail to bury.* Feeds T-212b.
+- [ ] **T-325** 🧠 ★★ **THE VERIFIER CROSS-CHECK — the reason this track exists.** Run the fine-tuned verifier (T-304) over the T-322 pairs. These are claims humans wrote and citations humans chose, so agreement is genuinely independent of your pipeline. *Done when: agreement rate is reported alongside the SciFact held-out numbers (T-305) and the 50-claim spot-check (T-705).* **Expect it to look worse than SciFact** — SciFact is expert-curated single-sentence evidence, this is real survey prose. Sarol et al. measured 0.59 micro-F1 on real citations against much higher curated-benchmark scores. **A drop here is the honest finding, not a failure** (`SESSION_CONTEXT.md §5.2`).
+- [ ] **T-326** 🧠 **Licence and citation compliance.** The original dataset is **CC BY-NC 4.0** (`PROJECT_PLAN.md §5.3`) — non-commercial only, which an academic project satisfies. **The mirrors' licence metadata is unreliable**: `pat-jj/SciReviewGen` declares MIT, which a mirror of S2ORC-derived data cannot grant; the other two declare nothing. **Cite Kasanishi et al., Findings of ACL 2023 (arXiv:2305.15186) and state CC BY-NC in the report regardless of what the mirror card says.** *Done when: the citation is in `refs.bib` and the licence line is in the report's data section.*
+
+---
+
+## 5.2 Phase 3C — Reranker fine-tune ★ (second trained model, Days 4–5: Aug 29–30)
+
+**Added 2026-08-25 by decision: a second fine-tuned model alongside the verifier.** Full specification in **`TRAINING_SPEC.md` §2** — read that before starting; the tasks below are the schedule, not the design.
+
+**This was the original training proposal.** `PROJECT_PLAN.md §2.2` records the reranker fine-tune as **Cut**, and the stated reason (`SESSION_CONTEXT.md §4.1`) was S2ORC access latency — *"the single biggest schedule risk."* **Phase 3B removed that blocker.** The cut was about access, never about merit.
+
+**Why the reranker and not the Writer or the Extractor:** zero new inference cost (it already runs on CPU at T-210 — this is a weight swap, not an architectural change); it is **off the M1 critical path**, so a failed training run breaks nothing; it answers Ammann et al.'s warning that gains *"rely on a strong, domain-aligned cross-encoder reranker"* when yours is a 22M web-search MiniLM (`SESSION_CONTEXT.md §5.6`); and retrieval recall is a hard ceiling on verification, so it lifts the graded metric indirectly. `TRAINING_SPEC.md §4` records why the Writer and Extractor were rejected.
+
+- [ ] **T-330** ⌨️ Build training triples from the SciReviewGen `train` split, reusing the T-321 parser. Query = `survey_title + chapter_heading`; positives = the `BIBnnn` abstracts. Sample 3,000 chapters, cap 8 positives each. *Done when: pair counts are reported and **the split is deduplicated by `survey_title`, not by row**.* ⚠️ **A row-level split puts chapters of the same survey on both sides and silently inflates the tuned score.**
+- [ ] **T-331** ⌨️ ★ **BM25 hard-negative mining** — for each query take BM25 top-50 from the pooled split corpus, drop true positives, sample at 1 positive : 4 negatives. *Done when: a spot-check of 20 negatives confirms they are topically plausible, not random.* ⚠️ **Hard negatives are the whole point. Random negatives make the task trivial — the model learns topic matching, which BM25 already does, and stock-vs-tuned will show no gain. If T-334 shows ~0 improvement, suspect this task first.**
+- [ ] **T-332** 🧠 Kaggle notebook: `cross-encoder/ms-marco-MiniLM-L-6-v2`, binary cross-entropy, max_len 512, lr 2e-5, batch 32, 2 epochs, fixed seed. *Expect 20–30 minutes on a T4.* **Train the verifier (T-303) first — it is the graded component and takes priority on the quota.**
+- [ ] **T-333** ⌨️ ONNX export + int8 dynamic quantization, matching the verifier's deployment path. *Done when: the quantized model reproduces float logits within tolerance and per-query CPU latency is measured.*
+- [ ] **T-334** 🧠 ★ **Stock vs fine-tuned**, on **two** sets: the SciReviewGen `test` split (in-domain) and **your own 25-paper bibliography** (out-of-domain, CS). Report Recall@20, nDCG@10, Precision@12 and rerank latency. *Reuses T-212's harness.* **Lead with the out-of-domain number** — SciReviewGen is frozen mid-2020 and skews biomedical, so a large in-domain gain with no out-of-domain gain means you fitted the benchmark, not the task.
+- [ ] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.*
+- [ ] **T-336** 🧠 **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
 
 ---
 
@@ -168,7 +313,7 @@ This is the graded component *and* the required training component. **Start it t
 - [ ] **T-401** 🧠 `agents/base.py` — the agent ABC, the partial-state-return contract (`SPEC §14.3`), and the trace hook.
 - [ ] **T-402** ⌨️ `agents/planner.py` — research question → 4–8 sub-questions + search plan, on the free-tier LLM. (`SPEC §7.1`) *Done when: a real question yields a validated plan object.*
 - [ ] **T-403** ⌨️ `agents/retriever.py` — the node wrapper around Phase 2. No LLM call. (`SPEC §7.2`)
-- [ ] **T-404** ⌨️ ★ `agents/extractor.py` — per paper: `methodology / advantages / disadvantages / critique`, plus `datasets`, `metrics`, `evidence_spans`. **Strict Pydantic + retry-with-repair, max 2, then `None` + `extraction_note`. Never abort a run on a parse failure.** (`SPEC §7.3`, `§14.2`) *Done when: 10 papers all produce a valid `Insight`, including at least one that needed a repair.*
+- [ ] **T-404** ⌨️ ★ `agents/extractor.py` — per paper: `methodology / advantages / disadvantages / critique`, plus `datasets`, `metrics`, `evidence_spans`. **Strict Pydantic + retry-with-repair, max 2, then `None` + `extraction_note`. Never abort a run on a parse failure.** **Strip markdown fences before parsing** — §0.1 measured that Gemma returns fenced JSON despite `responseSchema`, so fenced output is the normal case, not the error case. (`SPEC §7.3`, `§14.2`) *Done when: 10 papers all produce a valid `Insight`, including at least one that needed a repair.*
 - [ ] **T-405** 🧠 `graph/build.py` — wire **linearly** first: PLANNER → RETRIEVER → INGEST → RANK → EXTRACTOR → WRITER. No critic loop yet. *Done when: the graph runs start to finish on a real question.*
 - [ ] **T-406** ⌨️ `agents/writer.py` — thematic synthesis with IEEE `[n]` citations. **Evidence-first: the Writer may cite only what it was given.** ALCE measured post-hoc citation attachment costing 47% of citation recall (`SESSION_CONTEXT.md §5.10`). (`SPEC §7.6`)
 - [ ] **T-407** ⌨️ `output/markdown_writer.py`, `output/bibtex_writer.py`, `output/insight_table.py` (CSV). *Done when: `outputs/runs/<run_id>/` contains `review.md`, `refs.bib`, `insights.csv`, `trace.jsonl`, `config.yaml`.*
@@ -193,7 +338,7 @@ The centrepiece. Objective 2 lives here.
 
 ---
 
-## 8. Phase 6 — API and the Vue app (Days 8–9: Sep 2–3)
+## 8. Phase 6 — API and the Vue app (Days 8–10: Sep 2–4)
 
 Grading is weighted to the system visibly working. Build the panels in order; **1–3 alone are a strong demo.**
 
@@ -205,34 +350,58 @@ Grading is weighted to the system visibly working. Build the panels in order; **
 - [ ] **T-606** ⌨️ **Panel 2** — live agent progress: the six agents lighting up as SSE events arrive, showing iteration count and Critic decisions. *Makes the "agentic" claim visible in the first thirty seconds.*
 - [ ] **T-607** ⌨️ ★ **Panel 3 — evidence inspection.** Rendered review; **click any sentence → see its supporting evidence span and source paper.** *The money shot: direct visual proof of the anti-hallucination claim. If one panel survives, it is this one.*
 - [ ] **T-608** ⌨️ **Panel 4 — dropped-claims panel** plus artefact downloads. *"14 claims were removed as unsupported."* Showing what the system **refused** to say is more persuasive than showing what it said.
-- [ ] **T-609** ⌨️ **Human-in-the-loop control** — confirm/override on dropped claims, written back to the trace. *Only if T-007 keeps HITL in Objective 2. ~half a day on top of Panel 4.*
+- [ ] **T-609** ⌨️ ★ **Human-in-the-loop control** — confirm/override on dropped claims, written back to the trace via `human_overrides` (already in `graph/state.py`). **REQUIRED — T-007 decided 2026-08-25 that HITL is mandatory.** ~half a day on top of Panel 4. *This is the concrete implementation of Objective 2's "and Human-in-the-loop" clause; without it that objective is unmet and the claim on slide 5 is false.*
 - [ ] **T-610** 🧠 **Pre-bake the showcase run.** A 60-paper run is 20–40 minutes on CPU against a rate-limited API — far too slow to run live in front of an examiner. Ship a completed run that replays instantly via `GET /api/runs`, and demo *live* execution only at `max_papers=10`. **Decide this now, not the night before.**
 
 ---
 
-## 9. Phase 7 — Evaluation (Days 9–10: Sep 3–4)
+## 8.1 Phase 6B — Postgres run registry (Sep 3–4, after T-607)
+
+**Added 2026-08-25 by decision.** Full schema, DDL, SQLAlchemy models and failure semantics in **`DB_SCHEMA.md`** — read that first; the tasks below are the schedule, not the design.
+
+**Stack: PostgreSQL + plain SQLAlchemy 2.0, in-process inside the existing FastAPI backend.** No Flask, no Flask-SQLAlchemy — one web framework, one ORM.
+
+**It also fixes a real inconsistency.** `SESSION_CONTEXT.md §7.2` flags Review-1 slides 3, 8 and 9 as claiming **PostgreSQL** while every other document says Chroma + SQLite. That was logged as a slide error to correct; building this makes the claim true instead.
+
+> ⛔ **Sequenced after T-607 (evidence-inspection panel).** That panel is the graded money shot. The registry must never displace it.
+>
+> ★ **The load-bearing rule: the registry is best-effort and never blocks a run.** The pipeline writes artefacts to `outputs/runs/<run_id>/` and completes even if Postgres is down, unreachable, or never installed. Same discipline as `TraceLogger`, which never raises into its caller. *A registry bug must not be able to kill a 30-minute run four days before submission.*
+
+- [ ] **T-620** 👤 Install PostgreSQL locally, create the `researchgpt` role and database, put `DATABASE_URL` in `.env` and an empty key in `.env.example`. Add a `db = ["sqlalchemy>=2.0", "psycopg[binary]>=3.1"]` extra to `pyproject.toml` so the project still installs without Postgres. *Done when: `psql` connects and `CREATE EXTENSION pgcrypto` succeeds.*
+- [ ] **T-621** 🧠 `src/researchgpt/db/models.py` — the `Run` model per `DB_SCHEMA.md §7`. **Claude Code writes this by hand**, same reasoning as T-102: it is a schema, and `MutableList.as_mutable(JSONB)` is a correctness requirement rather than a style choice. ⚠️ **Without the `Mutable*` wrappers, `run.artefacts.append(...)` followed by `commit()` silently emits no UPDATE** — the row is never marked dirty, the artefact vanishes, and there is no error to debug.
+- [ ] **T-622** ⌨️ `src/researchgpt/db/session.py` — engine with `pool_pre_ping=True`, sessionmaker, and a `create_all` bootstrap. *No Alembic: one table, no production data, and every run is reconstructible from `outputs/runs/`.* *Done when: importing the module with `DATABASE_URL` unset does not raise — it disables the registry.*
+- [ ] **T-623** ⌨️ ★ `src/researchgpt/db/registry.py` — `register_run`, `mark_running`, `attach_artefact`, `complete_run`, `fail_run`. **Every one goes through the single `_safe()` wrapper from `DB_SCHEMA.md §9`** that catches broadly, logs a warning and returns `None`. *Done when: every public function returns cleanly with Postgres stopped.*
+- [ ] **T-624** ⌨️ Wire best-effort hooks into `cli.py` and the FastAPI run path: register at `run_start`, attach each artefact as it is written (with `bytes` and `sha256`), complete with `metrics` read from `trace.jsonl`.
+- [ ] **T-625** ⌨️ `GET /api/runs` reads the registry, **falling back to a filesystem scan of `outputs/runs/` when the registry is unavailable.** *The Vue run-list and the T-610 pre-baked demo both depend on this endpoint, so it must work with no database at all.*
+- [ ] **T-626** 🧠 ★ **Verification: stop the Postgres service mid-run and confirm the run completes with every artefact on disk.** *If this test does not pass, the non-blocking rule is not implemented, whatever the code looks like.* Also confirm `GET /api/runs` still returns rows via the filesystem fallback.
+
+---
+
+## 9. Phase 7 — Evaluation (Days 10–12: Sep 4–6)
 
 - [ ] **T-701** ⌨️ `eval/metrics.py` — citation accuracy (every `[n]` resolves to a real DOI in the metadata DB), groundedness, coverage, **claims dropped per run**, latency, request count. All computed from `trace.jsonl`.
 - [ ] **T-702** 🧠 ★ **Ablation 2 (− Verifier).** **Run this first, before any other ablation.** It quantifies hallucination with and without the filter — precisely the graded property. `max_papers=25`, launched overnight.
 - [ ] **T-703** 🧠 Ablation 1 (full system) at `max_papers=25` for comparison.
 - [ ] **T-704** 🧠 ★ **Hallucination stress test.** Deliberately query a topic the corpus does not cover and show the system **refuses rather than invents**: claims dropped, Critic reports the coverage gap, output carries an explicit Limitations section instead of fabricated content. Two hours of work, and the most convincing possible answer to *"how do I know it isn't making things up?"* Wire the result into Panel 4 so it is demoable, not merely reportable.
 - [ ] **T-705** 👤 ★ **50-claim verifier spot-check** on real output. *This is the non-circular evidence. Groundedness measured by the system that enforces groundedness proves only that the filter ran (`PROJECT_PLAN.md §9.6`).*
+- [ ] **T-705b** 🧠 ★ **Report the three verifier measurements side by side**: SciFact held-out (T-305, curated benchmark), SciReviewGen cross-check (T-325, human-authored at scale), and the 50-claim spot-check (T-705, your own domain). *Three independent lenses on one component. This table is the single strongest page in the evaluation, and it closes `PROJECT_PLAN.md §9.6`'s circularity trap outright — no reviewer can say the groundedness number only proves the filter ran.*
+- [ ] **T-706b** 🧠 **Ablation 5 — stock vs fine-tuned reranker** (T-336), if Phase 3C passed its adoption gate. Isolates the reranker's contribution to end-to-end grounding.
 - [ ] **T-706** 🧠 Ablations 3 (− Critic loop) and 4 (vanilla RAG ≈ base-paper configuration) — **only if time remains.** Use Ammann et al.'s configuration as a stronger ablation-4 baseline than vanilla RAG (`SESSION_CONTEXT.md §5.6`).
 - [ ] **T-707** 🧠 **Revise the target numbers downward before writing any results.** `PROJECT_PLAN.md §9` targets groundedness ≥ 0.9. Nothing peer-reviewed reaches that on realistic scientific verification — Sarol et al. 0.59 micro-F1, CliVER 0.797 against clinicians, SurveyGen 35.84% citation accuracy, SciReviewGen ~30% of chapters at human quality. **If the verifier reports 0.9+ against real citations, suspect the measurement, not a breakthrough** (`SESSION_CONTEXT.md §5.2`).
 
 ---
 
-## 10. Phase 8 — Documents, deck, submission (Days 10–11: Sep 4–5)
+## 10. Phase 8 — Documents, deck, submission (Days 12–13: Sep 6–7)
 
-- [ ] **T-801** 🧠 ⛔ **Correct `RESEARCHGPT_SPEC.md`** per `SESSION_CONTEXT.md §7.1`. Specifically §1.2 (the base paper is mis-described — its actual title is *"A synergistic multi-stage RAG architecture for boosting context relevance in data science literature"*) and §1.3 (the *"fixed single-pass pipeline"* claim is **factually wrong**; Aytar et al. is explicitly multi-stage). **That row is the foundation of the "we are more agentic" argument, and an examiner who reads the base paper will find it.** The honest contrast is *static multi-stage vs. dynamic agentic control with verification.*
-- [ ] **T-802** 🧠 Update `SPEC §3` (architecture diagram → the draw.io file), `§4` (relabel it "Package Dependency Map" and add the real MCD), `§7.5` (add HITL to the Critic), `§9` (revised targets from T-707).
+- [ ] **T-801** 🧠 ★ **Rewrite `RESEARCHGPT_SPEC.md` §1.2 and §1.3 around SurveyGen** (T-005 approved the switch 2026-08-25). §1.2 currently describes Aytar et al. and mis-states even that — its real title is *"A synergistic multi-stage RAG architecture for boosting context relevance in data science literature."* §1.3's *"fixed single-pass pipeline"* row is **factually wrong** about Aytar and must go regardless. **New framing:** SurveyGen is the same task (survey generation) with quality-aware retrieval that maps onto your venue tiering, and its authors state your problem statement for you. Aytar et al. becomes a *related* work, cited for the multi-stage retrieval design, not the base paper.
+- [ ] **T-802** 🧠 Update `SPEC §3` (architecture diagram → the draw.io file), `§4` (relabel it "Package Dependency Map" and add the real MCD — **add the persistence subsystem if Phase 6B ships**), `§7.5` (add HITL to the Critic), `§9` (revised targets from T-707).
 - [ ] **T-803** 🧠 Report — **Introduction**: lead with the four independent measurements of the same failure (Sarol 39.18% of citation instances contain accuracy errors; ALCE, best models "lack complete citation support 50% of the time"; FActScore, ChatGPT factually correct on 58% of atomic claims; SurveyGen 35.84%). Then FActScore's killer statistic: **36.0% of supported and 37.6% of unsupported sentences carried citations — statistically indistinguishable.** The presence of a citation carries almost no information; that is the justification for claim-level verification.
 - [ ] **T-804** 🧠 Report — **Related Work**: quote Ammann et al.'s own Limitations item 6 verbatim (*"Lack of iterative retrieval. Our pipeline operates in a single-shot manner... This limits its ability to support adaptive multi-step reasoning."*) — your closest competitor names your contribution as its own limitation. Use SciReviewGen's limitations list as a requirements table (`SESSION_CONTEXT.md §5.9`).
 - [ ] **T-805** 🧠 Report — **Discussion**: Valsci Table 3 — GPT-4o-mini *inside* their architecture scores F1 0.720; bare GPT-4o scores 0.706. **Architecture beats model scale, measured.** This converts the $0 constraint from an apology into a hypothesis: *the architecture is a correctness filter, not a correctness source.*
-- [ ] **T-806** 🧠 Report — **Limitations**, written honestly: SciFact's biomedical skew against a CS corpus (domain shift), human κ of 0.18–0.42 on exactly the thing you measure, retrieval recall as a hard ceiling on verification, and the abstract-only paper split. *Naming a limitation is stronger than hiding it.*
+- [ ] **T-806** 🧠 Report — **Limitations**, written honestly: SciFact's biomedical skew against a CS corpus (domain shift), SciReviewGen's frozen-2020 biomedical skew against the reranker's CS target domain, human κ of 0.18–0.42 on exactly the thing you measure, retrieval recall as a hard ceiling on verification, and the abstract-only paper split. *Naming a limitation is stronger than hiding it.* **Include the Writer future-work paragraph** — the fine-tuning option that was evaluated and rejected on inference cost, drafted verbatim in `TRAINING_SPEC.md §4`.
 - [ ] **T-807** 🧠 Report — literature-survey chapter: **hand-edit the T-409 generated survey.** One flagship run yields both the automated artefact and a human-checked chapter.
 - [ ] **T-808** 👤 **Fix the two visible errors in `Review-1 dsc06.pptx`** if that deck is shown again: slide 6 says *"GPU: 8GB Minimum"* on a CPU-only machine, and slide 8 says *"Extractor chunks and embeds them"* — that is the Ingestor's job, and as written the system has **no structured extraction at all**, which deletes a main contribution.
-- [ ] **T-809** 👤 Final deck: swap in real screenshots, the stock-vs-tuned table (T-305), the ablation-2 numbers (T-702), and the dropped-claims count.
+- [ ] **T-809** 👤 Final deck: swap in real screenshots, **the two-row trained-model table from `TRAINING_SPEC.md §3`** (verifier stock-vs-tuned from T-305, reranker stock-vs-tuned from T-334), the ablation-2 numbers (T-702), and the dropped-claims count. *That table is the answer to "where is the machine learning in this project?" — `SESSION_CONTEXT.md §7.2` flags slide 5 as needing it.*
 - [ ] **T-810** ⌨️ `README.md` + `make reproduce` — one command that regenerates a run from a cached config. *Reproducibility is `SPEC §14.10`, and it is cheap.*
 - [ ] **T-811** 👤 **Obtain the PDF of Li et al., *Information Processing & Management*** (DOI `10.1016/j.ipm.2025.104369`) through the library. ScienceDirect returns HTTP 403 to automated access, so it is the one paper in the set written from its title alone. *"Evidence-aware" + "self-corrective" describes your Verifier and Critic — **it may be a competitor to differentiate from, not a supporting citation.*** Also resolve its year (OpenAlex says 2025, Semantic Scholar 2026) before it enters the reference list.
 - [ ] **T-812** 👤 Verify **Vicinagearth** (paper C3-11) is Scopus-indexed. If not, substitute Wang et al. 2024, *Frontiers of Computer Science*, DOI `10.1007/s11704-024-40231-1`.
@@ -259,12 +428,29 @@ T-001/002 ─▶ T-104 (llm.py + cache) ─▶ T-201..210 (retrieval) ─▶ T-2
 T-301 ─▶ T-302 ─▶ T-303 (Kaggle) ─▶ T-304 (ONNX int8) ──────────┐      │
         (parallel, unattended)                                    │      ▼
                                                                   │  T-402..407 ─▶ 🔴 M1 (Aug 31)
-                                                                  │                    │
-                                                                  └──────▶ T-501..507 ─┴─▶ 🔴 M2 (Sep 2)
-                                                                                          │
-                                                                            T-603 (fixture) ─▶ T-607 (Panel 3)
-                                                                                          │
-                                                                                     T-702 (Ablation 2)
+T-320 ─▶ T-321 ⛔ ─▶ T-322 ─▶ T-323 ─▶ T-324 ────────┐            │                    │
+        (Phase 3B — parallel data track, no API,      │            │                    │
+         no pipeline, does NOT gate M1 or M2)         │            └──▶ T-501..507 ─────┴─▶ 🔴 M2 (Sep 2)
+                                                       │                                     │
+                                                       │                       T-603 (fixture) ─▶ T-607 (Panel 3)
+                                                       │                                     │
+                                       T-304 ─────────▶ T-325 ★★ ──▶ T-705b ◀── T-705   T-702 (Ablation 2)
+                                              (verifier cross-check)      (three-lens table)
+
+T-330 ─▶ T-331 ─▶ T-332 (Kaggle) ─▶ T-333 ─▶ T-334 ─▶ T-335 (adoption gate)
+        (Phase 3C — reranker fine-tune. NOT on the critical path at all:
+         the pipeline ships with the stock reranker and T-335 is a weight
+         swap. A failed run here costs nothing downstream.)
+
+Phase 3B joins the critical path only at T-325, which needs the trained verifier.
+Everything before it is independent parsing work. T-321 is the internal blocker:
+if the bib-resolution gate fails, T-322..T-325 cannot proceed.
+
+Phase 3C touches the critical path nowhere. It reuses T-321's parser and
+T-212's eval harness, and its output is optional by construction (T-335).
+
+Phase 6B (Postgres registry) is likewise off the critical path by design: the
+pipeline writes to disk regardless and T-625 falls back to a filesystem scan.
 ```
 
 ---
@@ -274,11 +460,15 @@ T-301 ─▶ T-302 ─▶ T-303 (Kaggle) ─▶ T-304 (ONNX int8) ────�
 | Date | If this has not happened | Do this |
 |---|---|---|
 | **Aug 28** | Recall@20 < 0.80 | Escalate `bge-small` → `bge-base`. Spend all of Aug 29 on retrieval. Push M1 to Sep 1. |
+| **Aug 28** | T-321 bib-resolution gate < 0.95 | The delimiter parse is wrong. Spend half a day fixing it. If it still fails, fall back to **`kdercksen/scireviewgen-csv`** (same splits) before abandoning — do not lose T-325 to one bad mirror. |
 | **Aug 29** | Kaggle verifier not trained | Fall back to a **stock** NLI checkpoint in the pipeline and report stock-vs-tuned as future work. The pipeline must never block on training. |
+| **Aug 30** | T-322 pairs not produced | Drop the T-324 retrieval gold sets (T-212b) and keep **only** the T-325 cross-check. The cross-check is why this track exists; the retrieval breadth check is a bonus. |
+| **Aug 30** | Reranker fine-tune (T-332) not trained, or T-334 shows no out-of-domain gain | **Keep the stock reranker and move on.** The pipeline is unaffected — this was always a weight swap, never a dependency. Report the negative result; a fine-tune that did not help is an honest finding, and the verifier still satisfies the training requirement on its own. |
 | **Aug 31** | M1 not landed | **Stop building forward.** Stabilise the linear pipeline, ship the survey, cut the Critic loop to a single pass. |
 | **Sep 2** | M2 not landed | Ship the five-agent system without the Critic loop. **The Verifier stays** — it is the graded component; the loop is not. |
-| **Sep 3** | Vue not started | Ship Panels 1–3 against the fixture only. Skip Panel 4 and HITL; fold the dropped-claims count into Panel 3 as a summary line. |
-| **Sep 4** | Ablations not run | Ship ablation 2 alone. It is the graded claim. Report the rest as future work. |
+| **Sep 4** | Vue not started | Ship Panels 1–3 against the fixture, **plus the minimum HITL surface** — a dropped-claims list with confirm/override writing to `human_overrides`. ⚠️ **HITL can no longer be dropped (T-007, 2026-08-25).** Cut Panel 4's *styling and artefact-download chrome* instead, not its function. |
+| **Sep 4** | Phase 6B registry not working | **Cut it entirely.** `GET /api/runs` falls back to a filesystem scan and loses nothing the demo needs — the filesystem already holds everything the registry would store. Revert the deck to Chroma + SQLite instead (`SESSION_CONTEXT.md §7.2`). |
+| **Sep 6** | Ablations not run | Ship ablation 2 alone. It is the graded claim. Report the rest as future work. |
 
 ---
 
@@ -291,7 +481,7 @@ Carried forward from `SESSION_CONTEXT.md §8`, plus new ones. All appear in Phas
 3. **T-007** — decide whether HITL stays in Objective 2.
 4. **T-811** — obtain the Li et al. IPM PDF and resolve its publication year.
 5. **T-812** — verify *Vicinagearth* is Scopus-indexed.
-6. **T-705** — the 50-claim spot-check. Nobody else can do it, and it is the only non-circular evidence you will have.
+6. **T-705** — the 50-claim spot-check. Nobody else can do it. *It is no longer your **only** non-circular evidence now that T-325 exists, but it is still the only one measured in **your own domain** — SciReviewGen is biomedical-and-CS survey prose, your corpus is agentic RAG.* Both are needed; they answer different objections.
 
 ---
 

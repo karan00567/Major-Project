@@ -1,0 +1,26 @@
+fetched 5 real abstracts from the gold set
+
+=== openai/gpt-oss-120b ===
+  [1/5] OK    22.5s  fields=7/8
+  [2/5] OK    42.4s  fields=5/8
+  [3/5] OK    23.1s  fields=4/8
+  [4/5] OK    25.4s  fields=4/8
+  [5/5] OK    19.8s  fields=3/8
+
+=== qwen/qwen3.6-27b ===
+  [1/5] OK    10.2s  fields=8/8
+  [2/5] OK    55.4s  fields=5/8
+  [3/5] OK    56.0s  fields=6/8
+  [4/5] OK    52.3s  fields=8/8 SCHEMA-ECHO
+  [5/5] OK    35.3s  fields=8/8 SCHEMA-ECHO
+
+==============================================================================
+model                     parse  valid  fields  echo     lat  note
+------------------------------------------------------------------------------
+openai/gpt-oss-120b        100%   100%   4.6/8     0   26.6s  
+qwen/qwen3.6-27b           100%   100%   7.0/8     2   41.8s  
+gemma-4-31b-it                               DISQUALIFIED  Latency. 84.5s on a 100-char probe; on real ~1,900-char abst
+gemma-4-26b-a4b-it                           DISQUALIFIED  Hard failure. Returns HTTP 200 with every output part flagge
+==============================================================================
+
+wrote eval\bakeoff_t004.json

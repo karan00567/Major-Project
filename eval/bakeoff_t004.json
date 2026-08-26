@@ -1,0 +1,104 @@
+{
+  "openai/gpt-oss-120b": {
+    "n": 5,
+    "disqualified": null,
+    "parse_rate": 1.0,
+    "validate_rate": 1.0,
+    "avg_fields": 4.6,
+    "schema_echoes": 0,
+    "avg_latency_s": 26.6,
+    "total_s": 133.3,
+    "rows": [
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 7,
+        "schema_echo": false,
+        "latency_s": 22.5
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 5,
+        "schema_echo": false,
+        "latency_s": 42.4
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 4,
+        "schema_echo": false,
+        "latency_s": 23.1
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 4,
+        "schema_echo": false,
+        "latency_s": 25.4
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 3,
+        "schema_echo": false,
+        "latency_s": 19.8
+      }
+    ]
+  },
+  "qwen/qwen3.6-27b": {
+    "n": 5,
+    "disqualified": null,
+    "parse_rate": 1.0,
+    "validate_rate": 1.0,
+    "avg_fields": 7.0,
+    "schema_echoes": 2,
+    "avg_latency_s": 41.8,
+    "total_s": 209.2,
+    "rows": [
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 8,
+        "schema_echo": false,
+        "latency_s": 10.2
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 5,
+        "schema_echo": false,
+        "latency_s": 55.4
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 6,
+        "schema_echo": false,
+        "latency_s": 56.0
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 8,
+        "schema_echo": true,
+        "latency_s": 52.3
+      },
+      {
+        "parse_ok": true,
+        "validate_ok": true,
+        "fields_populated": 8,
+        "schema_echo": true,
+        "latency_s": 35.3
+      }
+    ]
+  },
+  "gemma-4-31b-it": {
+    "n": 0,
+    "disqualified": "Latency. 84.5s on a 100-char probe; on real ~1,900-char abstracts a 5-paper arm had not completed after >60 min of wall clock (process alive, 1.2s CPU - blocked on generation, not compute). At ~1 call per paper and ~70 papers per run this cannot finish a real run."
+  },
+  "gemma-4-26b-a4b-it": {
+    "n": 0,
+    "disqualified": "Hard failure. Returns HTTP 200 with every output part flagged thought=true and no text part, so the entire output budget is spent on reasoning. LLMError: 'all parts were thought-only or missing text'."
+  }
+}
