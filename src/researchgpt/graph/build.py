@@ -40,6 +40,7 @@ from researchgpt.graph.state import ReviewState
 from researchgpt.output.writers import (
     write_bibtex,
     write_config,
+    write_corpus,
     write_insight_table,
     write_markdown,
 )
@@ -117,6 +118,10 @@ def run_pipeline(
                 "refs_bib": write_bibtex(run_dir, cited),
                 "insights_csv": write_insight_table(
                     run_dir, papers, state.get("paper_insights") or []),
+                "corpus_json": write_corpus(
+                    run_dir, papers,
+                    [i.paper_id for i in state.get("paper_insights") or []],
+                    state.get("retrieval_log") or []),
                 "config_json": write_config(run_dir, cfg),
             }
             state["artefacts"].update(

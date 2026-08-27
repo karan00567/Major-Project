@@ -45,6 +45,25 @@ from researchgpt.graph.state import ReviewState
 
 MAX_REPAIRS = 2
 
+#: Request-body ceiling for the zero-cost tier, in characters.
+#:
+#: 🔴 **Measured 2026-08-27: Groq rejects a body over ~20 KB with HTTP 413.**
+#: An 8-example extractor prompt plus a real abstract crossed it, and because
+#: `extract_one` is fail-soft the 413 was absorbed as a parse failure and
+#: reported as **0/8 fields on every paper** - a hard infrastructure limit
+#: wearing the costume of a quality collapse. That cost a debugging round, so
+#: the budget is now checked here instead of discovered mid-run.
+#:
+#: Consequence worth stating in the report: Dagdelen et al.'s ~20 few-shot
+#: examples is **not reachable** under TASKLIST 0.1's zero-cost constraint.
+#: Six examples plus a long abstract is what fits. That is a real cost of the
+#: free tier, not a design preference.
+MAX_PROMPT_CHARS = 18_000
+
+#: Leave the source text at least this much room, so trimming examples is never
+#: preferable to trimming the paper we are trying to read.
+MIN_SOURCE_CHARS = 1_500
+
 #: The eight content fields T-004 scores coverage over.
 CONTENT_FIELDS = (
     "methodology", "advantages", "disadvantages", "critique",
@@ -120,15 +139,32 @@ class Extractor(Agent):
 
     # -- one paper ---------------------------------------------------------
 
+    def _fit_prompt(self, paper: Paper, text: str) -> tuple[str, int]:
+        """Render the prompt, truncating the SOURCE if the body would 413.
+
+        The abstract is trimmed, never the examples: the examples are what make
+        the output well-formed, and a truncated abstract still extracts most of
+        its content because abstracts front-load method and result.
+        """
+        prompt = load("extractor_v1", title=paper.title or "",
+                      text_availability=paper.text_availability, text=text)
+        if len(prompt) <= MAX_PROMPT_CHARS:
+            return prompt, 0
+
+        overflow = len(prompt) - MAX_PROMPT_CHARS
+        keep = max(MIN_SOURCE_CHARS, len(text) - overflow - 80)
+        trimmed = text[:keep].rsplit(" ", 1)[0] + " [truncated to fit the prompt budget]"
+        return (
+            load("extractor_v1", title=paper.title or "",
+                 text_availability=paper.text_availability, text=trimmed),
+            len(text) - keep,
+        )
+
     def extract_one(self, paper: Paper, text: str) -> tuple[PaperInsight, dict[str, Any]]:
         """Extract from a single paper. Always returns an insight, never raises."""
-        prompt = load(
-            "extractor_v1",
-            title=paper.title or "",
-            text_availability=paper.text_availability,
-            text=text,
-        )
-        stats: dict[str, Any] = {"repairs": 0, "placeholder_echoes": 0, "failed": False}
+        prompt, truncated = self._fit_prompt(paper, text)
+        stats: dict[str, Any] = {"repairs": 0, "placeholder_echoes": 0,
+                                 "failed": False, "truncated_chars": truncated}
         last_error, raw = None, ""
 
         for attempt in range(MAX_REPAIRS + 1):
@@ -232,7 +268,8 @@ class Extractor(Agent):
         iteration = state.get("iteration", 0)
 
         insights: list[PaperInsight] = []
-        totals = {"repairs": 0, "echoes": 0, "failed": 0, "fields": 0, "no_text": 0}
+        totals = {"repairs": 0, "echoes": 0, "failed": 0, "fields": 0,
+                  "no_text": 0, "truncated": 0}
 
         for i, paper in enumerate(selected, 1):
             text = (paper.abstract or "").strip()
@@ -250,6 +287,7 @@ class Extractor(Agent):
             totals["repairs"] += stats["repairs"]
             totals["echoes"] += stats["placeholder_echoes"]
             totals["failed"] += int(stats["failed"])
+            totals["truncated"] += int(bool(stats.get("truncated_chars")))
             totals["fields"] += stats["fields"]
             if i % 10 == 0 or i == len(selected):
                 self._emit("extract_progress",
@@ -264,6 +302,7 @@ class Extractor(Agent):
                 "failed_after_repairs": totals["failed"],
                 "repair_passes": totals["repairs"],
                 "placeholder_echoes_removed": totals["echoes"],
+                "sources_truncated": totals["truncated"],
                 "mean_fields_of_8": round(mean_fields, 2),
                 "prompt_version": version("extractor_v1"),
             },
@@ -272,4 +311,5 @@ class Extractor(Agent):
         return {"paper_insights": insights}
 
 
-__all__ = ["Extractor", "field_coverage", "CONTENT_FIELDS"]
+__all__ = ["Extractor", "field_coverage", "CONTENT_FIELDS",
+           "MAX_PROMPT_CHARS"]

@@ -30,7 +30,24 @@ def load(name: str, /, **values: object) -> str:
         available = sorted(p.stem for p in PROMPT_DIR.glob("*.md"))
         raise FileNotFoundError(f"No prompt {name!r}. Available: {available}")
     text = path.read_text(encoding="utf-8")
-    return Template(text).substitute(**values)
+    try:
+        return Template(text).substitute(**values)
+    except ValueError as exc:
+        # Template's own message is just "Invalid placeholder in string: line
+        # N, col M", which does not say WHAT is wrong. The cause is always the
+        # same: a bare "$" in prose that Template reads as a placeholder. This
+        # has cost three debugging rounds, so the error now names the offender.
+        import re as _re
+
+        bad = [
+            (i, line) for i, line in enumerate(text.splitlines(), 1)
+            if _re.search(r"\$(?![A-Za-z_{])", line)
+        ]
+        raise ValueError(
+            f"{path.name} contains a bare '$' that string.Template reads as a "
+            f"placeholder. Escape it as '$$' or reword. Offending line(s): "
+            f"{[f'{i}: {ln.strip()[:70]}' for i, ln in bad[:3]]}"
+        ) from exc
 
 
 def version(name: str) -> str:

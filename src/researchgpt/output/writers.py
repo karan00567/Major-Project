@@ -130,6 +130,31 @@ def write_insight_table(
 
 
 @_safe
+def write_corpus(
+    run_dir: pathlib.Path, papers: list[Paper], extracted_ids: list[str],
+    retrieval_log: list[dict[str, Any]] | None = None,
+) -> pathlib.Path:
+    """Persist the retrieved corpus, so a run can be SCORED without re-running it.
+
+    Added after the first flagship attempt: T-409 measures recall against the
+    35-paper answer key, and the *union* recall (did retrieval find it at all?)
+    needs every retrieved paper, not just the ``max_papers`` that reached the
+    Extractor. Without this the only way to score a run is to re-retrieve, which
+    costs an hour and burns OpenAlex budget that is now metered (0.2).
+
+    ``extracted_ids`` records which of them actually reached the Extractor, so
+    union recall and corpus recall can be separated (`decisions.txt` D-04).
+    """
+    path = run_dir / "corpus.json"
+    path.write_text(json.dumps({
+        "papers": [p.model_dump() for p in papers],
+        "extracted_paper_ids": list(extracted_ids),
+        "retrieval_log": retrieval_log or [],
+    }, indent=1, default=str), encoding="utf-8")
+    return path
+
+
+@_safe
 def write_config(run_dir: pathlib.Path, cfg: Any) -> pathlib.Path:
     """The resolved config, so a run can be reproduced exactly (SPEC 14.10)."""
     path = run_dir / "config.json"
@@ -137,4 +162,5 @@ def write_config(run_dir: pathlib.Path, cfg: Any) -> pathlib.Path:
     return path
 
 
-__all__ = ["write_markdown", "write_bibtex", "write_insight_table", "write_config"]
+__all__ = ["write_markdown", "write_bibtex", "write_insight_table",
+           "write_corpus", "write_config"]

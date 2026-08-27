@@ -87,7 +87,24 @@ sources:
   # of the Review-2 deck, and its rate limiting is survivable now that latency
   # is not a constraint. It is BEST-EFFORT — on sustained 429s the run
   # continues on openalex + arxiv. Crossref stays cut (redundant).
-  enabled: [openalex, arxiv, semantic_scholar]
+  # Semantic Scholar DISABLED 2026-08-27 (decision: use OpenAlex instead).
+  #
+  # Why: keyless it answers roughly 1 query in 3 and burns up to 60s of
+  # exponential backoff on each miss (decisions.txt D-03 chose to skip the free
+  # academic key). Measured on the first M1 attempt: that alone was ~16 minutes
+  # of pure sleeping across a 24-task plan, and the run was killed at 10 min
+  # having completed 38 of 72 source-queries.
+  #
+  # TASKLIST 0.2 requires "OpenAlex OR Semantic Scholar" - OpenAlex satisfies
+  # it, and OpenAlex is now keyed (1,000 searches/day, 0.2) so there is ample
+  # headroom without S2.
+  #
+  # ⚠️ The T-214 connector is NOT deleted and still passes its tests. Both decks
+  # claim Semantic Scholar on 8 slides, so say "implemented and available,
+  # disabled by default for latency" rather than removing the claim (T-809).
+  # Re-enable by adding semantic_scholar back to this list - ideally once
+  # S2_API_KEY exists (T-215), which removes the throttling entirely.
+  enabled: [openalex, arxiv]
   max_per_source: 25
 
 review:

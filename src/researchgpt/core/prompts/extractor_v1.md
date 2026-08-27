@@ -5,12 +5,31 @@ model:    any ALLOWED_MODELS entry (TASKLIST §0.1)
 output:   PaperInsight (core/models.py) as a single JSON object
 consumer: agents/extractor.py (T-404)
 
-WARNING — few-shot count. Dagdelen et al. measured structured output
-stabilising at ~20 few-shot examples and being malformed below ~10
-(SESSION_CONTEXT.md §5.10). This file ships THREE. It is usable for smoke
-tests and for the T-004 bake-off, but T-404 must expand the EXAMPLES block to
-~20 before the Extractor output is trusted for a real run. Track that as a
-sub-item of T-404; do not treat this prompt as finished.
+few-shot count. Dagdelen et al. measured structured output stabilising at
+~20 examples and malformed below ~10 (SESSION_CONTEXT.md §5.10). This file
+shipped THREE until 2026-08-27 and now ships SIX, added for T-409 because
+TASKLIST requires the expansion before the Extractor is trusted for a real run.
+
+The three new examples target failure modes measured on the M1 run, which
+averaged 5.08/8 fields with `datasets` filled on only 6 of 12 papers:
+  4  a SURVEY - models return all-nulls because there are no experiments, but
+     a survey has a methodology (how it searched), results (its taxonomy) and
+     stated advantages/disadvantages of the field it reviews
+  5  a system paper with named components, where datasets/metrics ARE stated
+  7  a thin abstract, where RESTRAINT is correct - included so the other four
+     do not push the model toward padding
+
+The thin-abstract example is load-bearing: adding examples that fill more fields, without one
+that fills few, trades under-extraction for fabrication - the worse defect in a
+hallucination-graded pipeline.
+
+SIZE CEILING. Groq's free tier rejects a request body over ~20 KB with HTTP
+413. Measured 2026-08-27: eight examples plus a real abstract sat right on that
+edge and 413'd, which the Extractor absorbed as a parse failure and reported as
+0/8 fields - a hard limit masquerading as a quality collapse. So Dagdelen's
+~20 examples is NOT reachable on the zero-cost tier (TASKLIST 0.1), and six is chosen
+to leave headroom for a long abstract. agents/extractor.py enforces the budget
+explicitly rather than letting it surface as a 413.
 
 WARNING — fenced output. Gemma ignores responseSchema and returns
 markdown-fenced JSON (measured 2026-08-25). The caller must strip fences
@@ -139,6 +158,102 @@ We report a 36.7% improvement in MRR@10."
     {"quote": "36.7% improvement in MRR@10", "field": "results"}
   ],
   "extraction_note": "abstract only; no methods, dataset or limitations section available"
+}
+```
+
+### Example 4 — a SURVEY paper (do not return all nulls)
+
+A survey has no experiments, and models routinely conclude it therefore has no
+extractable content. **That is wrong.** A survey's *methodology* is how it
+searched and organised the literature; its *results* are the taxonomy or
+findings it reports; its *advantages/disadvantages* are its own claims about
+the field it reviews. `datasets` and `metrics` are legitimately empty.
+
+SOURCE: "Large Language Models have advanced text generation, but reliance on
+static training data produces outdated outputs. Retrieval-Augmented Generation
+addresses this by grounding responses in retrieved evidence. This survey traces
+the evolution from single-pass RAG to agentic RAG, in which autonomous agents
+plan, retrieve iteratively and self-correct. We organise the field into a
+taxonomy of single-agent, multi-agent and hierarchical designs, and review
+applications across healthcare, finance and education. We find that agentic
+designs improve adaptability on multi-step queries, but that evaluation remains
+fragmented, with no shared benchmark across the surveyed systems."
+
+```json
+{
+  "methodology": "Survey. Traces the evolution from single-pass RAG to agentic RAG and organises the field into a taxonomy of single-agent, multi-agent and hierarchical designs, with an application review across healthcare, finance and education.",
+  "advantages": "Agentic designs improve adaptability on multi-step queries relative to single-pass RAG.",
+  "disadvantages": "Evaluation across the surveyed systems is fragmented, with no shared benchmark.",
+  "critique": "The taxonomy is descriptive rather than empirical: without a common benchmark the survey cannot say which of the three design families actually performs better, only that they differ structurally.",
+  "datasets": [],
+  "metrics": [],
+  "results": "A three-way taxonomy of agentic RAG designs (single-agent, multi-agent, hierarchical); agentic designs adapt better to multi-step queries; evaluation is fragmented across the field.",
+  "limitations": "No shared benchmark exists across the surveyed systems, so cross-system comparison is not possible.",
+  "evidence_spans": [
+    {"quote": "We organise the field into a taxonomy of single-agent, multi-agent and hierarchical designs", "field": "methodology"},
+    {"quote": "agentic designs improve adaptability on multi-step queries", "field": "advantages"},
+    {"quote": "evaluation remains fragmented, with no shared benchmark across the surveyed systems", "field": "limitations"}
+  ],
+  "extraction_note": "survey paper; no experimental datasets or metrics of its own"
+}
+```
+
+### Example 5 — a system paper with named components
+
+Name the concrete parts. `datasets` and `metrics` are usually recoverable from
+a systems abstract even when results are summarised loosely.
+
+SOURCE: "We present HM-RAG, a hierarchical multi-agent multimodal RAG
+framework. A Decomposition Agent splits the query, three parallel Retrieval
+Agents search vector, graph and web sources, and a Decision Agent fuses their
+outputs by consistency voting. On ScienceQA and CrisisMMD, HM-RAG improves
+answer accuracy by 12.1% and F1 by 3.8% over the strongest single-agent
+baseline, without task-specific fine-tuning."
+
+```json
+{
+  "methodology": "Hierarchical three-tier multi-agent framework: a Decomposition Agent splits the query, three parallel Retrieval Agents cover vector, graph and web sources, and a Decision Agent fuses their outputs by consistency voting.",
+  "advantages": "Improves over the strongest single-agent baseline without task-specific fine-tuning, so the gain comes from the architecture rather than from training.",
+  "disadvantages": null,
+  "critique": "Three parallel retrieval agents plus a fusion stage multiply inference cost, and the abstract reports no latency or cost figure against the single-agent baseline it beats.",
+  "datasets": ["ScienceQA", "CrisisMMD"],
+  "metrics": ["answer accuracy", "F1"],
+  "results": "+12.1% answer accuracy and +3.8% F1 over the strongest single-agent baseline.",
+  "limitations": null,
+  "evidence_spans": [
+    {"quote": "A Decomposition Agent splits the query, three parallel Retrieval Agents search vector, graph and web sources, and a Decision Agent fuses their outputs by consistency voting", "field": "methodology"},
+    {"quote": "improves answer accuracy by 12.1% and F1 by 3.8% over the strongest single-agent baseline", "field": "results"},
+    {"quote": "without task-specific fine-tuning", "field": "advantages"}
+  ],
+  "extraction_note": null
+}
+```
+
+### Example 6 — a thin abstract: restraint is the correct answer
+
+**Do not pad.** Most fields here are genuinely unsupported, and inventing them
+is a defect the verifier will catch. Extract only the two things stated.
+
+SOURCE: "This paper explores the emerging field of agentic retrieval-augmented
+generation. Building on traditional RAG, agentic RAG incorporates goal
+reasoning and self-direction, enabling systems to make informed decisions about
+what to retrieve. We discuss the implications for AI-driven information
+retrieval and outline directions for future work."
+
+```json
+{
+  "methodology": "Discussion paper on agentic RAG, framed as an extension of traditional RAG with goal reasoning and self-direction.",
+  "advantages": "Goal reasoning and self-direction let the system decide what to retrieve rather than retrieving once against the original query.",
+  "disadvantages": null,
+  "critique": "The abstract asserts capability without describing an implementation or any evaluation, so the claimed benefit is positional rather than demonstrated.",
+  "datasets": [],
+  "metrics": [],
+  "results": null,
+  "limitations": null,
+  "evidence_spans": [
+    {"quote": "agentic RAG incorporates goal reasoning and self-direction, enabling systems to make informed decisions about what to retrieve", "field": "advantages"}
+  ],
+  "extraction_note": "abstract only; discussion paper with no implementation, evaluation or results reported"
 }
 ```
 

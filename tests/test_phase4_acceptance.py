@@ -503,3 +503,52 @@ def test_config_names_the_stock_reranker_after_the_t335_revert():
     cfg_text = (_p.Path("configs/default.yaml")).read_text(encoding="utf-8")
     assert "reranker: cross-encoder/ms-marco-MiniLM-L-6-v2" in cfg_text
     assert "T-335 REVERTED" in cfg_text
+
+
+# --------------------------------------------------------------------------
+# T-404 — the zero-cost tier's prompt budget
+# --------------------------------------------------------------------------
+
+
+def test_t404_prompt_stays_inside_the_free_tier_body_limit(cfg):
+    """Measured 2026-08-27: Groq rejects a request body over ~20 KB with HTTP
+    413. Because extract_one is fail-soft, an over-budget prompt was absorbed
+    as a parse failure and reported as 0/8 fields on every paper - a hard
+    infrastructure limit wearing the costume of a quality collapse."""
+    from researchgpt.agents.extractor import MAX_PROMPT_CHARS
+
+    long_paper = make_paper("p", abstract="word " * 3000)  # 15k chars of source
+    prompt, truncated = Extractor(StubLLM(), cfg)._fit_prompt(long_paper,
+                                                              long_paper.abstract)
+    assert len(prompt) <= MAX_PROMPT_CHARS
+    assert truncated > 0, "an oversized source should have been trimmed"
+    assert "[truncated to fit the prompt budget]" in prompt
+
+
+def test_t404_trims_the_source_not_the_examples(cfg):
+    """The examples are what make the output well-formed; a truncated abstract
+    still extracts most of its content because abstracts front-load method and
+    result."""
+    long_paper = make_paper("p", abstract="word " * 3000)
+    prompt, _ = Extractor(StubLLM(), cfg)._fit_prompt(long_paper, long_paper.abstract)
+    assert prompt.count("### Example") == 6, "few-shot examples must survive trimming"
+
+
+def test_t404_short_papers_are_not_truncated(cfg):
+    paper = make_paper("p", abstract="A normal length abstract. " * 20)
+    prompt, truncated = Extractor(StubLLM(), cfg)._fit_prompt(paper, paper.abstract)
+    assert truncated == 0
+    assert "[truncated" not in prompt
+
+
+def test_prompt_loader_names_a_stray_dollar_sign(tmp_path, monkeypatch):
+    """string.Template's own error is just "Invalid placeholder at line N, col
+    M", which does not say what is wrong. A bare '$' in prose has broken three
+    prompts now, so the loader names the offending line."""
+    import researchgpt.core.prompts as prompts
+
+    bad = tmp_path / "broken_v1.md"
+    bad.write_text("A prompt mentioning $0 cost.\n\nBODY: $body\n", encoding="utf-8")
+    monkeypatch.setattr(prompts, "PROMPT_DIR", tmp_path)
+    with pytest.raises(ValueError, match="bare '\$'"):
+        prompts.load("broken_v1", body="x")
