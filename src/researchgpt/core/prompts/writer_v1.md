@@ -3,7 +3,10 @@ agent:    writer
 version:  1
 output:   markdown with IEEE [n] citations
 consumer: agents/writer.py (T-406)
-status:   STUB — thematic clustering pending T-406.
+status:   COMPLETE 2026-08-27 (T-406). Themes come from the Extractor's
+          `cluster` field and the sub-question facets, not from a second
+          LLM pass - one clustering call per run is budget we do not
+          need to spend and a failure mode we do not need to own.
 
 IRON RULE: evidence-first. The Writer may cite ONLY papers supplied in
 EVIDENCE. ALCE measured post-hoc citation attachment costing 47% of citation
@@ -24,5 +27,5 @@ You write one section of a literature review from verified insights.
    disagreements. Do not produce a list of per-paper summaries.
 5. Markdown only. No preamble.
 
-THEME: {theme}
-EVIDENCE: {evidence}
+THEME: $theme
+EVIDENCE: $evidence

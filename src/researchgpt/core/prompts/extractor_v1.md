@@ -144,8 +144,8 @@ We report a 36.7% improvement in MRR@10."
 
 ## Now extract
 
-PAPER TITLE: {title}
-TEXT AVAILABILITY: {text_availability}
+PAPER TITLE: $title
+TEXT AVAILABILITY: $text_availability
 
 SOURCE:
-{text}
+$text
