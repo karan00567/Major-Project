@@ -283,3 +283,85 @@ def test_t330_artefact_records_hard_negative_quality():
         "gain and T-331 is the reason"
     )
     assert stats["distinct_surveys"] > 100, "too few surveys; sampling is not working"
+
+
+# --------------------------------------------------------------------------
+# T-335 relevance control — added after it caught a nearly-shipped broken model
+# --------------------------------------------------------------------------
+
+
+class _FakeScorer:
+    """Scores by a rule, so the control can be tested without a real model."""
+
+    def __init__(self, rule):
+        self.rule = rule
+
+    def score(self, query, texts):
+        return [self.rule(query, t) for t in texts]
+
+
+def _one_query_pool():
+    return {"retrieval augmented generation": [
+        {"text": f"a relevant paper about retrieval number {i}", "label": 1}
+        for i in range(6)
+    ]}
+
+
+def test_relevance_control_passes_a_model_that_knows_irrelevance():
+    from researchgpt.rerank.evaluate import OFF_TOPIC_CONTROLS, relevance_control
+
+    controls = set(OFF_TOPIC_CONTROLS)
+    healthy = _FakeScorer(lambda q, t: -10.0 if t in controls else 5.0)
+    result = relevance_control(healthy, _one_query_pool())
+    assert result["violations"] == 0
+    assert result["pass"] is True
+    assert result["mean_margin"] > 0
+
+
+def test_relevance_control_catches_a_model_that_scores_everything_high():
+    """The real failure of 2026-08-27: a reranker that lost its relevance prior
+    and scored wind turbines, soil nitrogen and opera libretti at +7..+9.7 for
+    retrieval queries. nDCG and Recall could not see it, because the eval pool
+    is already topically filtered."""
+    from researchgpt.rerank.evaluate import relevance_control
+
+    broken = _FakeScorer(lambda q, t: 8.0)
+    result = relevance_control(broken, _one_query_pool())
+    assert result["violations"] == result["queries"]
+    assert result["violation_rate"] == 1.0
+    assert result["pass"] is False
+    assert result["worst_examples"]
+
+
+def test_relevance_control_tolerates_a_single_noisy_query():
+    """One violation is noise; a quarter of queries is a broken model. The
+    threshold has to distinguish them or it will block good models too."""
+    from researchgpt.rerank.evaluate import OFF_TOPIC_CONTROLS, relevance_control
+
+    controls = set(OFF_TOPIC_CONTROLS)
+    pool = {f"query {i}": [{"text": f"doc {j}", "label": 1} for j in range(5)]
+            for i in range(8)}
+    mostly_ok = _FakeScorer(
+        lambda q, t: (9.0 if q == "query 0" else -10.0) if t in controls else 5.0
+    )
+    result = relevance_control(mostly_ok, pool)
+    assert result["violations"] == 1
+    assert result["pass"] is True
+
+
+def test_off_topic_controls_are_long_enough_to_be_in_distribution():
+    """A short control could be scored low for its length rather than its
+    irrelevance, which would make the check meaningless."""
+    from researchgpt.rerank.evaluate import OFF_TOPIC_CONTROLS
+
+    assert len(OFF_TOPIC_CONTROLS) >= 3
+    assert all(len(t) > 300 for t in OFF_TOPIC_CONTROLS)
+
+
+def test_reranker_falls_back_when_a_configured_model_is_missing():
+    """The tuned weights live under gitignored data/, so a fresh clone has a
+    config naming a path that does not exist. That must warn, not crash."""
+    from researchgpt.tools.reranker import STOCK_MODEL, Reranker
+
+    r = Reranker(model_name="data/models/definitely-not-here")
+    assert r._model_name == STOCK_MODEL

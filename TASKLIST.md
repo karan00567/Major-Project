@@ -576,12 +576,14 @@ This is the graded component *and* the required training component. **Start it t
   **Fixed** by setting `CUDA_VISIBLE_DEVICES=0` as the very first statement of section 1 — **before torch initialises CUDA** — plus an assert in section 2 that only one device is visible. A 22M cross-encoder gains nothing from a second GPU; DataParallel would mostly add transfer overhead. ⚠️ On recurrence the kernel must be **restarted**: the pin has no effect once CUDA is initialised.
 
   ⚠️ **This notebook needs a data upload**, unlike the verifier one: BM25 hard-negative mining needs the whole pooled corpus, so `data/rerank/train_triples.jsonl` (~99 MB) must be attached as a Kaggle Dataset. The notebook globs `/kaggle/input/**/train_triples.jsonl`, so the dataset name does not matter. Steps are in the README.
-- [ ] **T-333** ⌨️ ONNX export + int8 dynamic quantization, matching the verifier's deployment path. *Done when: the quantized model reproduces float logits within tolerance and per-query CPU latency is measured.* **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/export_onnx.py`.
+- [x] **T-333** ⌨️ ONNX export + int8 dynamic quantization, matching the verifier's deployment path. *Done when: the quantized model reproduces float logits within tolerance and per-query CPU latency is measured.* **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/export_onnx.py`.
 
   ⚠️ **The stated criterion — "reproduces float logits within tolerance" — is the wrong test for a *reranker*.** Only the induced **ordering** matters: a model whose scores all shift by a constant ranks identically and is perfectly usable. So the export checks (a) ONNX fp32 vs PyTorch on raw scores, which is the genuine *export-correctness* test, and (b) **Kendall tau ≥ 0.9** for int8, which asks whether quantization *reshuffled the ranking* rather than whether it moved the numbers.
 
+  ✅ **RUN 2026-08-27 on the real checkpoint: PASS.** fp32 vs PyTorch max |Δscore| **5e-6**; int8 **Kendall τ 0.960** vs torch, so quantization preserves rank order. Size **91 MB → 23 MB**. *int8 is NOT the problem with this model — tuned-pytorch and tuned-int8 score within ~0.1 of each other throughout.*
+
   🔴 **`TRAINING_SPEC §2.5` warns "quantization must not be assumed free", and that warning already fired once** — T-304 measured int8 as free on the *stock* verifier (macro-F1 rose 0.516 → 0.539) and then as a 0.027 **loss** on the *fine-tuned* one, dropping it below its own T-307 gate. **A quantization result measured on one checkpoint says nothing about another.** Which graph ships is therefore decided by T-335 on ranking quality, not here.
-- [ ] **T-334** 🧠 ★ **Stock vs fine-tuned**, on **two** sets: the SciReviewGen `test` split (in-domain) and **your own 25-paper bibliography** (out-of-domain, CS). Report Recall@20, nDCG@10, Precision@12 and rerank latency. *Reuses T-212's harness.* **Lead with the out-of-domain number** — SciReviewGen is frozen mid-2020 and skews biomedical, so a large in-domain gain with no out-of-domain gain means you fitted the benchmark, not the task. **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/evaluate.py`.
+- [x] **T-334** 🧠 ★ **Stock vs fine-tuned**, on **two** sets: the SciReviewGen `test` split (in-domain) and **your own 25-paper bibliography** (out-of-domain, CS). Report Recall@20, nDCG@10, Precision@12 and rerank latency. *Reuses T-212's harness.* **Lead with the out-of-domain number** — SciReviewGen is frozen mid-2020 and skews biomedical, so a large in-domain gain with no out-of-domain gain means you fitted the benchmark, not the task. **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/evaluate.py`.
 
   **Stock baseline on the out-of-domain set is already measured** (own bibliography, 15 sub-questions, 501 candidates, 19 gold hits pooled):
 
@@ -593,7 +595,41 @@ This is the graded component *and* the required training component. **Start it t
   **Self-tested**: running the harness with stock in *both* arms returns delta **exactly 0.0000** on all three metrics, so a non-zero delta later is a real difference and not harness noise.
 
   ✅ **Costs no OpenAlex budget** — it reuses T-212's cached pool (`eval/cache/pool_mps25.json`). That matters now that OpenAlex is metered (§0.2).
-- [ ] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.* **IMPLEMENTED 2026-08-27** as a mechanical gate in `rerank/evaluate.py`, decided on out-of-domain nDCG@10 and Recall@20.
+
+  **MEASURED 2026-08-27** against the Kaggle checkpoint (int8, i.e. what would ship):
+
+  | | stock | fine-tuned | delta |
+  |---|---|---|---|
+  | **out-of-domain nDCG@10** | 0.2277 | 0.2583 | **+0.0306** |
+  | **out-of-domain Recall@20** | 0.4815 | 0.6481 | **+0.1667** |
+  | out-of-domain Precision@12 | 0.0926 | 0.0926 | +0.0000 |
+  | in-domain nDCG@10 | 0.2646 | 0.7500 | **+0.4854** |
+
+  ⚠️ **The in-domain gain is 16x the out-of-domain gain.** Exactly the pattern this task warns about.
+
+  ⚠️ **And the out-of-domain average hides how thin it is.** Only **9 of 15** sub-questions have any gold paper pooled, and per-query the result is **3 improved, 5 unchanged, 1 regressed** — with the regression losing its only gold paper outright (`scientific information extraction`, Recall@20 1.000 → 0.000). Two of the three "wins" are a single gold paper flipping 0 → 1. *Four queries of evidence.*
+
+  ⚠️ **Harness limitation to state if these latencies are quoted:** the stock arm runs through sentence-transformers/PyTorch and the tuned arm through onnxruntime, so the ms/query column compares **runtimes**, not models. It is not an apples-to-apples latency measurement.
+- [x] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.* **IMPLEMENTED 2026-08-27** as a mechanical gate in `rerank/evaluate.py`, decided on out-of-domain nDCG@10 and Recall@20.
+
+  🔴 **RUN 2026-08-27. VERDICT: DO NOT PROMOTE. The fine-tuned reranker is catastrophically broken, and the gate as originally written PASSED it.**
+
+  On ranking metrics alone it passed (out-of-domain nDCG@10 +0.031, Recall@20 +0.167). But probed directly, the tuned model scores documents about **wind turbine blade fatigue (+9.4)**, **soil nitrogen mineralisation (+9.4)** and **nineteenth-century Italian opera libretti (+8.7)** for retrieval queries — and ranks an off-topic document **top-1 for 2 of 3 probes**. Stock scores all of them ≈ **−11**. Reproduced at both short and long input lengths and in **both** PyTorch and int8, so it is neither an out-of-distribution artefact nor a quantization fault: **the fine-tune destroyed the ms-marco relevance prior.** Catastrophic forgetting — the model learned *"does this look like a cited scientific abstract?"* instead of *"is this relevant to the query?"*
+
+  ★ **Why nDCG and Recall could not see it, which is the transferable lesson.** The out-of-domain pool is built from papers already retrieved for CS/agentic-RAG queries, so **everything in it is broadly on-topic**. Ranking metrics only measure ordering *within* that pre-filtered pool. A model that has forgotten what irrelevance looks like still orders on-topic papers acceptably. But `SESSION_CONTEXT §9` records that OpenAlex returns irrelevant high-citation medical papers for plain searches — so in production this model **would have promoted them into the corpus the Extractor reads**.
+
+  ✅ **Gate hardened with a relevance control** (`relevance_control()`): a fixed set of deliberately unrelated, full-length documents is scored against every query, and a model that puts them above its own **median** in-pool candidate fails outright regardless of nDCG. Re-run result:
+
+  | arm | violations | mean margin | |
+  |---|---|---|---|
+  | stock | **0/15** | +16.11 | PASS |
+  | fine-tuned | **15/15 (100%)** | −8.46 | **FAIL** |
+
+  *A gate that cannot fail on an obviously broken model is not a gate.* Regression-tested both ways: a synthetic scorer that rates everything highly fails it, and one noisy query out of eight does not.
+
+  **`configs/default.yaml` is unchanged — the stock reranker stays.** This is the honest negative result T-335 and the Aug 30 kill switch both anticipated; the pipeline is unaffected because this was always a weight swap, and the verifier satisfies the training requirement on its own.
+
+  **Most likely cause, and the cheap retry:** the run used **10 epochs**, not the **2** `TRAINING_SPEC §2.3` specifies, and `CrossEncoder.fit()` has no evaluator or best-checkpoint selection — so the 10th-epoch weights shipped unconditionally. Re-running at `EPOCHS = 2` costs ~12 minutes of GPU against the 62 already spent and is the obvious next experiment.
 
   ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
 - [ ] **T-336** 🧠 **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**

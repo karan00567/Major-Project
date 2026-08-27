@@ -20,6 +20,28 @@ quantization**. `TRAINING_SPEC §2.5`: *"Quantization must not be assumed free."
 The T-304 precedent is the reason that sentence exists — int8 was free on the
 stock verifier and cost 0.027 macro-F1 on the fine-tuned one.
 
+🔴 **The gate needs a relevance control, and learning that cost a nearly-shipped
+broken model.** On 2026-08-27 a fine-tuned reranker **passed** this gate
+(out-of-domain nDCG@10 +0.031, Recall@20 +0.167) while being catastrophically
+broken: it scored *"wind turbine blade fatigue"*, *"soil nitrogen
+mineralisation"* and *"nineteenth-century Italian opera libretti"* at **+7 to
++9.7** for retrieval queries, and ranked an off-topic document **top-1 for 2 of
+3 probes**. Stock scored all of them ≈ −11.
+
+**Why the ranking metrics missed it.** The out-of-domain pool is built from
+papers already retrieved for CS/agentic-RAG queries, so *everything in it is
+broadly on-topic*. nDCG and Recall only measure ordering **within** that
+pre-filtered pool. A model that has forgotten what irrelevance looks like still
+orders on-topic papers acceptably — and scores fine. But `SESSION_CONTEXT §9`
+records that OpenAlex returns irrelevant high-citation medical papers for plain
+searches, so in production the reranker *does* see genuine off-topic
+candidates, and this model would have promoted them.
+
+:func:`relevance_control` therefore scores a small fixed set of deliberately
+unrelated documents against each query. **A model that scores them above its own
+median in-pool document fails the gate outright, whatever its nDCG.** A gate
+that cannot fail on an obviously broken model is not a gate.
+
 If the gate fails, **keep the stock reranker and report the negative result**.
 The pipeline is unaffected either way; this was always a weight swap. TASKLIST
 Aug 30 kill switch says the same, and a fine-tune that did not help is an
@@ -215,6 +237,57 @@ def load_in_domain(chapters: int, seed: int) -> dict[str, list[dict[str, Any]]]:
     return per_query
 
 
+#: Deliberately unrelated to anything this project retrieves. Long enough to be
+#: in-distribution for a 512-token cross-encoder, so a low score cannot be
+#: blamed on length. Different fields on purpose: a model that has kept its
+#: relevance prior scores ALL of these far below any real candidate.
+OFF_TOPIC_CONTROLS = [
+    "Wind turbine blade fatigue under cyclic aerodynamic loading. We model crack "
+    "propagation in glass-fibre composite spars and validate the model against "
+    "full-scale accelerated fatigue tests on a 45-metre blade. " * 3,
+    "Soil nitrogen mineralisation rates in temperate grassland under varying "
+    "grazing intensity and rainfall. Field plots were sampled over three seasons "
+    "and analysed for ammonium and nitrate concentration. " * 3,
+    "A stylistic analysis of nineteenth-century Italian opera libretti and their "
+    "metrical conventions, with particular attention to the versi sciolti of the "
+    "Verdi middle period. " * 3,
+    "Crystallographic determination of the beta-lactamase active site at 1.8 "
+    "angstrom resolution, with implications for inhibitor design in resistant "
+    "gram-negative bacteria. " * 3,
+]
+
+
+def relevance_control(scorer: Any, per_query: dict[str, list[dict[str, Any]]]) -> dict:
+    """Does the model still know what IRRELEVANT looks like?
+
+    For each query, compare the best off-topic control against the *median*
+    real candidate. Median rather than max, deliberately: a pool contains
+    plenty of weak candidates, and beating the worst of them is not a failure.
+    Beating the typical one is.
+    """
+    violations, margins = [], []
+    for query, items in per_query.items():
+        pool_scores = sorted(scorer.score(query, [it["text"] for it in items]))
+        if not pool_scores:
+            continue
+        median = pool_scores[len(pool_scores) // 2]
+        worst_control = max(scorer.score(query, OFF_TOPIC_CONTROLS))
+        margins.append(median - worst_control)
+        if worst_control >= median:
+            violations.append({"query": query, "control_score": worst_control,
+                               "pool_median": median})
+    n = max(len(margins), 1)
+    return {
+        "queries": len(margins),
+        "violations": len(violations),
+        "violation_rate": len(violations) / n,
+        "mean_margin": sum(margins) / n,
+        "worst_examples": violations[:3],
+        # One violation is tolerable noise; a quarter of queries is not.
+        "pass": (len(violations) / n) <= 0.25,
+    }
+
+
 def _report(title: str, stock: dict, tuned: dict) -> dict:
     print(f"\n{'=' * 76}\n{title}\n{'=' * 76}")
     print(f"  {'arm':14s} {'nDCG@10':>10s} {'Recall@20':>11s} {'Precision@12':>13s} "
@@ -280,8 +353,30 @@ def main(argv: list[str] | None = None) -> None:
             print("\n  WARNING: gains IN-DOMAIN but not out-of-domain. The benchmark "
                   "was fitted, not the task (TRAINING_SPEC 2.4). Report it as such.")
 
+    # ---- relevance control: can the model still recognise irrelevance? ----
+    print("\n  relevance control - scoring deliberately off-topic documents ...")
+    ctrl_stock = relevance_control(stock_scorer, per_query)
+    ctrl_tuned = relevance_control(tuned_scorer, per_query)
+    print(f"  {'arm':14s} {'violations':>11s} {'rate':>7s} {'mean margin':>12s}")
+    for name, c in (("stock", ctrl_stock), ("fine-tuned", ctrl_tuned)):
+        print(f"  {name:14s} {c['violations']:5d}/{c['queries']:<5d} "
+              f"{c['violation_rate']:7.1%} {c['mean_margin']:12.3f}  "
+              f"{'PASS' if c['pass'] else 'FAIL'}")
+    if not ctrl_tuned["pass"]:
+        print("\n  !! The tuned model scores OFF-TOPIC documents above its own median")
+        print("  !! in-pool candidate. It has lost its relevance prior - the ranking")
+        print("  !! metrics cannot see this because the pool is already on-topic.")
+        for v in ctrl_tuned["worst_examples"]:
+            print(f"  !!   {v['query'][:44]:44s} control {v['control_score']:+7.2f} "
+                  f"vs pool median {v['pool_median']:+7.2f}")
+    results["relevance_control"] = {"stock": ctrl_stock, "tuned": ctrl_tuned}
+
     # ---- T-335 -----------------------------------------------------------
-    promote = ood_delta["nDCG@10"] > 0 and ood_delta["Recall@20"] >= 0
+    promote = (
+        ood_delta["nDCG@10"] > 0
+        and ood_delta["Recall@20"] >= 0
+        and ctrl_tuned["pass"]
+    )
     print("\n" + "=" * 76)
     if promote:
         print("T-335 ADOPTION GATE: PROMOTE.")
@@ -292,6 +387,11 @@ def main(argv: list[str] | None = None) -> None:
         print("T-335 ADOPTION GATE: DO NOT PROMOTE. Keep the stock reranker.")
         print(f"  Out-of-domain nDCG@10 {ood_delta['nDCG@10']:+.4f}, "
               f"Recall@20 {ood_delta['Recall@20']:+.4f}.")
+        if not ctrl_tuned["pass"]:
+            print(f"  BLOCKED BY THE RELEVANCE CONTROL: off-topic documents outrank "
+                  f"the median pool candidate on "
+                  f"{ctrl_tuned['violation_rate']:.0%} of queries.")
+            print("  The ranking metrics alone would have passed this model.")
         print("  This is an HONEST NEGATIVE RESULT, not a failure: the pipeline is")
         print("  unaffected (it was always a weight swap) and the verifier already")
         print("  satisfies the training requirement on its own. Report it.")
