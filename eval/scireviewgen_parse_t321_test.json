@@ -1,0 +1,19 @@
+{
+  "split": "test",
+  "rows": 1500,
+  "rows_with_markers": 1500,
+  "markers_total": 13393,
+  "markers_resolved": 13393,
+  "resolution_rate": 1.0,
+  "rows_fully_resolved": 1500,
+  "row_full_resolution_rate": 1.0,
+  "malformed_blocks": 0,
+  "rows_with_inconsistent_header": 0,
+  "empty_abstracts": 0,
+  "orphan_blocks": 0,
+  "mean_bibs_per_row": 7.306666666666667,
+  "mean_markers_per_row": 8.928666666666667,
+  "unresolved_examples": [],
+  "gate": 0.95,
+  "pass": true
+}

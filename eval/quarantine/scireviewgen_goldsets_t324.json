@@ -1,0 +1,12 @@
+{
+  "task": "T-324",
+  "split": "validation",
+  "chapters": 60,
+  "attempted": 291,
+  "matched": 54,
+  "match_rate": 0.18556701030927836,
+  "median_jaccard": 1.0,
+  "chapters_with_3plus_gold": 7,
+  "match_threshold": 0.5,
+  "note": "TASKLIST prescribed fuzzy TITLE matching; SciReviewGen carries no titles for cited papers, only abstracts. Matched on abstract instead."
+}

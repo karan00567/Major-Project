@@ -135,15 +135,24 @@ def predict_torch(
     return preds
 
 
-def predict_onnx(
+def predict_proba_onnx(
     onnx_path: str,
     tokenizer_path: str,
     pairs: list[dict[str, Any]],
     *,
     batch_size: int = 32,
     max_length: int = 256,
-) -> list[int]:
-    """Score ``pairs`` with the T-304 ONNX int8 model. Same contract as above."""
+) -> Any:
+    """Softmax probabilities in ``LABELS`` order, shape ``(len(pairs), 3)``.
+
+    T-503 defines ``support_score`` as a softmax probability, so probabilities
+    - not argmax - are what the pipeline actually consumes. :func:`predict_onnx`
+    is a thin argmax over this.
+
+    ⚠️ ``batch_size`` defaults to 32 for throughput on short inputs, but T-306
+    measured batch=1 to be **faster** on this model - padding waste dominates.
+    Callers that care about latency should pass ``batch_size=1``.
+    """
     import numpy as np  # noqa: PLC0415
     import onnxruntime as ort  # noqa: PLC0415
     from transformers import AutoConfig, AutoTokenizer  # noqa: PLC0415
@@ -155,7 +164,7 @@ def predict_onnx(
     session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
     input_names = {i.name for i in session.get_inputs()}
 
-    preds: list[int] = []
+    chunks: list[Any] = []
     for start in range(0, len(pairs), batch_size):
         batch = pairs[start : start + batch_size]
         enc = tokenizer(
@@ -168,8 +177,27 @@ def predict_onnx(
         )
         feeds = {k: v.astype(np.int64) for k, v in enc.items() if k in input_names}
         logits = session.run(None, feeds)[0][:, permutation]
-        preds.extend(logits.argmax(axis=-1).tolist())
-    return preds
+        # Subtract the row max before exp: raw logits reach +-15 here and a
+        # plain exp overflows to inf, which silently becomes nan after division.
+        shifted = logits - logits.max(axis=-1, keepdims=True)
+        exp = np.exp(shifted)
+        chunks.append(exp / exp.sum(axis=-1, keepdims=True))
+    return np.concatenate(chunks, axis=0) if chunks else np.zeros((0, len(LABELS)))
+
+
+def predict_onnx(
+    onnx_path: str,
+    tokenizer_path: str,
+    pairs: list[dict[str, Any]],
+    *,
+    batch_size: int = 32,
+    max_length: int = 256,
+) -> list[int]:
+    """Score ``pairs`` with the T-304 ONNX model. Same contract as the torch path."""
+    proba = predict_proba_onnx(
+        onnx_path, tokenizer_path, pairs, batch_size=batch_size, max_length=max_length
+    )
+    return proba.argmax(axis=-1).tolist()
 
 
 # --------------------------------------------------------------------------

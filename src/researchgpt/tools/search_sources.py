@@ -18,7 +18,28 @@ import httpx
 
 from researchgpt.core.models import Paper
 
+#: Both connectors read credentials from the environment - OPENALEX_API_KEY
+#: (10x daily budget) and S2_API_KEY. A module imported from a script or a
+#: notebook will not have had .env loaded, so a single guarded load_dotenv() at
+#: import is the whole fix. Never raises: python-dotenv is a hard dependency,
+#: but a missing .env is normal and must not break an import.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:  # pragma: no cover - defensive only
+    pass
+
 log = logging.getLogger(__name__)
+
+
+class OpenAlexBudgetExhausted(RuntimeError):
+    """OpenAlex returned 429 because the daily free budget is spent.
+
+    Distinct from "the query matched nothing", and deliberately not swallowed:
+    conflating the two silently converts a quota failure into a fabricated
+    measurement. See the 2026-08-27 note in :func:`search_openalex`.
+    """
 
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 _VERSION_RE = re.compile(r"v\d+$", re.IGNORECASE)
@@ -93,8 +114,21 @@ def search_openalex(
     year_min: int | None = None,
     max_results: int = 25,
     mailto: str = "sreekaran005@gmail.com",
+    api_key: str | None = None,
 ) -> list[Paper]:
-    """Search OpenAlex with ``title_and_abstract.search`` + date window."""
+    """Search OpenAlex with ``title_and_abstract.search`` + date window.
+
+    ``api_key`` defaults to ``OPENALEX_API_KEY`` from the environment. It is a
+    **free registered key**, not a paid plan - verified 2026-08-27 that it
+    reports ``prepaid-remaining-usd: 0``, so nothing is billable and TASKLIST
+    §0.1 is satisfied. It raises the daily budget 10x:
+
+        keyless   $0.10/day  ~  100 searches
+        with key  $1.00/day  ~ 1000 searches
+
+    Without it, evaluation work exhausts the day's quota in minutes.
+    """
+    key = api_key if api_key is not None else os.getenv("OPENALEX_API_KEY")
     filters = [f"title_and_abstract.search:{query}"]
     if year_min is not None:
         filters.append(f"from_publication_date:{year_min}-01-01")
@@ -111,9 +145,37 @@ def search_openalex(
                 "filter": filter_str,
                 "per-page": per_page,
                 "cursor": cursor,
+                # Courtesy only: measured 2026-08-27 that `mailto` no longer
+                # buys any quota. The polite pool is gone.
                 "mailto": mailto,
             }
+            if key:
+                params["api_key"] = key
             resp = client.get("https://api.openalex.org/works", params=params)
+            if resp.status_code == 429:
+                # ⚠️ OpenAlex moved to a METERED DAILY BUDGET (measured
+                # 2026-08-27): x-ratelimit-limit-usd = $0.10/day, and a search
+                # costs $0.001 -- roughly 100 searches per day. `mailto` no
+                # longer buys extra budget; the polite pool is gone.
+                #
+                # This is raised as a NAMED exception rather than returned as
+                # an empty list on purpose. A silent [] is indistinguishable
+                # from "nothing matched", and that is exactly how an exhausted
+                # budget once masqueraded as a real T-324 match rate of 18.6%.
+                # Callers must be able to tell "no results" from "no quota".
+                hint = (
+                    "Set OPENALEX_API_KEY in .env - the free registered key "
+                    "raises the daily budget 10x ($0.10 -> $1.00)."
+                    if not key
+                    else "TASKLIST 0.1 forbids buying more; wait for the reset."
+                )
+                raise OpenAlexBudgetExhausted(
+                    f"OpenAlex daily budget exhausted "
+                    f"({'with' if key else 'WITHOUT'} an api_key). "
+                    f"remaining=${resp.headers.get('x-ratelimit-remaining-usd', '?')} "
+                    f"of ${resp.headers.get('x-ratelimit-limit-usd', '?')}/day; "
+                    f"resets in {resp.headers.get('x-ratelimit-reset', '?')}s. {hint}"
+                )
             resp.raise_for_status()
             data = resp.json()
             results = data.get("results") or []

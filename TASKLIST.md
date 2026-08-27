@@ -109,6 +109,56 @@ What this does **not** change:
 - **`gpt-oss-120b` stays primary for now.** Even with latency relaxed, `gemma-4-31b-it` at 84.5s × ~70 Extractor calls is **~1.6 h for extraction alone** — roughly 3× the stated 30-minute tolerance. It remains a legitimate T-004 candidate if it wins on quality, but it is not free.
 - **T-610 (pre-baked demo run) stays.** Its value was never only speed — it removes any live-network dependency from the viva. Reframe the justification as demo *reliability*, not latency.
 
+### 🔴 OpenAlex is now METERED — measured 2026-08-27
+
+**This changes a load-bearing assumption and was found the hard way**, by a
+T-324 run that silently produced a fabricated match rate after the budget ran
+out mid-run.
+
+OpenAlex has moved to a **daily spending budget**. Measured from live response
+headers:
+
+| | keyless | **with a free registered key** |
+|---|---|---|
+| `x-ratelimit-limit-usd` | $0.10 / day | **$1.00 / day** |
+| `x-ratelimit-limit` (credits) | 1,000 | **10,000** |
+| cost per search | $0.001 / 10 credits | same |
+| **effective quota** | ~100 searches/day | **~1,000 searches/day** |
+
+On exhaustion it returns **HTTP 429** with
+`"Insufficient budget... Need more? Add funds at openalex.org/pricing"`.
+
+✅ **`OPENALEX_API_KEY` obtained and wired in 2026-08-27 (Sreekaran).** It is the
+**free registered tier, not a paid plan** — verified from live headers that
+`prepaid-remaining-usd` is `0`, so nothing is billable and **§0.1 is satisfied**.
+`search_openalex` reads it from `.env` automatically. **Never add funds**; the
+$0 rule is not negotiable and 1,000 searches/day is ample.
+
+⚠️ **`mailto` no longer buys anything.** The polite pool is gone — a request
+with and without `mailto` gets the identical 429. `T-201`'s `mailto` parameter
+is now courtesy only, not a quota mechanism.
+
+**Consequences, all of which bind:**
+
+- **Evaluation is what burns the quota, not the pipeline.** A real run asks
+  4–8 Planner queries. T-324 asked 291 and died at ~100 *keyless*. With the
+  key that is comfortable, but T-212, T-212b, T-324 and T-334 together still
+  warrant caching rather than repeated live sweeps.
+- **The `eval/cache/` pool cache (added for T-213) is now essential**, not a
+  convenience. Never re-run a retrieval eval without it.
+- **`search_openalex` now raises `OpenAlexBudgetExhausted`** rather than
+  letting a 429 look like "no results". *A silent `[]` is indistinguishable
+  from a genuine miss, and that is precisely how an exhausted budget
+  masqueraded as a real T-324 match rate of 18.6%.*
+- **`decisions.txt` D-03 (skip the Semantic Scholar key) still stands, but for
+  a new reason.** It was made assuming OpenAlex was unlimited; that premise was
+  false. The registered OpenAlex key restores the headroom, so S2 remains a
+  genuine secondary rather than a needed fallback — the conclusion survives
+  even though the reasoning behind it did not.
+- **arXiv is unmetered** and gains importance as the third source.
+- **T-610's pre-baked demo run stops being merely prudent and becomes
+  necessary** — a live 60-paper demo could exhaust the day's budget on stage.
+
 ### OpenAlex or Semantic Scholar is mandatory
 
 **Requirement satisfied: OpenAlex is already the primary source** (`configs/default.yaml`, T-201) and is keyless, reliable and rich in venue/OA metadata.
@@ -399,13 +449,85 @@ This is the graded component *and* the required training component. **Start it t
 
 **What the mirror actually contains** (inspected 2026-08-25, `kejian/SciReviewGen`): 84,705 train / 4,410 validation / 4,457 test rows, two columns. `reference` = survey title `<s>` chapter `<s>` cited-paper abstract `<s> BIBnnn </s>`, repeated per cited paper. `target` = the human-written survey chapter, with inline `BIBnnn` citation markers. Both intended uses are recoverable from these two columns by parsing — no S2ORC access needed.
 
-- [ ] **T-320** ⌨️ Download `kejian/SciReviewGen` via the HF token (T-003) into `data/scireviewgen/`. Record split row counts and mirror provenance. *Done when: all five parquet shards load and the row counts match 84,705 / 4,410 / 4,457.*
-- [ ] **T-321** ⌨️ ⛔ `eval/scireviewgen_parser.py` — split `reference` into `(survey_title, chapter_id, [{bib_id, abstract}])` on the `<s>` / `</s>` delimiters. **⚠️ Verify on FULL rows that every `BIBnnn` marker appearing in `target` resolves to a bib block in `reference`.** *I checked this on the datasets-server preview and the API truncates long cells, so the alignment could not be confirmed — it is the one unproven assumption in this track and everything downstream rests on it.* *Done when: bib-resolution rate is measured over ≥500 full rows and printed. **Gate: ≥ 0.95.*** If it is lower, the delimiter parse is wrong — fix the parser, do not silently drop the unresolved markers.
-- [ ] **T-322** ⌨️ ★ `eval/scireviewgen_pairs.py` — emit human-authored claim→evidence pairs to JSONL: for each sentence in `target` containing `BIBnnn`, pair it with that bib's abstract from `reference`. Schema `{claim, evidence, bib_id, survey_title, chapter_id}`. *Done when: a 500-chapter sample yields a JSONL whose pair count and per-chapter distribution are reported.*
-- [ ] **T-323** 🧠 **Sample and QA.** Draw ~200 chapters, hand-inspect 20 pairs. Discard chapters whose bib mapping is ambiguous. *A claim sentence citing three papers is not cleanly attributable to one — decide the rule (drop multi-cite sentences, or pair against the union) and write it down, because it changes what the cross-check measures.*
-- [ ] **T-324** 🧠 **Retrieval gold sets** — chapter topic → query; cited abstracts → gold set. **SciReviewGen carries no DOIs**, so mapping onto live OpenAlex retrieval needs fuzzy title matching. *Done when: the title-match rate onto OpenAlex is measured and reported. This number is itself a limitation to state in the report, not a detail to bury.* Feeds T-212b.
-- [ ] **T-325** 🧠 ★★ **THE VERIFIER CROSS-CHECK — the reason this track exists.** Run the fine-tuned verifier (T-304) over the T-322 pairs. These are claims humans wrote and citations humans chose, so agreement is genuinely independent of your pipeline. *Done when: agreement rate is reported alongside the SciFact held-out numbers (T-305) and the 50-claim spot-check (T-705).* **Expect it to look worse than SciFact** — SciFact is expert-curated single-sentence evidence, this is real survey prose. Sarol et al. measured 0.59 micro-F1 on real citations against much higher curated-benchmark scores. **A drop here is the honest finding, not a failure** (`SESSION_CONTEXT.md §5.2`).
-- [ ] **T-326** 🧠 **Licence and citation compliance.** The original dataset is **CC BY-NC 4.0** (`PROJECT_PLAN.md §5.3`) — non-commercial only, which an academic project satisfies. **The mirrors' licence metadata is unreliable**: `pat-jj/SciReviewGen` declares MIT, which a mirror of S2ORC-derived data cannot grant; the other two declare nothing. **Cite Kasanishi et al., Findings of ACL 2023 (arXiv:2305.15186) and state CC BY-NC in the report regardless of what the mirror card says.** *Done when: the citation is in `refs.bib` and the licence line is in the report's data section.*
+- [x] **T-320** ⌨️ Download `kejian/SciReviewGen` via the HF token (T-003) into `data/scireviewgen/`. Record split row counts and mirror provenance. *Done when: all five parquet shards load and the row counts match 84,705 / 4,410 / 4,457.* ✅ **DONE 2026-08-27** — `src/researchgpt/eval/scireviewgen.py`. All five shards load; **84,705 / 4,410 / 4,457 exact match**. Provenance written to `data/scireviewgen/provenance.json`. No HF token needed — the mirror is ungated. 507 MB.
+- [x] **T-321** ⌨️ ⛔ `eval/scireviewgen_parser.py` — split `reference` into `(survey_title, chapter_id, [{bib_id, abstract}])` on the `<s>` / `</s>` delimiters. **⚠️ Verify on FULL rows that every `BIBnnn` marker appearing in `target` resolves to a bib block in `reference`.** *I checked this on the datasets-server preview and the API truncates long cells, so the alignment could not be confirmed — it is the one unproven assumption in this track and everything downstream rests on it.* *Done when: bib-resolution rate is measured over ≥500 full rows and printed. **Gate: ≥ 0.95.*** If it is lower, the delimiter parse is wrong — fix the parser, do not silently drop the unresolved markers. ✅ **DONE 2026-08-27 — GATE PASSES PERFECTLY. Resolution rate 1.0000.**
+
+  | split | rows | BIB markers | resolved | rate |
+  |---|---|---|---|---|
+  | validation | 1,000 | 8,019 | 8,019 | **1.0000** |
+  | test | 1,500 | 13,393 | 13,393 | **1.0000** |
+
+  **21,412 markers checked on FULL rows. Zero malformed blocks, zero inconsistent headers, zero empty abstracts, zero cited-but-never-marked blocks.** The delimiter grammar is perfectly regular: every one of 6,284 probed blocks is exactly four fields ending in `BIBnnn`.
+
+  ✅ **This closes the concern this task was written around** — *"the one unproven assumption in this track and everything downstream rests on it."* It could only be checked against the datasets-server preview, which truncates long cells. On full rows it holds exactly. **The Aug 28 kill switch does not fire; the `kdercksen` fallback is not needed.**
+
+  The parser is defensive where it costs nothing: a block whose last field is not a `BIBnnn` is counted malformed rather than parsed, and an abstract containing a literal `<s>` is rejoined rather than shifting every field left. Neither case occurs in the data; both are regression-tested.
+- [x] **T-322** ⌨️ ★ `eval/scireviewgen_pairs.py` — emit human-authored claim→evidence pairs to JSONL: for each sentence in `target` containing `BIBnnn`, pair it with that bib's abstract from `reference`. Schema `{claim, evidence, bib_id, survey_title, chapter_id}`. *Done when: a 500-chapter sample yields a JSONL whose pair count and per-chapter distribution are reported.* ✅ **DONE 2026-08-27** — `src/researchgpt/eval/scireviewgen_pairs.py`. **1,665 pairs** from 500 validation chapters (436 distinct chapters, 63 distinct surveys).
+
+  | sentence outcome | n |
+  |---|---|
+  | no citation | 9,672 |
+  | **multi-cite → dropped (D-07a)** | **644** |
+  | too short / too long | 44 |
+  | dangling reference → dropped (T-323) | 144 |
+  | meta-sentence → dropped (T-323) | 48 |
+  | **KEPT** | **1,665** |
+
+  **25.3% of citing sentences are multi-cite and were dropped** per `decisions.txt` D-07(a). That cost is the price of clean attribution and belongs in the report's method section, not in a footnote.
+
+  ⚠️ **Only 63 distinct surveys across 436 chapters.** Chapters cluster heavily by survey — **direct confirmation of T-330's warning** that the Phase 3C split must dedupe by `survey_title`, never by row.
+- [x] **T-323** 🧠 **Sample and QA.** Draw ~200 chapters, hand-inspect 20 pairs. Discard chapters whose bib mapping is ambiguous. *A claim sentence citing three papers is not cleanly attributable to one — decide the rule (drop multi-cite sentences, or pair against the union) and write it down, because it changes what the cross-check measures.* ✅ **DONE 2026-08-27. Rule decided in `decisions.txt` D-07(a): drop multi-cite sentences.** Written down here, in the module docstring, and in `DATA_PROVENANCE.md`.
+
+  🔴 **The hand-inspection earned its place — it found a defect no count would have surfaced.** Stripping the citation marker can destroy the sentence: *"An integrated inverter and LIM loss model is proposed in BIB018."* becomes *"...is proposed in."* — grammatical debris with no proposition left to verify. **11% of the first 1,857-pair build was degenerate this way**: 7.3% ending on a dangling preposition, 1.1% carrying punctuation wreckage (`"Recently,, see also, Harrison 1999)"`), 2.8% meta-sentences about the survey itself rather than the cited work.
+
+  *Left in, these would have surfaced later as verifier "errors" that were really data defects — the worst kind of measurement bug in a track whose entire purpose is an honest cross-check.* The build now repairs what it can and drops the rest, reporting both counts. Verified: zero dangling and zero debris remain.
+- [x] **T-324** 🧠 **Retrieval gold sets** — chapter topic → query; cited abstracts → gold set. **SciReviewGen carries no DOIs**, so mapping onto live OpenAlex retrieval needs fuzzy title matching. *Done when: the title-match rate onto OpenAlex is measured and reported. This number is itself a limitation to state in the report, not a detail to bury.* Feeds T-212b.
+
+  🔴 **This task as written cannot be done: SciReviewGen carries no TITLES for the cited papers either.** The `reference` column holds only `(survey_title, chapter_heading, abstract, BIBnnn)`. TASKLIST correctly flags the missing DOIs but assumes titles survive — they do not. Verified 2026-08-27.
+
+  **Resolution: match on the abstract**, the only identifying text present. First ~18 words → OpenAlex `title_and_abstract.search`, accepted only at Jaccard ≥ 0.5 against the source abstract. Probed before building: **7 of 8 resolved**, median Jaccard **1.00**, and the distribution is bimodal (true matches 0.52–1.00, the miss 0.00) so the threshold is not delicately placed. The verification step is what makes it safe: a bare search returns plausible neighbours and would quietly build a gold set of *wrong* papers, which then reads as a retrieval failure in T-212b rather than the matching failure it is.
+
+  🔴 **The first full run reported an 18.6% match rate. That number is VOID and must not be quoted.** The keyless OpenAlex budget expired around request ~100; every chapter from ~34 onward resolved zero. The figure was quota exhaustion wearing the costume of a measurement. **Artefacts quarantined to `eval/quarantine/`.**
+
+  *Root cause was mine, and it is the generalisable lesson:* `resolve_abstract` caught `Exception` and returned `None`, which the caller counted as "no match". **A silent failure that is indistinguishable from a negative result will fabricate a measurement.** Fixed in two places — `search_openalex` now raises `OpenAlexBudgetExhausted` on 429 instead of letting it look like an empty result set, and T-324 stops on it, flags `partial_run_budget_exhausted` in both artefacts, and prints that the rate is unfinished.
+
+  ✅ **Unblocked by the `OPENALEX_API_KEY` (§0.2) and re-run clean 2026-08-27** (`partial_run_budget_exhausted: false`).
+
+  | | |
+  |---|---|
+  | cited papers attempted | 291 |
+  | resolved onto OpenAlex | 205 |
+  | **MATCH RATE** | **70.4%** |
+  | median Jaccard of matches | **1.00** |
+  | gold papers carrying a DOI | 189 / 205 |
+  | chapters with ≥3 gold papers | 33 of 60 |
+
+  **The median match is an exact abstract match (Jaccard 1.00)**, so the 29.6% that fail are genuine absences from OpenAlex or extraction differences, not a loose threshold letting through near-misses. Compare the void keyless figure: **18.6% → 70.4%** once the quota was real.
+
+  ⚠️ **T-212b's recall is BOUNDED at 0.704 by construction** — 86 of 291 cited papers have no OpenAlex identity, so they can never be retrieved regardless of how good retrieval is. **Quote the two numbers together or the recall figure is meaningless.** This is the limitation TASKLIST asks to be stated rather than buried.
+- [x] **T-325** 🧠 ★★ **THE VERIFIER CROSS-CHECK — the reason this track exists.** Run the fine-tuned verifier (T-304) over the T-322 pairs. These are claims humans wrote and citations humans chose, so agreement is genuinely independent of your pipeline. *Done when: agreement rate is reported alongside the SciFact held-out numbers (T-305) and the 50-claim spot-check (T-705).* **Expect it to look worse than SciFact** — SciFact is expert-curated single-sentence evidence, this is real survey prose. Sarol et al. measured 0.59 micro-F1 on real citations against much higher curated-benchmark scores. **A drop here is the honest finding, not a failure** (`SESSION_CONTEXT.md §5.2`).
+
+  ✅ **COMPLETE 2026-08-27.** `src/researchgpt/eval/scireviewgen_crosscheck.py`, run over the **1,665 T-322 pairs** with the shipped fp32 verifier.
+
+  ### T-325 AGREEMENT RATE: **38.3%** (637 of 1,665)
+
+  | scoring | SUPPORT | CONTRADICT | NEI | agreement |
+  |---|---|---|---|---|
+  | **span-level** (max over evidence sentences — matches T-502) | 637 | 44 | 984 | **38.3%** |
+  | whole-abstract (naive, one truncated window) | 582 | 49 | 1,034 | 35.0% |
+
+  **Span-level scoring is worth +3.3 points**, so the deployment-faithful framing is also the better-scoring one. T-502 should score claims against *spans*, not documents — this is now measured, not assumed.
+
+  ⚠️ **The 0.7 support threshold (T-503) is currently a NO-OP.** Thresholded and argmax agreement are **identical to the pair** (637 both ways): every case where SUPPORT is the top class also clears 0.7. The verifier is confident when it says SUPPORT. *Consequence for T-503: the threshold is not doing the precision work it was introduced to do on this distribution. Tune it against real pipeline output (T-702/T-705), not against a number that cannot move.*
+
+  🔴 **A hypothesis of mine was refuted by the data, and is recorded so it is not retried.** Reading a sample of disagreements, many were of the form *"Zhang et al. proposed a robot finger…"* or *"Shi and Malik proposed…"* — where the abstract supports the *content* but never names its authors, so a strict NLI model correctly refuses to entail the attribution. I predicted these were inflating the disagreement rate. **Measured across all 1,665 pairs, the opposite holds:** attribution claims are **more** common among agreements (20.6%) than disagreements (15.4%), and so are "headless" claims whose subject was the stripped citation (9.6% vs 5.6%). **Excluding both patterns *lowers* agreement to 35.3%.** *Eight examples suggested a mechanism that 1,665 refuted; the artefact explanation is dead and the 38.3% is genuine signal.*
+
+  ★ **What it actually means, and this is the line for the report.** Disagreement is overwhelmingly **NEI (59.1%), not CONTRADICT (2.6%)**. The verifier is not calling human citations wrong — it is saying *the abstract does not contain enough to support the citing sentence*. That is a direct empirical measurement of **the abstract-only limitation T-505 already legislates for**, where Li et al. measured abstract-conditioned faithfulness at 0.745 against 0.94–0.96 with full context (`SESSION_CONTEXT §5.7`). **T-325 turns T-505 from a borrowed citation into our own finding**, on 1,665 human-authored pairs.
+
+  **Report it beside the other two lenses (T-705b), never alone**, and do not compare it to SciFact's 0.769 as though they measured the same thing: SciFact is expert-curated, single-sentence, deliberately-entailing evidence; this is whole abstracts standing in for papers, cited by humans for background and contrast as well as support. Sarol et al.'s 0.59 micro-F1 on real citations is the right order-of-magnitude comparator, and even that differs in metric.
+- [x] **T-326** 🧠 **Licence and citation compliance.** The original dataset is **CC BY-NC 4.0** (`PROJECT_PLAN.md §5.3`) — non-commercial only, which an academic project satisfies. **The mirrors' licence metadata is unreliable**: `pat-jj/SciReviewGen` declares MIT, which a mirror of S2ORC-derived data cannot grant; the other two declare nothing. **Cite Kasanishi et al., Findings of ACL 2023 (arXiv:2305.15186) and state CC BY-NC in the report regardless of what the mirror card says.** *Done when: the citation is in `refs.bib` and the licence line is in the report's data section.* ✅ **DONE 2026-08-27.** `refs.bib` **created** (it did not exist) with `kasanishi2023scireviewgen`, plus `wadden2020scifact` and `lo2020s2orc` since the licence chain runs through S2ORC. `DATA_PROVENANCE.md` **created** as the source the report's data section draws from — every dataset with its licence, what it was used for, and the limitation it carries into the results.
+
+  The mirror-licence trap is written down rather than merely known: `pat-jj/SciReviewGen` declares **MIT**, which a mirror of S2ORC-derived data cannot grant; the other two declare nothing. **Cite Kasanishi et al. and state CC BY-NC 4.0 regardless of any mirror card.** A test asserts both files still say so.
 
 ---
 

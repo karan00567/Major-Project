@@ -1,0 +1,19 @@
+{
+  "split": "validation",
+  "rows": 1000,
+  "rows_with_markers": 1000,
+  "markers_total": 8019,
+  "markers_resolved": 8019,
+  "resolution_rate": 1.0,
+  "rows_fully_resolved": 1000,
+  "row_full_resolution_rate": 1.0,
+  "malformed_blocks": 0,
+  "rows_with_inconsistent_header": 0,
+  "empty_abstracts": 0,
+  "orphan_blocks": 0,
+  "mean_bibs_per_row": 6.284,
+  "mean_markers_per_row": 8.019,
+  "unresolved_examples": [],
+  "gate": 0.95,
+  "pass": true
+}

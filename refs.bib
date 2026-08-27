@@ -1,0 +1,64 @@
+% ResearchGPT bibliography.
+% Started 2026-08-27 for T-326 (SciReviewGen licence and citation compliance).
+% Phase 8 (T-803..T-807, T-813) extends this; T-813 re-verifies every DOI
+% before submission, because indexes and publication years change.
+
+% ---------------------------------------------------------------------------
+% Datasets
+% ---------------------------------------------------------------------------
+
+% T-326. Cite the ORIGINAL paper, not the Hugging Face mirror we actually read
+% (kejian/SciReviewGen). Mirror licence metadata is unreliable: pat-jj declares
+% MIT, which a mirror of S2ORC-derived data cannot grant. The original is
+% CC BY-NC 4.0 and that is what the report must state.
+@inproceedings{kasanishi2023scireviewgen,
+  title     = {{SciReviewGen}: A Large-scale Dataset for Automatic Literature
+               Review Generation},
+  author    = {Kasanishi, Tetsu and Isonuma, Masaru and Mori, Junichiro and
+               Sakata, Ichiro},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL 2023},
+  year      = {2023},
+  eprint    = {2305.15186},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  note      = {Licensed CC BY-NC 4.0. Derived from S2ORC, frozen at 2020-07-05.}
+}
+
+% T-301. The verifier's training data.
+@inproceedings{wadden2020scifact,
+  title     = {Fact or Fiction: Verifying Scientific Claims},
+  author    = {Wadden, David and Lin, Shanchuan and Lo, Kyle and Wang, Lucy Lu
+               and van Zuylen, Madeleine and Cohan, Arman and Hajishirzi, Hannaneh},
+  booktitle = {Proceedings of the 2020 Conference on Empirical Methods in
+               Natural Language Processing (EMNLP)},
+  year      = {2020},
+  doi       = {10.18653/v1/2020.emnlp-main.609},
+  note      = {Used via allenai/scifact\_entailment. Licensed CC BY-NC 2.0.}
+}
+
+% Underlying corpus for SciReviewGen; cited because the licence chain runs
+% through it and constrains redistribution.
+@inproceedings{lo2020s2orc,
+  title     = {{S2ORC}: The Semantic Scholar Open Research Corpus},
+  author    = {Lo, Kyle and Wang, Lucy Lu and Neumann, Mark and Kinney, Rodney
+               and Weld, Daniel S.},
+  booktitle = {Proceedings of the 58th Annual Meeting of the Association for
+               Computational Linguistics (ACL)},
+  year      = {2020},
+  doi       = {10.18653/v1/2020.acl-main.447}
+}
+
+% ---------------------------------------------------------------------------
+% Base paper (T-005, approved 2026-08-25)
+% ---------------------------------------------------------------------------
+
+@inproceedings{bao2025surveygen,
+  title     = {{SurveyGen}},
+  author    = {Bao, and others},
+  booktitle = {Proceedings of the 2025 Conference on Empirical Methods in
+               Natural Language Processing (EMNLP)},
+  year      = {2025},
+  doi       = {10.18653/v1/2025.emnlp-main.136},
+  note      = {Base paper. TODO(T-813): complete the author list from the
+               published version before submission.}
+}

@@ -1,0 +1,1287 @@
+{
+  "description": "T-324 retrieval gold sets from SciReviewGen chapters. Breadth check for T-212b; the 35-paper own_bibliography.json stays the primary gate.",
+  "source": "kejian/SciReviewGen",
+  "split": "validation",
+  "matching": "abstract-prefix search onto OpenAlex, accepted at jaccard >= 0.5. The dataset carries no titles and no DOIs.",
+  "match_rate": 0.18556701030927836,
+  "frozen_at": "S2ORC 2020-07-05 - post-2020 OpenAlex hits are correct but score as false positives in T-212b. Measurement artefact.",
+  "chapters": [
+    {
+      "survey_title": "A Survey of Machine Learning Approaches and Techniques for Student Dropout Prediction",
+      "chapter": "Machine learning in education",
+      "query": "A Survey of Machine Learning Approaches and Techniques for Student Dropout Prediction Machine learning in education",
+      "gold": [
+        {
+          "bib_id": "BIB003",
+          "doi": "10.1109/cidm.2014.7008698",
+          "openalex_id": null,
+          "title": "To what extend can we predict students' performance? A case study in colleges in South Africa",
+          "year": 2014,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB004",
+          "doi": "10.24059/olj.v20i2.790",
+          "openalex_id": "https://olj.onlinelearningconsortium.org/index.php/olj/article/download/790/201",
+          "title": "Learning Analytics Methods, Benefits, and Challenges in Higher Education: A Systematic Literature Review",
+          "year": 2016,
+          "venue": "Online Learning",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB005",
+          "doi": "10.1371/journal.pone.0171207",
+          "openalex_id": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0171207&type=printable",
+          "title": "Data-driven system to predict academic grades and dropout",
+          "year": 2017,
+          "venue": "PLoS ONE",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB006",
+          "doi": null,
+          "openalex_id": "http://ceur-ws.org/Vol-1828/paper-08.pdf",
+          "title": "Smart School Multimodal Dataset and Challenges",
+          "year": 2017,
+          "venue": "Infoscience (Ecole Polytechnique F\u00e9d\u00e9rale de Lausanne)",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB007",
+          "doi": "10.1109/jstsp.2017.2692560",
+          "openalex_id": null,
+          "title": "A Machine Learning Approach for Tracking and Predicting Student Performance in Degree Programs",
+          "year": 2017,
+          "venue": "IEEE Journal of Selected Topics in Signal Processing",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 7
+    },
+    {
+      "survey_title": "A Survey of Machine Learning Approaches and Techniques for Student Dropout Prediction",
+      "chapter": "Machine learning techniques on addressing student dropout",
+      "query": "A Survey of Machine Learning Approaches and Techniques for Student Dropout Prediction Machine learning techniques on addressing student dropout",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.14569/ijarai.2013.020206",
+          "openalex_id": "http://thesai.org/Downloads/IJARAI/Volume2No2/Paper_6-Comparison_of_Supervised_and_Unsupervised_Learning_Algorithms_for_Pattern_Classification.pdf",
+          "title": "Comparison of Supervised and Unsupervised Learning Algorithms for Pattern Classification",
+          "year": 2013,
+          "venue": "INTERNATIONAL JOURNAL OF ADVANCED RESEARCH IN ARTIFICIAL INTELLIGENCE",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": null,
+          "openalex_id": null,
+          "title": "Forum Thread Recommendation for Massive Open Online Courses",
+          "year": 2014,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB005",
+          "doi": null,
+          "openalex_id": "http://hdl.handle.net/10197/8338",
+          "title": "Time Series Clustering of Moodle Activity Data",
+          "year": 2016,
+          "venue": "Research Repository UCD (University College Dublin)",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB006",
+          "doi": "10.1109/jstsp.2017.2692560",
+          "openalex_id": null,
+          "title": "A Machine Learning Approach for Tracking and Predicting Student Performance in Degree Programs",
+          "year": 2017,
+          "venue": "IEEE Journal of Selected Topics in Signal Processing",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB007",
+          "doi": "10.1587/transinf.2017edl8048",
+          "openalex_id": "https://www.jstage.jst.go.jp/article/transinf/E100.D/9/E100.D_2017EDL8048/_pdf",
+          "title": "DNN Transfer Learning Based Non-Linear Feature Extraction for Acoustic Event Classification",
+          "year": 2017,
+          "venue": "IEICE Transactions on Information and Systems",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 7
+    },
+    {
+      "survey_title": "Survey on Remote Electronic Voting",
+      "chapter": "I. Introduction",
+      "query": "Survey on Remote Electronic Voting I. Introduction",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": null,
+          "openalex_id": null,
+          "title": "Three Case Studies from Switzerland : E-Voting",
+          "year": 2009,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": null,
+          "openalex_id": null,
+          "title": "When Reality Comes Knocking Norwegian Experiences with Verifiable Electronic Voting.",
+          "year": 2012,
+          "venue": null,
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Survey on Remote Electronic Voting",
+      "chapter": "D. Coercion Evidence",
+      "query": "Survey on Remote Electronic Voting D. Coercion Evidence",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1145/1102199.1102213",
+          "openalex_id": null,
+          "title": "Coercion-resistant electronic elections",
+          "year": 2005,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1109/sp.2013.32",
+          "openalex_id": "https://ieeexplore.ieee.org/ielx7/6547086/6547088/06547121.pdf",
+          "title": "Caveat Coercitor: Coercion-Evidence in Electronic Voting",
+          "year": 2013,
+          "venue": null,
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Survey on Remote Electronic Voting",
+      "chapter": "C. Blind Signatures + Secret Sharing",
+      "query": "Survey on Remote Electronic Voting C. Blind Signatures + Secret Sharing",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1109/afips.1979.98",
+          "openalex_id": null,
+          "title": "Safeguarding cryptographic keys",
+          "year": 1899,
+          "venue": "afips",
+          "jaccard": 0.52
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1145/359168.359176",
+          "openalex_id": "https://dl.acm.org/doi/pdf/10.1145/359168.359176",
+          "title": "How to share a secret",
+          "year": 1979,
+          "venue": "Communications of the ACM",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Survey on Remote Electronic Voting",
+      "chapter": "A. Coercion-Resistance",
+      "query": "Survey on Remote Electronic Voting A. Coercion-Resistance",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1145/1102199.1102213",
+          "openalex_id": null,
+          "title": "Coercion-resistant electronic elections",
+          "year": 2005,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1109/sp.2013.32",
+          "openalex_id": "https://ieeexplore.ieee.org/ielx7/6547086/6547088/06547121.pdf",
+          "title": "Caveat Coercitor: Coercion-Evidence in Electronic Voting",
+          "year": 2013,
+          "venue": null,
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "The Management of Context-Sensitive Features: A Review of Strategies",
+      "chapter": "Introduction",
+      "query": "The Management of Context-Sensitive Features: A Review of Strategies Introduction",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1162/neco.1990.2.4.472",
+          "openalex_id": null,
+          "title": "Robust Classifiers without Robust Features",
+          "year": 1990,
+          "venue": "Neural Computation",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB003",
+          "doi": "10.1109/72.182692",
+          "openalex_id": null,
+          "title": "Speaker normalization and adaptation using second-order connectionist networks",
+          "year": 1993,
+          "venue": "IEEE Transactions on Neural Networks",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB004",
+          "doi": "10.1109/cic.1995.482614",
+          "openalex_id": null,
+          "title": "A patient-adaptive neural network ECG patient monitoring algorithm",
+          "year": 2002,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB006",
+          "doi": "10.48550/arxiv.cs/0212035",
+          "openalex_id": "https://arxiv.org/pdf/cs/0212035",
+          "title": "Exploiting Context When Learning to Classify",
+          "year": 2002,
+          "venue": "arXiv (Cornell University)",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002",
+        "BIB005"
+      ],
+      "cited_total": 6
+    },
+    {
+      "survey_title": "The Management of Context-Sensitive Features: A Review of Strategies",
+      "chapter": "Implicit Context",
+      "query": "The Management of Context-Sensitive Features: A Review of Strategies Implicit Context",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": null,
+          "openalex_id": "https://escholarship.org/uc/item/6bn113fn",
+          "title": "Incremental learning of independent, overlapping, and graded concept descriptions with an instance-based process framework",
+          "year": 1989,
+          "venue": "eScholarship (California Digital Library)",
+          "jaccard": 0.683
+        },
+        {
+          "bib_id": "BIB003",
+          "doi": "10.1109/72.182692",
+          "openalex_id": null,
+          "title": "Speaker normalization and adaptation using second-order connectionist networks",
+          "year": 1993,
+          "venue": "IEEE Transactions on Neural Networks",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002"
+      ],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "The Management of Context-Sensitive Features: A Review of Strategies",
+      "chapter": "Applying the Framework to the Research Literature",
+      "query": "The Management of Context-Sensitive Features: A Review of Strategies Applying the Framework to the Research Literature",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1109/72.182692",
+          "openalex_id": null,
+          "title": "Speaker normalization and adaptation using second-order connectionist networks",
+          "year": 1993,
+          "venue": "IEEE Transactions on Neural Networks",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "INTRODUCTION",
+      "query": "Applications of belief functions in business decisions: A review INTRODUCTION",
+      "gold": [
+        {
+          "bib_id": "BIB005",
+          "doi": "10.1214/aoms/1177699517",
+          "openalex_id": "https://projecteuclid.org/journals/annals-of-mathematical-statistics/volume-37/issue-2/New-Methods-for-Reasoning-Towards-Posterior-Distributions-Based-on-Sample/10.1214/aoms/1177699517.pdf",
+          "title": "New Methods for Reasoning Towards Posterior Distributions Based on Sample Data",
+          "year": 1966,
+          "venue": "The Annals of Mathematical Statistics",
+          "jaccard": 0.95
+        },
+        {
+          "bib_id": "BIB006",
+          "doi": "10.1214/aoms/1177698950",
+          "openalex_id": "https://projecteuclid.org/journals/annals-of-mathematical-statistics/volume-38/issue-2/Upper-and-Lower-Probabilities-Induced-by-a-Multivalued-Mapping/10.1214/aoms/1177698950.pdf",
+          "title": "Upper and Lower Probabilities Induced by a Multivalued Mapping",
+          "year": 1967,
+          "venue": "The Annals of Mathematical Statistics",
+          "jaccard": 0.943
+        },
+        {
+          "bib_id": "BIB007",
+          "doi": "10.48550/arxiv.1303.5745",
+          "openalex_id": "https://arxiv.org/pdf/1303.5745",
+          "title": "Pulcinella: A General Tool for Propagating Uncertainty in Valuation Networks",
+          "year": 2013,
+          "venue": "arXiv (Cornell University)",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB008",
+          "doi": "10.48550/arxiv.1303.5439",
+          "openalex_id": "https://arxiv.org/pdf/1303.5439",
+          "title": "A Decision Calculus for Belief Functions in Valuation-Based Systems",
+          "year": 2013,
+          "venue": "arXiv (Cornell University)",
+          "jaccard": 0.976
+        }
+      ],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 8
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "MAPPING UNCERTAINTIES",
+      "query": "Applications of belief functions in business decisions: A review MAPPING UNCERTAINTIES",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1109/34.55104",
+          "openalex_id": null,
+          "title": "The combination of evidence in the transferable belief model",
+          "year": 1990,
+          "venue": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "Evidential Reasoning with Versatile Evidence",
+      "query": "Applications of belief functions in business decisions: A review Evidential Reasoning with Versatile Evidence",
+      "gold": [
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1002/int.4550100304",
+          "openalex_id": "http://hdl.handle.net/1808/11003",
+          "title": "The belief-function approach to aggregating audit evidence",
+          "year": 1995,
+          "venue": "International Journal of Intelligent Systems",
+          "jaccard": 0.935
+        }
+      ],
+      "unresolved": [
+        "BIB001",
+        "BIB003"
+      ],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "Integrating Statistical and Non-Statistical Evidence",
+      "query": "Applications of belief functions in business decisions: A review Integrating Statistical and Non-Statistical Evidence",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": null,
+          "openalex_id": "https://dk.um.si/IzpisGradiva.php?id=28715",
+          "title": "Auditing: An Integrated Approach",
+          "year": 1976,
+          "venue": "University of Maribor digital library (University of Maribor)",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.2308/aud.2000.19.1.145",
+          "openalex_id": null,
+          "title": "Attribute Sampling: A Belief-Function Approach to Statistical Audit Evidence",
+          "year": 2000,
+          "venue": "Auditing A Journal of Practice & Theory",
+          "jaccard": 0.688
+        }
+      ],
+      "unresolved": [
+        "BIB003"
+      ],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "Judgment under Ambiguity",
+      "query": "Applications of belief functions in business decisions: A review Judgment under Ambiguity",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.2307/1884324",
+          "openalex_id": null,
+          "title": "Risk, Ambiguity, and the Savage Axioms",
+          "year": 1961,
+          "venue": "The Quarterly Journal of Economics",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB005",
+          "doi": "10.1016/s1474-7979(00)03033-7",
+          "openalex_id": null,
+          "title": "Belief functions in accounting behavioral research",
+          "year": 2004,
+          "venue": "Advances in accounting behavioral research",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB006"
+      ],
+      "cited_total": 6
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "Business Model Combination",
+      "query": "Applications of belief functions in business decisions: A review Business Model Combination",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1109/hicss.1999.772921",
+          "openalex_id": "http://hdl.handle.net/1808/11000",
+          "title": "Evidential reasoning for WebTrust assurance services",
+          "year": 2003,
+          "venue": null,
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1007/978-3-7908-1798-0_8",
+          "openalex_id": null,
+          "title": "Evaluating Mergers and Acquisitions: A Belief Function Approach",
+          "year": 2002,
+          "venue": "Studies in fuzziness and soft computing",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB003",
+          "doi": "10.1007/978-3-7908-1798-0_11",
+          "openalex_id": "http://hdl.handle.net/1808/158",
+          "title": "Modeling Financial Portfolios Using Belief Functions",
+          "year": 2002,
+          "venue": "Studies in fuzziness and soft computing",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "APPLICATIONS OF LINEAR BELIEF FUNCTIONS",
+      "query": "Applications of belief functions in business decisions: A review APPLICATIONS OF LINEAR BELIEF FUNCTIONS",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.2307/2285412",
+          "openalex_id": null,
+          "title": "Bayesian Inference in Statistical Analysis.",
+          "year": 1975,
+          "venue": "Journal of the American Statistical Association",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Applications of belief functions in business decisions: A review",
+      "chapter": "SUMMARY AND CONCLUSION",
+      "query": "Applications of belief functions in business decisions: A review SUMMARY AND CONCLUSION",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": null,
+          "openalex_id": "https://dk.um.si/IzpisGradiva.php?id=28715",
+          "title": "Auditing: An Integrated Approach",
+          "year": 1976,
+          "venue": "University of Maribor digital library (University of Maribor)",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1007/978-3-7908-1798-0_11",
+          "openalex_id": "http://hdl.handle.net/1808/158",
+          "title": "Modeling Financial Portfolios Using Belief Functions",
+          "year": 2002,
+          "venue": "Studies in fuzziness and soft computing",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "Low Power Wide Area Networks: A Survey",
+      "chapter": "Low Power Wide Area",
+      "query": "Low Power Wide Area Networks: A Survey Low Power Wide Area",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1109/mcom.2015.7263374",
+          "openalex_id": null,
+          "title": "Low power wide area machine-to-machine networks: key techniques and prototype",
+          "year": 2015,
+          "venue": "IEEE Communications Magazine",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1109/itst.2015.7377400",
+          "openalex_id": null,
+          "title": "On the coverage of LPWANs: range evaluation and channel attenuation model for LoRa technology",
+          "year": 2015,
+          "venue": null,
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "FIELD Crawford METHODS / WEB SURVEY DATA COLLECTION SYSTEMS REVIEWS Evaluation of Web Survey Data Collection Systems",
+      "chapter": "",
+      "query": "FIELD Crawford METHODS / WEB SURVEY DATA COLLECTION SYSTEMS REVIEWS Evaluation of Web Survey Data Collection Systems",
+      "gold": [
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1086/322199",
+          "openalex_id": null,
+          "title": "Web Survey Design and Administration",
+          "year": 2001,
+          "venue": "Public Opinion Quarterly",
+          "jaccard": 0.957
+        },
+        {
+          "bib_id": "BIB003",
+          "doi": "10.1177/089443930101900202",
+          "openalex_id": null,
+          "title": "Web Surveys",
+          "year": 2001,
+          "venue": "Social Science Computer Review",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB001",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Introduction",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Introduction",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1063/1.1148392",
+          "openalex_id": null,
+          "title": "Fiber Bragg gratings",
+          "year": 1997,
+          "venue": "Review of Scientific Instruments",
+          "jaccard": 0.759
+        },
+        {
+          "bib_id": "BIB002",
+          "doi": "10.1109/50.618377",
+          "openalex_id": null,
+          "title": "Fiber grating sensors",
+          "year": 1997,
+          "venue": "Journal of Lightwave Technology",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB004",
+          "doi": "10.1364/ol.26.001051",
+          "openalex_id": null,
+          "title": "Whispering-gallery-mode laser at 156 \u03bcm excited by a fiber taper",
+          "year": 2001,
+          "venue": "Optics Letters",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB005",
+          "doi": "10.2184/lsj.30.426",
+          "openalex_id": "https://www.jstage.jst.go.jp/article/lsj/30/8/30_8_426/_pdf",
+          "title": "Photonic Crystal Fibers.",
+          "year": 2002,
+          "venue": "The Review of Laser Engineering",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB007",
+          "doi": "10.1364/ol.29.001194",
+          "openalex_id": null,
+          "title": "Tunable photonic crystal fiber coupler based on a side-polishing technique",
+          "year": 2004,
+          "venue": "Optics Letters",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB008",
+          "doi": "10.1117/12.625947",
+          "openalex_id": null,
+          "title": "Photonic crystal fibers for sensing applications",
+          "year": 2005,
+          "venue": "Proceedings of SPIE, the International Society for Optical Engineering/Proceedings of SPIE",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB003",
+        "BIB006"
+      ],
+      "cited_total": 13
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "TOF Structures and Their Fabrication",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications TOF Structures and Their Fabrication",
+      "gold": [
+        {
+          "bib_id": "BIB001",
+          "doi": "10.1109/50.134196",
+          "openalex_id": null,
+          "title": "The shape of fiber tapers",
+          "year": 1992,
+          "venue": "Journal of Lightwave Technology",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB003",
+          "doi": "10.1364/ao.49.002441",
+          "openalex_id": "https://arxiv.org/pdf/1001.3076",
+          "title": "Ultralow loss single-mode silica tapers manufactured by a microheater",
+          "year": 2010,
+          "venue": "Applied Optics",
+          "jaccard": 1.0
+        },
+        {
+          "bib_id": "BIB004",
+          "doi": "10.1364/ol.38.004617",
+          "openalex_id": null,
+          "title": "Fiber-tip high-temperature sensor based on multimode interference",
+          "year": 2013,
+          "venue": "Optics Letters",
+          "jaccard": 1.0
+        }
+      ],
+      "unresolved": [
+        "BIB002"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "A Singlemode-Multimode-Singlemode (SMS) Structure",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications A Singlemode-Multimode-Singlemode (SMS) Structure",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 11
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "A Singlemode-Tapered-Multimode-Singlemode (STMS) Structure and Its Fabrication",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications A Singlemode-Tapered-Multimode-Singlemode (STMS) Structure and Its Fabrication",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 10
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Adaptation of an STMS Structure as a Probe Type Structure",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Adaptation of an STMS Structure as a Probe Type Structure",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Periodically Tapered SMS Fiber Structures",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Periodically Tapered SMS Fiber Structures",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 20
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Tapered Fiber Structures Incorporating Photonic Crystal Fiber",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Tapered Fiber Structures Incorporating Photonic Crystal Fiber",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 20
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Micro Fiber Coupler (MFC) Structure",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Micro Fiber Coupler (MFC) Structure",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 16
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Applications of TOFs as Optical Fiber Sensors",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Applications of TOFs as Optical Fiber Sensors",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 10
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "RI Sensor",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications RI Sensor",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 14
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Temperature Sensor",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Temperature Sensor",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007"
+      ],
+      "cited_total": 7
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Humidity Sensor",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Humidity Sensor",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 8
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Biosensor",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Biosensor",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006"
+      ],
+      "cited_total": 6
+    },
+    {
+      "survey_title": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications",
+      "chapter": "Sensor Interrogation",
+      "query": "A Review of Multimode Interference in Tapered Optical Fibers and Related Applications Sensor Interrogation",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina",
+      "chapter": "inTroducTion",
+      "query": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina inTroducTion",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina",
+      "chapter": "oTher reTinal imaging modaliTies",
+      "query": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina oTher reTinal imaging modaliTies",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina",
+      "chapter": "principles of opTical coherence Tomography",
+      "query": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina principles of opTical coherence Tomography",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 9
+    },
+    {
+      "survey_title": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina",
+      "chapter": "revieW of algoriThms for ocT image preprocessing",
+      "query": "A Review of Algorithms for Segmentation of Optical Coherence Tomography from Retina revieW of algoriThms for ocT image preprocessing",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 26
+    },
+    {
+      "survey_title": "A systematic literature review of open source software quality assessment models",
+      "chapter": "Background",
+      "query": "A systematic literature review of open source software quality assessment models Background",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 9
+    },
+    {
+      "survey_title": "A systematic literature review of open source software quality assessment models",
+      "chapter": "RQ2.",
+      "query": "A systematic literature review of open source software quality assessment models RQ2.",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A systematic literature review of open source software quality assessment models",
+      "chapter": "Principal findings",
+      "query": "A systematic literature review of open source software quality assessment models Principal findings",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A systematic literature review of open source software quality assessment models",
+      "chapter": "Implications of the results",
+      "query": "A systematic literature review of open source software quality assessment models Implications of the results",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007"
+      ],
+      "cited_total": 7
+    },
+    {
+      "survey_title": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES",
+      "chapter": "INTRODUCTION",
+      "query": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES INTRODUCTION",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES",
+      "chapter": "DIGITAL STETHOSCOPE",
+      "query": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES DIGITAL STETHOSCOPE",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003"
+      ],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES",
+      "chapter": "Heart Sound Segmentation",
+      "query": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES Heart Sound Segmentation",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES",
+      "chapter": "Aortic Pulmonary Signal Decomposition",
+      "query": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES Aortic Pulmonary Signal Decomposition",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003"
+      ],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES",
+      "chapter": "Automatic Pathology Classification",
+      "query": "A SURVEY OF AUDIO PROCESSING ALGORITHMS FOR DIGITAL STETHOSCOPES Automatic Pathology Classification",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 9
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "VRPPD subclass definitions",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot VRPPD subclass definitions",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "Exact methods",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot Exact methods",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 9
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "Heuristics",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot Heuristics",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 35
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "The static pickup and delivery problem",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot The static pickup and delivery problem",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "SC96",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot SC96",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "Metaheuristics",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot Metaheuristics",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 9
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "Summary",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot Summary",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "Related work",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot Related work",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 18
+    },
+    {
+      "survey_title": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot",
+      "chapter": "The static dial-a-ride problem",
+      "query": "A survey on pickup and delivery problems: Part i: Transportation between customers and depot The static dial-a-ride problem",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION",
+      "chapter": "User Modeling",
+      "query": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION User Modeling",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION",
+      "chapter": "ONOTOLOGY",
+      "query": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION ONOTOLOGY",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002"
+      ],
+      "cited_total": 2
+    },
+    {
+      "survey_title": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION",
+      "chapter": "Expert Knowledge:",
+      "query": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION Expert Knowledge:",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003"
+      ],
+      "cited_total": 3
+    },
+    {
+      "survey_title": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION",
+      "chapter": "SURVEYS",
+      "query": "A SURVEY ON ONTOLOGY BASED WEB PERSONALIZATION SURVEYS",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004"
+      ],
+      "cited_total": 4
+    },
+    {
+      "survey_title": "Color Learning and Illumination Invariance on Mobile Robots: A Survey",
+      "chapter": "Introduction",
+      "query": "Color Learning and Illumination Invariance on Mobile Robots: A Survey Introduction",
+      "gold": [],
+      "unresolved": [
+        "BIB001",
+        "BIB002",
+        "BIB003",
+        "BIB004",
+        "BIB005",
+        "BIB006",
+        "BIB007",
+        "BIB008"
+      ],
+      "cited_total": 9
+    }
+  ]
+}

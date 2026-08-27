@@ -126,6 +126,37 @@ OPTIONS
       a connector that answers 1 in 3 makes that claim thin.
 
 ANSWER: B, we have openalex right, we weill keep that as primary and semantic scholar as seconday
+  >> PREMISE FALSIFIED 2026-08-27, but the DECISION SURVIVES. Read this before
+     relying on the reasoning.
+
+     This answer rested on "we have openalex" meaning OpenAlex was unlimited.
+     It is not. Measured from live response headers on 2026-08-27, OpenAlex
+     has moved to a METERED DAILY BUDGET:
+
+                        keyless          with a free registered key
+       daily budget     $0.10            $1.00
+       per search       $0.001 (10 credits)
+       searches/day     ~100             ~1,000
+       reset            midnight UTC
+
+     Exhaustion returns HTTP 429 pointing at openalex.org/pricing. TASKLIST
+     0.1 forbids paying, so this is a hard ceiling.
+
+     How it surfaced: a T-324 run reported an 18.6% match rate that was pure
+     artefact - the budget died around request ~100 and every later chapter
+     resolved zero. The number is void and the artefacts are quarantined.
+
+     RESOLVED: Sreekaran supplied OPENALEX_API_KEY the same day. Verified it
+     is the FREE REGISTERED tier, not a paid plan (prepaid-remaining-usd = 0),
+     so the $0 rule holds. It is wired into search_openalex via .env.
+     >>> NEVER ADD FUNDS. 1,000 searches/day is ample; paying breaks 0.1.
+
+     So the conclusion stands - OpenAlex primary, Semantic Scholar secondary -
+     but for a different reason than the one given. It is not that OpenAlex is
+     free and unlimited; it is that a free key restores enough headroom that S2
+     is a genuine secondary rather than a needed fallback.
+
+     Also note: `mailto` no longer buys any quota. The polite pool is gone.
 
 
 ================================================================================
