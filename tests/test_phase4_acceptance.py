@@ -19,7 +19,7 @@ from researchgpt.agents.planner import Planner, PlanValidationError
 from researchgpt.agents.retriever import Retriever, looks_like_author_list, title_key
 from researchgpt.agents.writer import Writer
 from researchgpt.core.config import load_config
-from researchgpt.core.models import Paper, PaperInsight, SearchTask
+from researchgpt.core.models import Paper, PaperInsight, SearchTask, SubQuestion
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -427,3 +427,79 @@ def test_prompts_all_render_with_their_placeholders():
     assert load("planner_v1", research_question="q", constraints="{}")
     assert load("extractor_v1", title="t", text_availability="full", text="x")
     assert load("writer_v1", theme="t", evidence="e")
+
+
+# --------------------------------------------------------------------------
+# T-406 — the uncited-section defect found by the first M1 run
+# --------------------------------------------------------------------------
+
+
+def test_t406_retries_a_section_that_forgot_to_cite_anything(cfg):
+    """First M1 run: "Methods and Architectures" came back as 6,751 characters
+    with ZERO [n] markers. Nothing caught it, because zero markers means zero
+    DROPPED markers, so every integrity counter read clean."""
+    uncited = "This is a long uncited essay about methods. " * 20
+    cited = "A grounded claim [1]. " * 20
+    llm = StubLLM(uncited, cited, cited, cited, cited)
+    out = Writer(llm, cfg)({
+        "iteration": 0, "papers": [make_paper("p")],
+        "paper_insights": [PaperInsight(paper_id="p", methodology="m")],
+        "sub_questions": [SubQuestion(sq_id="SQ1", text="t", facet="method")],
+        "research_question": "q",
+    })
+    assert llm.calls >= 2, "the uncited section should have been retried"
+    assert "[1]" in out["final_review"]
+
+
+def test_t406_rejects_a_section_still_uncited_after_the_retry(cfg):
+    """Unverifiable prose is worse than a missing section - the Verifier drops
+    unsupported claims, so the Writer must not emit unsupported sections."""
+    uncited = "This is a long uncited essay about methods. " * 20
+    llm = StubLLM(uncited, uncited)
+    # .run() directly: __call__ adds fail_soft, which correctly contains the
+    # error so one bad section cannot kill a 30-minute run. The pipeline-level
+    # guard in graph/build.py is what turns "no review at all" into a failure.
+    with pytest.raises(ValueError, match="no cited section"):
+        Writer(llm, cfg).run({
+            "iteration": 0, "papers": [make_paper("p")],
+            "paper_insights": [PaperInsight(paper_id="p", methodology="m")],
+            "sub_questions": [SubQuestion(sq_id="SQ1", text="t", facet="method")],
+            "research_question": "q",
+        })
+
+
+def test_t405_pipeline_refuses_to_report_success_with_no_review(cfg, tmp_path):
+    """The Writer is fail_soft, so a total failure would otherwise exit 0 with
+    an empty review.md - success by silence."""
+    import researchgpt.graph.build as build
+
+    class DeadWriter(Writer):
+        def run(self, state):
+            raise ValueError("no cited section survived")
+
+    def agents(cfg_, llm_, trace_):
+        return [DeadWriter(llm_, cfg_, trace=trace_)]
+
+    with patch.object(build, "make_agents", agents):
+        with patch.object(build, "TraceLogger") as tl:
+            tl.return_value.run_dir = tmp_path
+            with pytest.raises(RuntimeError, match="produced no review"):
+                build.run_pipeline("q", cfg, run_id="dead", write_artefacts=False)
+
+
+def test_t406_a_short_uncited_fragment_is_not_rejected(cfg):
+    """A one-line transitional sentence carrying no citation is not the defect;
+    a 6,751-character uncited essay is. The threshold has to tell them apart."""
+    from researchgpt.agents.writer import MIN_CITED_SECTION_CHARS
+
+    assert 200 <= MIN_CITED_SECTION_CHARS <= 1000
+
+
+def test_config_names_the_stock_reranker_after_the_t335_revert():
+    """T-335 was reverted on M1 evidence: the tuned model put an IoT paper
+    above the most relevant paper in a real Planner-generated pool."""
+    import pathlib as _p
+
+    cfg_text = (_p.Path("configs/default.yaml")).read_text(encoding="utf-8")
+    assert "reranker: cross-encoder/ms-marco-MiniLM-L-6-v2" in cfg_text
+    assert "T-335 REVERTED" in cfg_text

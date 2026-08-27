@@ -612,6 +612,24 @@ This is the graded component *and* the required training component. **Start it t
   ⚠️ **Harness limitation to state if these latencies are quoted:** the stock arm runs through sentence-transformers/PyTorch and the tuned arm through onnxruntime, so the ms/query column compares **runtimes**, not models. It is not an apples-to-apples latency measurement.
 - [x] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.* **IMPLEMENTED 2026-08-27** as a mechanical gate in `rerank/evaluate.py`, decided on out-of-domain nDCG@10 and Recall@20.
 
+  🔴 **REVERTED 2026-08-27 by the first real pipeline run (M1). `configs/default.yaml` names the STOCK reranker.**
+
+  The adoption below rested on condition 2 — *the live pool is 98.2% on-topic, so there is little for a miscalibrated model to mis-promote*. **That measurement did not generalise.** It came from T-212's *cached* pool, built from 15 hand-written, tightly-scoped queries. The Planner (T-402) emits 20+ broader queries and produces a far more heterogeneous pool.
+
+  M1's ranked top-10 contained **edge-server RL, IoT monitoring and US biodiversity specimens**. A/B on the same live pool, query `multi agent retrieval literature review`:
+
+  | rank | stock | tuned |
+  |---|---|---|
+  | 1 | LiRA (multi-agent literature review) **+7.77** | **IoT behavioural monitoring +4.77** |
+  | 2 | LatteReview (systematic review) +5.43 | LiRA, demoted to **+2.10** |
+  | 3 | MARS (multi-agent retrieval) +5.36 | LatteReview +0.35 |
+
+  **The tuned model ranks an IoT paper above the single most relevant paper in the pool.** The relevance control flagged exactly this and was right; my condition-2 evidence was drawn from an unrepresentative pool. *Two reversals on this decision is not a good look, but the final state rests on production output rather than a proxy, and the lesson is specific: a "the pool is clean" argument must be measured on the pool the PLANNER builds, not on a hand-curated one.*
+
+  **Fix before re-adopting:** retrain with **mixed negatives** (~3 hard : 1 random). Training on 100% BM25 hard negatives is what removed the model's ability to recognise irrelevance (T-331). ~40 minutes; not spent, because M1 took priority.
+
+  <details><summary>Superseded adoption reasoning, kept for the report</summary>
+
   ✅ **RUN 2026-08-27. VERDICT: PROMOTE WITH CONDITIONS. The tuned reranker is adopted** — `configs/default.yaml` now names `data/models/reranker-onnx` (the **2-epoch**, int8 ONNX build).
 
   | | stock | **adopted (2-epoch, int8)** | delta |
@@ -633,7 +651,9 @@ This is the graded component *and* the required training component. **Start it t
 
   ⚠️ **An earlier verdict here read "DO NOT PROMOTE — catastrophically broken". That was an overcorrection and is retracted.** The relevance control was first wired as a hard veto; it measures a real property, but whether that property *matters* depends on the two facts above, which had not been measured when the veto was written. The gate now reports **PROMOTE WITH CONDITIONS** and prints them. *Ranking gains remain a hard requirement — the control cannot rescue a model that does not rank better.*
 
-  **Honest reporting line for T-705b / the deck:** *"the fine-tuned reranker raises Recall@20 by 35% on our own bibliography while losing absolute score calibration; we verified it is used only for ordering and that our candidate pool is 98% on-topic, and adopted it under those documented conditions."*
+  </details>
+
+  **Honest reporting line for T-705b / the deck:** *"the fine-tuned reranker raised Recall@20 by 35% on a curated bibliography and improved every in-domain ranking metric, yet we rejected it: a relevance control showed it had stopped recognising irrelevance, and on the first real pipeline run it ranked an IoT-monitoring paper above the most relevant paper in the pool. We traced the cause to training exclusively on BM25 hard negatives."*
 
   ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
 - [ ] **T-336** 🧠 **UNBLOCKED 2026-08-27** — T-335 adopted the tuned reranker, so this ablation now has two real arms to compare. **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
@@ -642,14 +662,35 @@ This is the graded component *and* the required training component. **Start it t
 
 ## 6. Phase 4 — Agents and the first survey (Days 4–6: Aug 29–31) 🔴 M1
 
-- [ ] **T-401** 🧠 `agents/base.py` — the agent ABC, the partial-state-return contract (`SPEC §14.3`), and the trace hook.
-- [ ] **T-402** ⌨️ `agents/planner.py` — research question → 4–8 sub-questions + search plan, on the free-tier LLM. (`SPEC §7.1`) *Done when: a real question yields a validated plan object.*
-- [ ] **T-403** ⌨️ `agents/retriever.py` — the node wrapper around Phase 2. No LLM call. (`SPEC §7.2`)
-- [ ] **T-404** ⌨️ ★ `agents/extractor.py` — per paper: `methodology / advantages / disadvantages / critique`, plus `datasets`, `metrics`, `evidence_spans`. **Strict Pydantic + retry-with-repair, max 2, then `None` + `extraction_note`. Never abort a run on a parse failure.** **Strip markdown fences before parsing** — §0.1 measured that Gemma returns fenced JSON despite `responseSchema`, so fenced output is the normal case, not the error case. (`SPEC §7.3`, `§14.2`) *Done when: 10 papers all produce a valid `Insight`, including at least one that needed a repair.*
-- [ ] **T-405** 🧠 `graph/build.py` — wire **linearly** first: PLANNER → RETRIEVER → INGEST → RANK → EXTRACTOR → WRITER. No critic loop yet. *Done when: the graph runs start to finish on a real question.*
-- [ ] **T-406** ⌨️ `agents/writer.py` — thematic synthesis with IEEE `[n]` citations. **Evidence-first: the Writer may cite only what it was given.** ALCE measured post-hoc citation attachment costing 47% of citation recall (`SESSION_CONTEXT.md §5.10`). (`SPEC §7.6`)
-- [ ] **T-407** ⌨️ `output/markdown_writer.py`, `output/bibtex_writer.py`, `output/insight_table.py` (CSV). *Done when: `outputs/runs/<run_id>/` contains `review.md`, `refs.bib`, `insights.csv`, `trace.jsonl`, `config.yaml`.*
-- [ ] **T-408** 🔴 **MILESTONE M1 — a complete cited literature survey from the CLI.** *The insurance policy. If everything after this collapses, there is still something to submit.* **Hard date: 2026-08-31.**
+- [x] **T-401** 🧠 `agents/base.py` — the agent ABC, the partial-state-return contract (`SPEC §14.3`), and the trace hook. ✅ **DONE 2026-08-27** — `agents/base.py`. Centralises the partial-state contract, the trace hook and `fail_soft`. **The contract is enforced, not documented**: an agent returning the state it was handed re-adds every paper (the `add` reducers) and doubles the corpus on iteration 2 of the Critic loop, so `__call__` refuses it; unknown state keys are refused too, because LangGraph keeps them and nothing reads them. *Design change made while testing: agents re-raise their own exception type rather than being wrapped — a uniform `AgentError` destroyed the type-based handling `OpenAlexBudgetExhausted` and `PlanValidationError` need, and the trace already records which agent failed.*
+- [x] **T-402** ⌨️ `agents/planner.py` — research question → 4–8 sub-questions + search plan, on the free-tier LLM. (`SPEC §7.1`) *Done when: a real question yields a validated plan object.* ✅ **DONE 2026-08-27** — `agents/planner.py` + a worked example in `planner_v1.md`. **This is the agent T-212 diagnosed as the binding constraint.** The measured query rules are now *enforced in validation*, not merely requested: 3–5 terms (OpenAlex ANDs them, so 6+ returns nothing), ≥3 of 4 facets, every sub-question carrying a query. Live run: **18 queries, mean 3.6 terms, all four facets**, naming specific systems (`SciFact hallucination benchmark`, `PubMedQA grounding evaluation`, `CORD-19 citation consistency`) against the 15 generic stand-ins that scored 0.371. **Repair, not retry** — a repair pass sends the model its own broken output plus the parse error. NOT fail-soft: a run with no plan writes a survey about nothing.
+- [x] **T-403** ⌨️ `agents/retriever.py` — the node wrapper around Phase 2. No LLM call. (`SPEC §7.2`) ✅ **DONE 2026-08-27** — `agents/retriever.py`. Owns the dedup the reducers deliberately do not do: normalised DOI, then a ≥25-char title key to bridge an arXiv preprint to its published version (different DOIs, same title). Richer record wins a collision, so an abstract-less duplicate cannot silently downgrade a paper under T-505. **Also drops `abstracts` that are really author lists** — measured **1.9%** of the T-212 pool (e.g. Wadden's SciFact record), each costing a wasted extraction call and an empty insight row. Detected on name-list *shape*, not length, because short real abstracts exist and dropping one is worse than the waste.
+- [x] **T-404** ⌨️ ★ `agents/extractor.py` — per paper: `methodology / advantages / disadvantages / critique`, plus `datasets`, `metrics`, `evidence_spans`. **Strict Pydantic + retry-with-repair, max 2, then `None` + `extraction_note`. Never abort a run on a parse failure.** **Strip markdown fences before parsing** — §0.1 measured that Gemma returns fenced JSON despite `responseSchema`, so fenced output is the normal case, not the error case. (`SPEC §7.3`, `§14.2`) *Done when: 10 papers all produce a valid `Insight`, including at least one that needed a repair.* ✅ **DONE 2026-08-27** — `agents/extractor.py`. Measured **5.08/8 fields** on the M1 run, above T-004's 4.6. `fail_soft`: with ~60 papers one unparseable response would otherwise destroy a 30-minute pipeline at paper 47. **Strips echoed schema placeholders** — T-004 measured one model emitting the literal `string` into `datasets`/`metrics` on 2 of 5 papers, output that parses, validates and injects fabricated content into a hallucination-graded pipeline. **Takes the RANKED prefix** and traces a warning when the ranking is absent: insertion order is *whichever query ran first*, the defect that made the T-212 harness read 0.029 instead of 0.057. *The ~20 few-shot expansion is still open — 5.08/8 is measured, not final.*
+- [x] **T-405** 🧠 `graph/build.py` — wire **linearly** first: PLANNER → RETRIEVER → INGEST → RANK → EXTRACTOR → WRITER. No critic loop yet. *Done when: the graph runs start to finish on a real question.* ✅ **DONE 2026-08-27** — `graph/build.py` plus `agents/ranker.py` for the INGEST/RANK stage. Sequential runner for M1 **and** a compiled LangGraph for the Phase 5 loop to attach to; they share node functions so they cannot drift, and the sequential `_merge` applies the **same reducer rules** rather than merging naively — a naive merge would hide the accumulate/replace distinction until the Critic loop turned it into a duplication bug.
+- [x] **T-406** ⌨️ `agents/writer.py` — thematic synthesis with IEEE `[n]` citations. **Evidence-first: the Writer may cite only what it was given.** ALCE measured post-hoc citation attachment costing 47% of citation recall (`SESSION_CONTEXT.md §5.10`). (`SPEC §7.6`) ✅ **DONE 2026-08-27** — `agents/writer.py`. Evidence-first: ALCE measured post-hoc citation attachment costing **47% of citation recall**, so the model writes `[n]` with the sentence and never sees a paper it may not cite. Every marker is resolved against the evidence block and unresolvable ones dropped and counted. **M1 result: 9 references, 0 unresolvable citations.** Abstract-only papers are flagged in the evidence block per T-505. See T-408 for the uncited-section defect this run exposed.
+- [x] **T-407** ⌨️ `output/markdown_writer.py`, `output/bibtex_writer.py`, `output/insight_table.py` (CSV). *Done when: `outputs/runs/<run_id>/` contains `review.md`, `refs.bib`, `insights.csv`, `trace.jsonl`, `config.yaml`.* ✅ **DONE 2026-08-27** — `output/writers.py`. `review.md`, `refs.bib`, `insights.csv`, `config.json`. **No writer raises into the pipeline**: a 30-minute run that completes and then dies formatting a CSV has lost everything for no reason. `@misc` rather than `@article` when there is no venue — claiming a journal we do not know is a small fabrication in a project about citation accuracy.
+- [x] **T-408** 🔴 **MILESTONE M1 — a complete cited literature survey from the CLI.** *The insurance policy. If everything after this collapses, there is still something to submit.* **Hard date: 2026-08-31.** ✅ **LANDED 2026-08-27, four days early.** `outputs/runs/m1_first/`
+
+  | | |
+  |---|---|
+  | papers retrieved | **179** (603 chunks, 152 with abstracts) |
+  | corpus extracted | 12 (`max_papers=12`) |
+  | **extraction coverage** | **5.08 / 8 fields** — above T-004's 4.6 baseline |
+  | extraction failures | **0**; 1 repair pass across 12 papers; 0 placeholder echoes |
+  | sections | 3 (Methods, Evaluation, Limitations) |
+  | review | 16,183 chars, **9 references**, **0 unresolvable citations** |
+  | LLM requests | **16** for the whole run |
+  | artefacts | `review.md`, `refs.bib`, `insights.csv`, `config.json`, `trace.jsonl` |
+
+  **The four-field schema populated**: 12/12 papers carry a `critique`, 10/12 a `methodology`, 6/12 `datasets`. That table is the concrete answer to SurveyGen's *"limited critical analysis"*.
+
+  🔴 **Two real defects surfaced, both now fixed and regression-tested. Neither would have been found without a live run.**
+
+  1. **A 6,751-character section with ZERO citations.** "Methods and Architectures" came back as a numbered book chapter (*"3.1 Methodological Trends", "3.1.1 CTDE versus…"*) and dropped the citation instruction entirely. **Nothing caught it, because zero markers means zero *dropped* markers — every integrity counter read clean.** Uncited prose is the exact failure this system exists to prevent. The Writer now retries once with an explicit correction and then **rejects** the section: the Verifier drops unsupported claims, so the Writer must not emit unsupported sections. A pipeline-level guard also refuses to exit 0 with an empty `review.md`.
+  2. **The circuit breaker disabled the wrong source.** Its first version tripped on three consecutive empty responses and killed **arXiv** — which is unmetered and answers instantly. It now trips on **wall-clock wasted**, which is the property that actually hurt (Semantic Scholar keyless burns up to 60s per miss; the first M1 attempt was killed at 10 min having done 38 of 72 source-queries).
+
+  ⚠️ **Timing, for the T-610 demo decision:** retrieval dominates. 26 source-queries took most of the run; extraction was 12 LLM calls. A 60-paper run will be well past the ~30-minute §0.2 tolerance, which is exactly why T-610 pre-bakes the showcase run.
+
 - [ ] **T-409** 🧠 Run the **flagship query** — the system surveys *its own topic*, agentic RAG for automated literature review. The 25-paper bibliography is the answer key. Keep the output: after a human edit pass it becomes the report's literature-survey chapter (T-807).
 
 ---

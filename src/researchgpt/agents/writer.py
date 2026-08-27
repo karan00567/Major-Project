@@ -54,6 +54,31 @@ THEME_ORDER: tuple[tuple[str, str], ...] = (
 #: stops fitting usefully in one prompt and citation precision degrades.
 MAX_EVIDENCE_PER_THEME = 14
 
+#: A section this long with no citation at all is unverifiable prose, not a
+#: literature review.
+#:
+#: 🔴 **Observed on the first M1 run**: "Methods and Architectures" came back as
+#: **6,751 characters with zero `[n]` markers** - the model wrote a numbered
+#: book chapter ("3.1 Methodological Trends", "3.1.1 CTDE versus...") and
+#: dropped the citation instruction entirely while doing it. Nothing caught it,
+#: because zero markers means zero DROPPED markers, so every integrity counter
+#: read clean.
+#:
+#: Uncited prose is the exact failure this system exists to prevent, so a
+#: section that produces none is retried once with an explicit correction and
+#: then rejected. Rejecting is consistent with the rest of the architecture:
+#: the Verifier drops unsupported claims, so the Writer must not emit
+#: unsupported sections.
+MIN_CITED_SECTION_CHARS = 400
+
+_UNCITED_RETRY = """Your previous section contained NO [n] citations at all.
+
+Every factual sentence must carry at least one [n] marker pointing at the
+numbered EVIDENCE above. Do not write a numbered chapter outline; write cited
+prose. If you cannot support a sentence from the evidence, delete the sentence.
+
+Rewrite the section now, with citations."""
+
 
 class Writer(Agent):
     name = "writer"
@@ -162,6 +187,32 @@ class Writer(Agent):
                 continue
 
             text, dropped, used = self._resolve_citations(raw.strip(), len(cited))
+
+            # Retry once if the model wrote prose and forgot to cite anything.
+            if not used and len(text) >= MIN_CITED_SECTION_CHARS:
+                self._emit("section_uncited_retry",
+                           {"theme": heading, "chars": len(text)}, iteration)
+                try:
+                    raw = self._llm.complete(prompt + "\n\n" + _UNCITED_RETRY)
+                    text, dropped, used = self._resolve_citations(
+                        raw.strip(), len(cited))
+                except Exception as exc:
+                    self._emit("section_failed",
+                               {"theme": heading,
+                                "error": f"retry: {type(exc).__name__}: {exc}"},
+                               iteration)
+                    continue
+
+            if not used and len(text) >= MIN_CITED_SECTION_CHARS:
+                # Still uncited after an explicit correction. Drop it: the
+                # Verifier drops unsupported claims, so the Writer must not
+                # emit unsupported sections.
+                self._emit("section_rejected_uncited",
+                           {"theme": heading, "chars": len(text),
+                            "why": "no [n] citations after a retry; unverifiable "
+                                   "prose is worse than a missing section."},
+                           iteration)
+                continue
             # Renumber to the global reference list so [n] is stable across
             # sections in the stitched document.
             remap: dict[int, int] = {}
@@ -188,7 +239,10 @@ class Writer(Agent):
                         "citations_dropped": dropped}, iteration)
 
         if not sections:
-            raise ValueError("every section failed to generate.")
+            raise ValueError(
+                "every section was rejected or failed. A review with no cited "
+                "section is not a review."
+            )
 
         review = self._stitch(state, sections, global_sources)
         self._emit(
@@ -218,4 +272,4 @@ class Writer(Agent):
         return "\n".join(out)
 
 
-__all__ = ["Writer", "THEME_ORDER"]
+__all__ = ["Writer", "THEME_ORDER", "MIN_CITED_SECTION_CHARS"]

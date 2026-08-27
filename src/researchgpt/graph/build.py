@@ -125,6 +125,20 @@ def run_pipeline(
             trace.event("graph", "artefacts_written",
                         {k: str(v) for k, v in written.items()}, 0)
 
+        # The Writer is fail_soft so one bad section costs a section, not the
+        # run. But a run that produced NO review is a failed run, and it must
+        # not exit 0 with an empty review.md. Artefacts are written first:
+        # insights.csv and the trace are still worth having.
+        if not (state.get("final_review") or "").strip():
+            trace.event("graph", "run_failed",
+                        {"reason": "no review produced; every section was rejected "
+                                   "or failed. See section_rejected_uncited / "
+                                   "section_failed events."}, 0)
+            raise RuntimeError(
+                "Pipeline produced no review. Every section was rejected or failed - "
+                "check the trace for section_rejected_uncited and section_failed."
+            )
+
         trace.event(
             "graph", "run_end",
             {"papers": len(state.get("papers") or []),

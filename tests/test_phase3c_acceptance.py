@@ -428,12 +428,21 @@ def test_nothing_in_the_pipeline_thresholds_on_a_reranker_score():
     )
 
 
-def test_config_names_the_adopted_reranker_and_documents_its_conditions():
+def test_config_names_the_stock_reranker_after_the_t335_revert():
+    """T-335 adopted the tuned reranker, then REVERTED it on M1 evidence.
+
+    The adoption rested on "the live pool is 98.2% on-topic", measured on
+    T-212's cached pool of 15 hand-written, tightly-scoped queries. The Planner
+    generates 20+ broader queries, and on the first real run the tuned model
+    ranked an IoT-monitoring paper above the single most relevant paper in the
+    pool. The condition did not generalise; the relevance control was right.
+
+    The reason travels with the config so the next reader does not re-adopt it
+    from the in-domain numbers alone.
+    """
     import pathlib
 
     cfg = pathlib.Path("configs/default.yaml").read_text(encoding="utf-8")
-    assert "reranker: data/models/reranker-onnx" in cfg
-    # The conditions must travel with the config, or the next reader ships a
-    # miscalibrated model into a context that does threshold on scores.
-    assert "ORDERING ONLY" in cfg
-    assert "98.2%" in cfg
+    assert "reranker: cross-encoder/ms-marco-MiniLM-L-6-v2" in cfg
+    assert "T-335 REVERTED" in cfg
+    assert "mixed negatives" in cfg.lower() or "MIXED negatives" in cfg

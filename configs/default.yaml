@@ -56,24 +56,27 @@ retrieval:
   fusion: rrf
   rrf_k: 60
   rerank: true
-  # T-335 ADOPTED 2026-08-27: the SciReviewGen fine-tune (2 epochs, int8 ONNX).
-  #   own-bibliography Recall@20  0.4815 -> 0.6481   (+35% relative)
-  #   own-bibliography nDCG@10    0.2277 -> 0.2577
-  # Adopted under two documented conditions, both verified before promotion:
-  #   1. ORDERING ONLY. Its absolute scores are NOT calibrated - it rates
-  #      unrelated documents at +3..+5 where stock gives -11 (cause: T-331
-  #      trained on 100% BM25 hard negatives, so it never saw a document that
-  #      was irrelevant to everything). Nothing may threshold on the score;
-  #      Reranker.filter_by_score() raises to enforce this.
-  #   2. The live candidate pool is 98.2% on-topic, so there is almost nothing
-  #      for a miscalibrated model to mis-promote. Measured: 0 off-topic papers
-  #      in the top-12 vs the stock model's 1.
-  # RE-RUN THE T-335 GATE if the pool composition changes - notably if
-  # max_per_source rises to 100 (decisions.txt D-05), which admits more
-  # marginal papers.
-  # A missing path falls back to the stock model with a warning, so a fresh
-  # clone still runs: data/models/ is gitignored and rebuilt from Kaggle.
-  reranker: data/models/reranker-onnx   # 22M int8; stock fallback = cross-encoder/ms-marco-MiniLM-L-6-v2
+  # T-335 REVERTED 2026-08-27 after the first real pipeline run (M1).
+  #
+  # The tuned SciReviewGen reranker WAS adopted, on the measured condition that
+  # "the live pool is 98.2% on-topic, so there is little for a miscalibrated
+  # model to mis-promote". That condition was drawn from T-212's CACHED pool,
+  # built from 15 hand-written, tightly-scoped queries. The Planner (T-402)
+  # generates 20+ broader queries, and the resulting pool is far more
+  # heterogeneous - so the measurement did not generalise.
+  #
+  # Observed in M1 output: the tuned model's top-10 contained edge-server RL,
+  # IoT monitoring and US biodiversity specimens. A/B on the same live pool,
+  # query "multi agent retrieval literature review":
+  #     stock  #1 LiRA (multi-agent literature review)          +7.77
+  #     tuned  #1 "real-time behavioral monitoring in IoT"      +4.77
+  #                LiRA demoted to #2                           +2.10
+  #
+  # The relevance control (T-335) flagged exactly this and was right. Keeping
+  # the stock model until the reranker is retrained with MIXED negatives
+  # (~3 hard : 1 random) - training on 100% BM25 hard negatives is what removed
+  # its ability to recognise irrelevance (T-331).
+  reranker: cross-encoder/ms-marco-MiniLM-L-6-v2   # ~22M, CPU. Stock: calibrated.
   final_k: 12
   chunk_size: 1200
   chunk_overlap: 200
