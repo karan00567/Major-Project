@@ -82,3 +82,6 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "network: hits a live API or the Hugging Face Hub; deselect with -m 'not network'",
+]

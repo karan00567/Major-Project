@@ -1,0 +1,51 @@
+{
+  "stock": {
+    "model": "cross-encoder/nli-deberta-v3-small",
+    "per_class": {
+      "SUPPORT": {
+        "precision": 0.8870967741935484,
+        "recall": 0.23404255319148937,
+        "f1": 0.3703703703703704,
+        "support": 235
+      },
+      "CONTRADICT": {
+        "precision": 0.5419847328244275,
+        "recall": 0.5419847328244275,
+        "f1": 0.5419847328244275,
+        "support": 131
+      },
+      "NEI": {
+        "precision": 0.5080459770114942,
+        "recall": 0.8435114503816794,
+        "f1": 0.6341463414634145,
+        "support": 262
+      }
+    },
+    "macro_f1": 0.5155004815527374,
+    "accuracy": 0.552547770700637,
+    "confusion": [
+      [
+        55,
+        22,
+        158
+      ],
+      [
+        4,
+        71,
+        56
+      ],
+      [
+        3,
+        38,
+        221
+      ]
+    ],
+    "n": 628
+  },
+  "labels": [
+    "SUPPORT",
+    "CONTRADICT",
+    "NEI"
+  ],
+  "pairs_file": "data\\scifact\\pairs_validation.jsonl"
+}

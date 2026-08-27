@@ -1,0 +1,34 @@
+{
+  "task": "T-306",
+  "model": "data\\models\\verifier-onnx\\fp32",
+  "results": {
+    "1": {
+      "claims_per_sec": 25.411824665841134,
+      "ms_per_claim": 39.35175899998285,
+      "ms_per_batch_p50": 34.44705007132143,
+      "tokenize_share": 0.019428775497668093,
+      "n_claims": 200
+    },
+    "8": {
+      "claims_per_sec": 23.187598221668182,
+      "ms_per_claim": 43.12650195333845,
+      "ms_per_batch_p50": 307.22035001963377,
+      "tokenize_share": 0.0042675959206889755,
+      "n_claims": 256
+    },
+    "16": {
+      "claims_per_sec": 14.402301073729792,
+      "ms_per_claim": 69.43334921834321,
+      "ms_per_batch_p50": 895.7847999408841,
+      "tokenize_share": 0.0023050376464911282,
+      "n_claims": 256
+    },
+    "32": {
+      "claims_per_sec": 7.73413254718176,
+      "ms_per_claim": 129.29698242169252,
+      "ms_per_batch_p50": 4197.258200030774,
+      "tokenize_share": 0.0015878204423730555,
+      "n_claims": 256
+    }
+  }
+}

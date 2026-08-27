@@ -1,0 +1,526 @@
+================================================================================
+RESEARCHGPT - DECISIONS ONLY YOU CAN TAKE
+================================================================================
+Written 2026-08-27 by Claude Code, from a full pass over TASKLIST.md.
+Target submission: ~2026-09-07.  Days remaining: 11.
+
+HOW TO USE THIS FILE
+  Every item below is a real fork in the road that is currently unresolved and
+  that code cannot settle on its own. Each one gives you the options, what each
+  option costs, and a recommendation. Write your answer under "ANSWER:".
+
+  Your four earlier answers (T-002, T-005, T-006, T-007) live in
+  `decsions.txt.txt`. That filename is misspelled and this one is not; pick one
+  of the two to be canonical and delete the other, or they will drift apart.
+
+  Where a decision has already been measured rather than guessed, the numbers
+  are quoted so you are deciding against evidence, not against intuition.
+
+WHERE THE PROJECT ACTUALLY IS
+  Done   : Phase 0 (preflight), Phase 1 (skeleton), Phase 2 (retrieval, minus
+           its gate). 26 acceptance tests pass.
+  Not started (nothing on disk): Phase 3, 3B, 3C, 4, 5, 6, 6B, 7, 8.
+           `src/researchgpt/agents/` contains only `__init__.py`.
+  Open task count: ~85 across those phases, over 11 days, across 3 people.
+
+  That ratio is the reason D-01 is first and is the most consequential
+  decision in this file. Everything else is downstream of it.
+
+
+================================================================================
+SECTION 1 - DECIDE TODAY (2026-08-27)
+================================================================================
+
+--------------------------------------------------------------------------------
+D-01  SCOPE: which of the three optional tracks do you actually start?
+      Affects: Phase 3B, Phase 3C, Phase 6B, and whether M1 lands on Aug 31
+--------------------------------------------------------------------------------
+TASKLIST adds three tracks that are explicitly off the critical path (section
+12): Phase 3B (SciReviewGen, 7 tasks), Phase 3C (reranker fine-tune, 7 tasks),
+Phase 6B (Postgres registry, 7 tasks). That is 21 of the ~85 open tasks -
+roughly a quarter of everything left - and none of them is needed for the
+pipeline to run.
+
+They are not equally droppable:
+
+  Phase 3B contains T-325, the verifier cross-check, which is on the
+    never-cut list. Its purpose is to answer the circularity trap in
+    PROJECT_PLAN section 9.6: "the system enforces groundedness, then measures
+    it." Without T-325, your entire non-circular evidence base is T-705's 50
+    hand-checked claims. T-320..T-324 are pure parsing with no LLM and no API
+    budget, so this track genuinely can run in parallel.
+
+  Phase 3C is a weight swap with an adoption gate (T-335) that may well
+    reject it. TASKLIST already says the verifier alone satisfies the training
+    requirement, and the Aug 30 kill switch says to keep stock and move on.
+
+  Phase 6B exists mostly to make three Review-1 slides true (they claim
+    PostgreSQL; everything else says Chroma + SQLite). It is 7 tasks to
+    retroactively justify a slide.
+
+OPTIONS
+  (a) Full scope - run all three tracks.
+      Highest grade ceiling. Also the option where M1 slips, and the Aug 31
+      M1 deadline is the one TASKLIST calls "the insurance policy."
+
+  (b) Keep 3B, drop 3C, drop 6B.  [RECOMMENDED]
+      Protects T-325 (never-cut) and the M1 date. Costs you the second
+      trained model and the Postgres claim. Fix the slides instead of the
+      database - one edit versus seven tasks. If Phase 4/5 land early, 3C is
+      cheap to bolt on afterwards because it is a weight swap.
+
+  (c) Keep 3B and 3C, drop 6B.
+      Defensible if "two trained models" is something your rubric rewards
+      explicitly. Check the rubric before choosing this - do not assume.
+
+  (d) Drop all three, ship the six-agent pipeline alone.
+      Safest schedule, but you lose T-325 and with it the answer to the
+      circularity objection. Only take this if you are already behind on
+      Phase 4 by Aug 30.
+
+ANSWER:A
+
+
+--------------------------------------------------------------------------------
+D-02  Start the Kaggle verifier training run - today or tomorrow?
+      Affects: T-301..T-307, the Aug 29 kill switch
+--------------------------------------------------------------------------------
+TASKLIST section 5: "Start it the moment T-001/T-002 close - it runs unattended
+while Phase 2 proceeds." T-001 and T-002 closed on Aug 25. It is Aug 27 and
+nothing has started. The Aug 29 kill switch says that if the verifier is not
+trained by then, you fall back to a stock NLI checkpoint and report
+stock-vs-tuned as future work - which would cost you T-305, the headline table
+that justifies the training component at all.
+
+The run itself is under an hour on a T4. The lead time is writing T-301
+(SciFact pairing) and T-302 (the notebook), not the GPU.
+
+OPTIONS
+  (a) Start today: T-301 + T-302 tonight, T-303 runs overnight.  [RECOMMENDED]
+      Two clear days of slack before the kill switch. Costs one evening.
+  (b) Start tomorrow (Aug 28), accept one day of slack.
+      Works, but any SentencePiece/tokenizer surprise eats the whole margin.
+      Note T-306 already warns that `sentencepiece` and `protobuf` are missing
+      on this machine - that breaks the local export steps, not Kaggle.
+  (c) Skip training, ship stock NLI.
+      Do not choose this voluntarily. The verifier is the graded component and
+      the required training component. This is a kill switch, not a plan.
+
+ANSWER: A
+
+
+--------------------------------------------------------------------------------
+D-03  T-215: apply for the free Semantic Scholar API key?
+      Affects: T-214 reliability, and every retrieval run from here on
+--------------------------------------------------------------------------------
+Measured, twice: without a key, Semantic Scholar answers roughly 1 query in 3.
+Each failure burns the full 60-second backoff before degrading to an empty
+list. The connector handles this correctly - it never raises - but it means S2
+contributes about a third of the time it should. They grant academic keys free.
+
+OPTIONS
+  (a) Apply now.  [RECOMMENDED]  Ten minutes of form-filling. Turnaround is
+      typically a few days, so applying late is the same as not applying.
+  (b) Skip it. The pipeline still works; you simply get fewer S2 papers and
+      slower eval runs. Note both decks claim Semantic Scholar on 8 slides -
+      a connector that answers 1 in 3 makes that claim thin.
+
+ANSWER: B, we have openalex right, we weill keep that as primary and semantic scholar as seconday
+
+
+================================================================================
+SECTION 2 - DECIDE BY 2026-08-29
+================================================================================
+
+--------------------------------------------------------------------------------
+D-04  THE RETRIEVAL GATE: `Recall@60 >= 0.80` is currently unreachable.
+      What replaces it?
+      Affects: T-212, T-213, `configs/default.yaml`, the evaluation chapter
+--------------------------------------------------------------------------------
+This is the decision TASKLIST names explicitly as "a decision for the human,
+not a number to chase."
+
+MEASURED 2026-08-26, after two harness defects were found and fixed:
+
+    run                        pool    union recall   Recall@60 (the gate)
+    2026-08-25, unranked        447        0.371              0.029
+    max_per_source=25, ranked   493        0.371              0.057
+    max_per_source=100, ranked 1937        0.714              0.029
+
+Read the middle column first. Union recall is the fraction of your 35 gold
+papers that appear ANYWHERE in the retrieved pool. It is a hard ceiling: no
+reranker, however good, can put a paper in the top 60 that was never fetched.
+
+    At max_per_source=25 that ceiling is 0.371.
+    At max_per_source=100 it is 0.714.
+    The gate is 0.80.
+
+So the gate cannot be met at either setting even with a theoretically perfect
+ranker. This is not a tuning problem. There are two independent hurdles:
+first the union ceiling must exceed 0.80, and only then must 28 of 35 gold
+papers be ranked into 60 slots.
+
+WHY, diagnosed three ways:
+  - Of the 10 gold papers never retrieved at mps=100, 10/10 are present in
+    OpenAlex, 0 are excluded by the year_min=2019 window, and 9/10 are
+    findable by exactly the short-query shape already in use. They were not
+    unreachable. They were never asked for.
+  - Gold papers that ARE pooled rank 38 times across the 15 sub-question
+    rankings, but only 2 reach rank <= 4 - and rank <= 4 is all that 60 papers
+    split over 15 sub-questions can take.
+  - The stock reranker is above chance but only just: 2 top-4 hits against
+    1.19 expected at random. Where a query was specific ("scientific survey
+    generation") gold landed at ranks 1 and 2. It is under-informed by generic
+    queries, not broken.
+
+The 15 queries used are hand-written stand-ins. Generating good ones is the
+Planner's job (T-402), which does not exist yet.
+
+OPTIONS
+  (a) Keep the gate, re-run after T-402, accept that it may fail.
+      Honest, and the re-run is nearly free now (pool caching was added, so it
+      costs a re-rank rather than another 18 minutes of S2 backoff). Risk:
+      you find out on ~Aug 31 that it still fails, with no time to react.
+
+  (b) Restate the gate to match the geometry.  [RECOMMENDED]
+      Report BOTH numbers and gate on the one that measures retrieval rather
+      than corpus-size arithmetic:
+        - primary gate: union recall over the retrieved pool >= 0.80
+          (this measures "did we find it")
+        - secondary, reported not gated: Recall@max_papers
+          (this measures "did we keep it", and is bounded by max_papers/35)
+      This is defensible in the report because it is exactly what the
+      measurement showed, and stating it is stronger than quietly missing a
+      number you set before you had data.
+
+  (c) Raise `max_papers` from 60 to ~120 so the top-N has room.
+      60 papers over ~15 sub-questions is 4 slots each. Doubling gives 8.
+      Cost: every downstream stage doubles - the Extractor is 26.6s/paper, so
+      120 papers is ~53 minutes of extraction alone, against section 0.2's
+      stated ~30-minute tolerance. It also doubles free-tier request
+      consumption, which is a hard quota, not a speed setting.
+
+  (d) Bet entirely on T-402 emitting far more specific queries.
+      The diagnose_misses evidence says this is plausible - 9/10 misses were
+      findable by a short query. But it is a bet on unwritten code, and it has
+      to lift union recall from 0.371 to above 0.80.
+
+  (e) Some combination of (b) and a modest max_papers rise (60 -> 80).
+
+RECOMMENDATION: (b) now, and re-run T-212 immediately after T-402 lands. Decide
+(c) only with the T-402 numbers in hand.
+
+ANSWER: b
+
+
+--------------------------------------------------------------------------------
+D-05  `max_per_source`: stay at 25, or raise to 100?
+      Affects: `configs/default.yaml`, run time, D-04
+--------------------------------------------------------------------------------
+Currently 25, deliberately unchanged. Raising it to 100 nearly doubles the
+union recall ceiling (0.371 -> 0.714) but makes the corpus the Extractor
+actually sees WORSE: gold papers in the top 60 fell from 2 to 1. More
+candidates genuinely make the top-60 selection harder for a reranker that is
+barely above chance on generic queries.
+
+OPTIONS
+  (a) Stay at 25 until T-402 exists, then re-measure.  [RECOMMENDED]
+      This is what TASKLIST currently says and what the config currently does.
+  (b) Raise to 100 now.
+      Only sensible if you also take D-04 option (b), where union recall
+      becomes the gate - under that framing 100 nearly doubles your headline
+      number. Be aware it currently degrades the thing the Extractor reads.
+  (c) Split the difference at 50 and measure.
+      Costs one eval run (~18 min, or a re-rank if cached). Reasonable if you
+      want the curve rather than two points.
+
+ANSWER: raise to 50 and we wil evalute
+
+
+--------------------------------------------------------------------------------
+D-06  The Aug 28 kill switch contradicts the Aug 26 measurement. Which wins?
+      Affects: T-213, TASKLIST section 13
+--------------------------------------------------------------------------------
+TASKLIST section 13 says: "Aug 28 | Recall@20 < 0.80 | Escalate bge-small ->
+bge-base. Spend all of Aug 29 on retrieval. Push M1 to Sep 1."
+
+That row is stale in two ways. It names Recall@20, a metric already retired as
+mathematically impossible against a 35-paper gold set (20/35 = 0.57 ceiling).
+And it prescribes exactly the escalation the Aug 26 measurement says NOT to
+make: ranking is weak because the queries are generic, not because the encoder
+is small. Swapping the embedding model would mask that, at a cost of ~6 minutes
+per ingestion and a day of schedule.
+
+Tomorrow is Aug 28. If nobody decides this, someone will read that row and
+spend Aug 29 on an escalation the evidence has already ruled out.
+
+OPTIONS
+  (a) Retire the row. Do not escalate to bge-base. Spend nothing.  [RECOMMENDED]
+      Replace it with: "Aug 28 | union recall < 0.40 at mps=25 | re-examine
+      the source set, not the encoder."
+  (b) Honour the row as written and spend Aug 29 on bge-base.
+      Not supported by any measurement you currently hold.
+
+ANSWER: a
+
+
+--------------------------------------------------------------------------------
+D-07  T-323: how do you pair a sentence that cites three papers?
+      Affects: T-322, T-325, and what the cross-check actually measures
+--------------------------------------------------------------------------------
+Only arises if you keep Phase 3B (see D-01). TASKLIST flags it directly: "a
+claim sentence citing three papers is not cleanly attributable to one - decide
+the rule and write it down, because it changes what the cross-check measures."
+
+OPTIONS
+  (a) Drop multi-cite sentences entirely.  [RECOMMENDED]
+      Cleanest semantics: every surviving pair is one claim, one source, which
+      is exactly what your verifier is trained to judge. Cost: you lose a
+      chunk of the data, and survey prose cites multiply quite often, so
+      expect to lose a lot. Report the drop rate - it is a limitation, not a
+      flaw.
+  (b) Pair the sentence against the union of all cited abstracts.
+      Keeps the data, but now you are measuring "is this claim supported by
+      SOME of this evidence set", which is a different and easier task than
+      the one the verifier does in the pipeline. If you choose this, say so
+      plainly in the report; a reviewer who notices it unprompted will not be
+      generous.
+  (c) Pair against each cited abstract separately and score as supported if
+      any one supports it.
+      Most faithful to how a human wrote the sentence, but it multiplies the
+      pair count and biases toward SUPPORT.
+
+Whichever you pick, it goes in the report's method section verbatim.
+
+ANSWER: a
+
+
+================================================================================
+SECTION 3 - DECIDE BEFORE ANY RESULT IS WRITTEN (by ~2026-09-04)
+================================================================================
+
+--------------------------------------------------------------------------------
+D-08  T-707: what target numbers does the report claim?
+      Affects: the whole evaluation chapter - and your credibility
+--------------------------------------------------------------------------------
+PROJECT_PLAN section 9 targets groundedness >= 0.9. Nothing peer-reviewed
+reaches that on realistic scientific verification: Sarol et al. 0.59 micro-F1,
+CliVER 0.797 against clinicians, SurveyGen 35.84% citation accuracy,
+SciReviewGen ~30% of chapters at human quality.
+
+TASKLIST is blunt about this: "If the verifier reports 0.9+ against real
+citations, suspect the measurement, not a breakthrough."
+
+The decision must be taken BEFORE you see your own numbers. Revising a target
+after seeing the result is post-hoc, and an examiner can tell.
+
+OPTIONS
+  (a) Revise the target down to an evidence-anchored band now, citing the four
+      papers above as the basis.  [RECOMMENDED]
+      e.g. groundedness 0.60-0.75 against real citations, with the reasoning
+      recorded. Then whatever you measure is interpretable against a stated
+      prior.
+  (b) Keep 0.9 and report the shortfall honestly.
+      Defensible, but you spend the discussion explaining a number you chose
+      badly rather than a system you built well.
+  (c) Report without any target.
+      Weakest option. A measurement with no prior is hard to grade.
+
+ANSWER: a
+
+
+--------------------------------------------------------------------------------
+D-09  T-307: when do you escalate deberta-v3-small -> deberta-v3-base?
+      Affects: verifier quality, Kaggle quota
+--------------------------------------------------------------------------------
+Set the trigger before you see the number, for the same reason as D-08.
+Section 0.2 says latency is no longer a constraint and to "lean toward
+escalating rather than defending small". Both models train in well under an
+hour, so the only real cost is Kaggle quota - which you may also want for
+Phase 3C (D-01).
+
+OPTIONS
+  (a) Pre-commit a threshold, e.g. "escalate if macro-F1 on the held-out
+      SciFact validation split is below 0.75".  [RECOMMENDED]
+      Write the number here, before T-303 runs.
+  (b) Escalate unconditionally - train both, report both.
+      Nearly free on time, and gives you a model-size row in the results
+      table. Competes with T-332 for quota if you kept Phase 3C.
+  (c) Stay on `small` regardless.
+      Only if quota is genuinely tight.
+
+ANSWER (threshold, if (a)): a, 0.75
+  >> RESOLVED 2026-08-27. Gate PASSED on the model: macro-F1 0.769 >= 0.75.
+     Keep deberta-v3-small. Kaggle quota is free for T-332 (reranker).
+
+     BUT the gate exposed an ambiguity worth knowing about, already resolved
+     in code: D-09 did not say WHICH ARTEFACT the 0.75 applies to.
+       PyTorch / ONNX fp32   macro-F1 0.769  PASS
+       ONNX int8 (deployed)  macro-F1 0.741  FAIL
+     Resolved as "the artefact that actually runs", because a gate on a model
+     you do not deploy measures nothing. Under that reading int8 fails, so
+     THE PIPELINE NOW SHIPS fp32 ONNX, not int8. Cost: 400 MB of disk and
+     ~35 s per run (79 s vs 44 s for 2,000 claims, against a ~30 min budget).
+     Justified by TASKLIST 0.2 / PROJECT_PLAN 4.2: "trade latency, not
+     accuracy - the verifier is the graded component."
+     Escalating to deberta-v3-base would have been the WRONG fix: capacity is
+     fine, quantization is the problem.
+     To revert: export_report.json names recommended_model; override there.
+
+
+--------------------------------------------------------------------------------
+D-10  T-404: the winning model fills only 4.6 of 8 fields. How much do you
+      spend fixing that, and does qwen get a second look?
+      Affects: extraction quality, which is a main contribution
+--------------------------------------------------------------------------------
+Bake-off result (T-004, measured on 5 real gold abstracts per arm):
+
+    arm                    parse  valid  fields  echo   verdict
+    openai/gpt-oss-120b    100%   100%   4.6/8    0     PRIMARY
+    qwen/qwen3.6-27b       100%   100%   7.0/8    2/5   rejected
+
+qwen fills more fields but echoed the literal schema placeholder "string" into
+`datasets`/`metrics` on 2 of 5 papers. That parses, validates, and silently
+injects fabricated content into a hallucination-graded pipeline - exactly what
+SPEC section 14.2 forbids. Excluding those rows it scores 6.33/8, not 7.0.
+
+The suspicion recorded in TASKLIST is that 4.6/8 is a PROMPT problem, not a
+model problem: `extractor_v1.md` ships 3 few-shot examples against the ~20 that
+Dagdelen et al. measured as the stabilisation point.
+
+OPTIONS
+  (a) Expand the few-shots to ~20, re-run the bake-off, keep gpt-oss.
+      [RECOMMENDED]  Half a day. Expect the field count to rise. This is the
+      cheapest large win available in Phase 4.
+  (b) Expand the few-shots AND re-open the qwen arm.
+      If better examples eliminate the placeholder echo, qwen's coverage
+      advantage becomes real. Risk: the echo is a model habit, not a prompting
+      artefact, and you will have spent the time to find out. Only do this if
+      (a) leaves you short.
+  (c) Accept 4.6/8 and move on.
+      Only if you are behind on M1. Half your schema being empty is a visible
+      weakness in the insight table the examiner will look at.
+
+ANSWER: a
+
+
+--------------------------------------------------------------------------------
+D-11  T-610: how is the system demonstrated at the viva?
+      TASKLIST: "Decide this now, not the night before."
+--------------------------------------------------------------------------------
+A 60-paper run is 20-40 minutes on CPU against a rate-limited free tier. That
+cannot be run live in front of an examiner.
+
+OPTIONS
+  (a) Pre-bake a full showcase run that replays instantly, and demo LIVE only
+      at max_papers=10.  [RECOMMENDED - this is what TASKLIST specifies]
+      Removes every live-network dependency from the graded moment while still
+      proving the thing genuinely runs. Justify it as demo RELIABILITY, not as
+      a latency workaround.
+  (b) Fully live.
+      One rate-limit or network hiccup and the demo dies in front of the
+      committee.
+  (c) Fully pre-baked, nothing live.
+      Safe, but invites "did it actually run?" and you have no answer in the
+      room.
+
+ANSWER: a
+
+
+--------------------------------------------------------------------------------
+D-12  T-705: who does the 50-claim spot-check, and when?
+      Affects: your only in-domain non-circular evidence
+--------------------------------------------------------------------------------
+Human-only, cannot be delegated to the pipeline (the whole point is that it is
+independent of the pipeline). Even with T-325 in hand, this is the only
+verifier measurement taken in YOUR domain - SciReviewGen is biomedical-and-CS
+survey prose; your corpus is agentic RAG. TASKLIST: "Both are needed; they
+answer different objections."
+
+It needs real pipeline output, so it cannot start before M1 (Aug 31 target).
+That leaves a narrow window. With three authors it splits to ~17 claims each.
+
+OPTIONS
+  (a) Split across all three authors, scheduled for a fixed slot on Sep 5.
+      [RECOMMENDED]  Put it in the calendar now; it is the item most likely to
+      be squeezed out by the deck.
+  (b) One person does all 50.
+      More consistent judgements, ~3 hours, one person's bottleneck.
+  (c) Reduce to 25 claims.
+      Halves the cost and roughly halves the statistical weight. Acceptable
+      fallback if Sep 5 is lost; state the sample size plainly.
+
+ANSWER (who / when): human will do, option A
+
+
+================================================================================
+SECTION 4 - SMALL CONFIRMATIONS. LOW EFFORT, EASY TO LOSE.
+================================================================================
+
+D-13  T-811 - Li et al., IPM, DOI 10.1016/j.ipm.2025.104369.
+      Get the PDF through the library (ScienceDirect returns 403 to automated
+      access, so this is the one paper written from its title alone). Then
+      decide: is it a COMPETITOR to differentiate from, or a SUPPORTING
+      citation? "Evidence-aware" + "self-corrective" describes your Verifier
+      and Critic, so it is plausibly the former - which changes where it
+      appears in the report. Also resolve the year: OpenAlex says 2025,
+      Semantic Scholar says 2026.
+ANSWER: 2025 it is, and decide what you think is best
+  >> CLAUDE'S CALL (2026-08-27): treat it as a COMPETITOR to differentiate from.
+     Reasoning: "evidence-aware" + "self-corrective" is a description of your
+     Verifier and Critic. If it is cited as support, a reviewer who knows the
+     paper will ask why your contribution is not already theirs. Citing it as a
+     competitor forces you to state the difference explicitly, which is the
+     stronger position and costs one paragraph in Related Work. Year: 2025.
+     STILL NEEDED FROM YOU: the PDF via the library, to confirm the
+     differentiation is real before the claim goes in the report (T-811).
+
+
+D-14  T-812 - Verify *Vicinagearth* (paper C3-11) is Scopus-indexed.
+      If it is not, substitute Wang et al. 2024, Frontiers of Computer Science,
+      DOI 10.1007/s11704-024-40231-1.
+ANSWER:
+
+
+D-15  T-808 - Is `Review-1 dsc06.pptx` shown again?
+      If yes, two visible errors must be fixed: slide 6 says "GPU: 8GB Minimum"
+      on a CPU-only machine, and slide 8 says "Extractor chunks and embeds
+      them" - that is the Ingestor's job, and as written the system has no
+      structured extraction at all, which deletes a main contribution.
+      If that deck is retired, this costs nothing.
+ANSWER: no, leave it
+
+
+D-16  T-620 - Install PostgreSQL locally?
+      Only if you keep Phase 6B in D-01. If you drop 6B, edit Review-1 slides
+      3, 8 and 9 back to "Chroma + SQLite" instead. One edit versus seven
+      tasks.
+ANSWER: yes
+
+
+================================================================================
+SECTION 5 - NOT DECISIONS. JUST DO THESE.
+================================================================================
+
+  * COMMIT THE WORKING TREE. Nothing has been committed since the initial
+    commit. `src/researchgpt/data/` - six modules including T-205 and T-207,
+    both marked * critical path - was excluded from that commit by an
+    unanchored `.gitignore` pattern and has never been in version control.
+    The pattern is fixed; the files are still uncommitted. A disk failure
+    today loses two starred tasks. TASKLIST T-903 asks for a commit per task.
+    Verify with: git ls-files src/ | wc -l   (it should count every source
+    file, not 25).
+
+  * T-212 stays unticked until it is re-run after T-402. It is not an
+    oversight; the diagnosis says it cannot pass before the Planner exists.
+
+  * Do NOT spend the T-213 buffer on bge-base (see D-06). Item (1) - re-run
+    T-212 after T-402 - is the only buffer item left worth spending, and pool
+    caching now makes it nearly free.
+
+  * `configs/default.yaml` is deliberately unchanged at max_per_source=25 and
+    max_papers=60. If D-04 or D-05 changes either, change the config in the
+    same commit as the decision, and note the reason in the file header where
+    the other measurements already live.
+
+================================================================================
