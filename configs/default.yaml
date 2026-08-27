@@ -109,7 +109,20 @@ sources:
 
 review:
   min_papers: 20
-  max_papers: 60                   # 25 for ablation runs
+  # Lowered 60 -> 25 on 2026-08-28. Extraction is one sequential LLM call per
+  # paper and the 6-example prompt made each slower, so 60 papers is ~60-90 min
+  # against the ~30-minute tolerance in TASKLIST 0.2. 25 is also the size
+  # TASKLIST already specifies for ablation runs (T-702/T-703), so the flagship
+  # run and the ablations are now directly comparable rather than differently
+  # sized.
+  #
+  # ⚠️ Consequence for T-409's recall figure: with a 35-paper answer key, the
+  # CORPUS recall ceiling is 25/35 = 0.714. It cannot reach 0.80 at this
+  # setting, by arithmetic, and must not be read as a retrieval failure.
+  # UNION recall - did retrieval find the paper at all - is unaffected, and
+  # decisions.txt D-04 already makes that the primary gate for exactly this
+  # reason.
+  max_papers: 25
   year_min: 2019
   max_iterations: 3                # hard cap, forced WRITE on the last
   grounding_threshold: 0.7
