@@ -539,12 +539,59 @@ This is the graded component *and* the required training component. **Start it t
 
 **Why the reranker and not the Writer or the Extractor:** zero new inference cost (it already runs on CPU at T-210 — this is a weight swap, not an architectural change); it is **off the M1 critical path**, so a failed training run breaks nothing; it answers Ammann et al.'s warning that gains *"rely on a strong, domain-aligned cross-encoder reranker"* when yours is a 22M web-search MiniLM (`SESSION_CONTEXT.md §5.6`); and retrieval recall is a hard ceiling on verification, so it lifts the graded metric indirectly. `TRAINING_SPEC.md §4` records why the Writer and Extractor were rejected.
 
-- [ ] **T-330** ⌨️ Build training triples from the SciReviewGen `train` split, reusing the T-321 parser. Query = `survey_title + chapter_heading`; positives = the `BIBnnn` abstracts. Sample 3,000 chapters, cap 8 positives each. *Done when: pair counts are reported and **the split is deduplicated by `survey_title`, not by row**.* ⚠️ **A row-level split puts chapters of the same survey on both sides and silently inflates the tuned score.**
-- [ ] **T-331** ⌨️ ★ **BM25 hard-negative mining** — for each query take BM25 top-50 from the pooled split corpus, drop true positives, sample at 1 positive : 4 negatives. *Done when: a spot-check of 20 negatives confirms they are topically plausible, not random.* ⚠️ **Hard negatives are the whole point. Random negatives make the task trivial — the model learns topic matching, which BM25 already does, and stock-vs-tuned will show no gain. If T-334 shows ~0 improvement, suspect this task first.**
-- [ ] **T-332** 🧠 Kaggle notebook: `cross-encoder/ms-marco-MiniLM-L-6-v2`, binary cross-entropy, max_len 512, lr 2e-5, batch 32, 2 epochs, fixed seed. *Expect 20–30 minutes on a T4.* **Train the verifier (T-303) first — it is the graded component and takes priority on the quota.**
-- [ ] **T-333** ⌨️ ONNX export + int8 dynamic quantization, matching the verifier's deployment path. *Done when: the quantized model reproduces float logits within tolerance and per-query CPU latency is measured.*
-- [ ] **T-334** 🧠 ★ **Stock vs fine-tuned**, on **two** sets: the SciReviewGen `test` split (in-domain) and **your own 25-paper bibliography** (out-of-domain, CS). Report Recall@20, nDCG@10, Precision@12 and rerank latency. *Reuses T-212's harness.* **Lead with the out-of-domain number** — SciReviewGen is frozen mid-2020 and skews biomedical, so a large in-domain gain with no out-of-domain gain means you fitted the benchmark, not the task.
-- [ ] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.*
+- [x] **T-330** ⌨️ Build training triples from the SciReviewGen `train` split, reusing the T-321 parser. Query = `survey_title + chapter_heading`; positives = the `BIBnnn` abstracts. Sample 3,000 chapters, cap 8 positives each. *Done when: pair counts are reported and **the split is deduplicated by `survey_title`, not by row**.* ⚠️ **A row-level split puts chapters of the same survey on both sides and silently inflates the tuned score.** ✅ **DONE 2026-08-27** — `src/researchgpt/rerank/triples.py`.
+
+  | | |
+  |---|---|
+  | chapters | 3,000 sampled from a 20,000-row pool |
+  | **distinct surveys** | **1,381** (2.2 chapters per survey) |
+  | unique cited abstracts | 13,929 |
+  | **pairs** | **75,395** — 15,079 positive / 60,316 negative, exactly **1:4** |
+
+  ⚠️ **Sequential reading would have wrecked survey diversity.** Chapters of one survey sit adjacent in the parquet, so the *first* N rows span almost no surveys — measured: **150 rows → 13 surveys**. Sampling across a 20,000-row pool instead gives **1,381 surveys from 3,000 chapters**. Survey diversity is precisely what the reranker has to generalise over, so this is not a cosmetic change.
+
+  *Fewer pairs than `TRAINING_SPEC`'s ~120k estimate (75k) because the mean chapter cites ~5 papers, not the 8-per-chapter cap.* Ample for a 22M cross-encoder.
+- [x] **T-331** ⌨️ ★ **BM25 hard-negative mining** — for each query take BM25 top-50 from the pooled split corpus, drop true positives, sample at 1 positive : 4 negatives. *Done when: a spot-check of 20 negatives confirms they are topically plausible, not random.* ⚠️ **Hard negatives are the whole point. Random negatives make the task trivial — the model learns topic matching, which BM25 already does, and stock-vs-tuned will show no gain. If T-334 shows ~0 improvement, suspect this task first.** ✅ **DONE 2026-08-27, and the diagnostic this warning asks for is now built in.**
+
+  | | |
+  |---|---|
+  | BM25 depth mined | top-50 |
+  | mean hard candidates per query | **47.6** |
+  | queries short of hard negatives | **0** |
+  | **random-fallback negatives** | **0 (0.0%)** |
+
+  **Every negative in the training set is a genuine BM25 hard negative** — a document BM25 already ranks highly and is wrong about. Nothing was padded at random.
+
+  ★ **`random_fallback_share_of_negatives` is recorded in `eval/rerank_triples_t330.json` specifically so T-334's null result, if it comes, is diagnosable rather than mysterious.** If that share is high, BM25 could not find confusable documents and the model was handed a task it could already do. On this build it is 0.0, so a null T-334 would *not* be explained here — look at the training config or accept the honest negative.
+
+  Regression-tested: a true positive can never be sampled as a negative for its own query, and a corpus too small to supply negatives emits **fewer** rather than inventing them, flagging the shortfall.
+- [x] **T-332** 🧠 Kaggle notebook: `cross-encoder/ms-marco-MiniLM-L-6-v2`, binary cross-entropy, max_len 512, lr 2e-5, batch 32, 2 epochs, fixed seed. *Expect 20–30 minutes on a T4.* **Train the verifier (T-303) first — it is the graded component and takes priority on the quota.** ✅ **NOTEBOOK DONE 2026-08-27** — `notebook-kaggle-traning/02_train_reranker_scireviewgen.ipynb` (17 cells) + README section. **The verifier ran first and passed T-307 at 0.769, so the quota is free.**
+
+  **Smoke-tested, not just written.** All 8 code cells were executed locally on CPU against a 600-pair subset — data load, survey-grouped split, CrossEncoder build, stock baseline, `fit()`, the ranking comparison and save all ran clean.
+
+  ⚠️ **One thing the smoke test nearly hid.** Stock and fine-tuned printed *identical* metrics to four decimals, which looks exactly like a no-op trainer. Verified directly that `CrossEncoder.fit()` does mutate the model — raw scores moved by up to **3.49** — so the identical metrics were coarse metrics over 2 dev queries, not broken training. *Worth knowing before someone reads a flat table on Kaggle and concludes the run failed.*
+
+  ⚠️ **This notebook needs a data upload**, unlike the verifier one: BM25 hard-negative mining needs the whole pooled corpus, so `data/rerank/train_triples.jsonl` (~99 MB) must be attached as a Kaggle Dataset. The notebook globs `/kaggle/input/**/train_triples.jsonl`, so the dataset name does not matter. Steps are in the README.
+- [ ] **T-333** ⌨️ ONNX export + int8 dynamic quantization, matching the verifier's deployment path. *Done when: the quantized model reproduces float logits within tolerance and per-query CPU latency is measured.* **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/export_onnx.py`.
+
+  ⚠️ **The stated criterion — "reproduces float logits within tolerance" — is the wrong test for a *reranker*.** Only the induced **ordering** matters: a model whose scores all shift by a constant ranks identically and is perfectly usable. So the export checks (a) ONNX fp32 vs PyTorch on raw scores, which is the genuine *export-correctness* test, and (b) **Kendall tau ≥ 0.9** for int8, which asks whether quantization *reshuffled the ranking* rather than whether it moved the numbers.
+
+  🔴 **`TRAINING_SPEC §2.5` warns "quantization must not be assumed free", and that warning already fired once** — T-304 measured int8 as free on the *stock* verifier (macro-F1 rose 0.516 → 0.539) and then as a 0.027 **loss** on the *fine-tuned* one, dropping it below its own T-307 gate. **A quantization result measured on one checkpoint says nothing about another.** Which graph ships is therefore decided by T-335 on ranking quality, not here.
+- [ ] **T-334** 🧠 ★ **Stock vs fine-tuned**, on **two** sets: the SciReviewGen `test` split (in-domain) and **your own 25-paper bibliography** (out-of-domain, CS). Report Recall@20, nDCG@10, Precision@12 and rerank latency. *Reuses T-212's harness.* **Lead with the out-of-domain number** — SciReviewGen is frozen mid-2020 and skews biomedical, so a large in-domain gain with no out-of-domain gain means you fitted the benchmark, not the task. **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/evaluate.py`.
+
+  **Stock baseline on the out-of-domain set is already measured** (own bibliography, 15 sub-questions, 501 candidates, 19 gold hits pooled):
+
+  | arm | nDCG@10 | Recall@20 | Precision@12 |
+  |---|---|---|---|
+  | stock `ms-marco-MiniLM-L-6-v2` | **0.2277** | **0.4815** | **0.0926** |
+  | fine-tuned | — | — | — |
+
+  **Self-tested**: running the harness with stock in *both* arms returns delta **exactly 0.0000** on all three metrics, so a non-zero delta later is a real difference and not harness noise.
+
+  ✅ **Costs no OpenAlex budget** — it reuses T-212's cached pool (`eval/cache/pool_mps25.json`). That matters now that OpenAlex is metered (§0.2).
+- [ ] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.* **IMPLEMENTED 2026-08-27** as a mechanical gate in `rerank/evaluate.py`, decided on out-of-domain nDCG@10 and Recall@20.
+
+  ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
 - [ ] **T-336** 🧠 **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
 
 ---

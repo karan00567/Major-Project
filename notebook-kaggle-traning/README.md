@@ -1,19 +1,22 @@
 # Kaggle training notebooks
 
-Every GPU training run in ResearchGPT lives here. Each notebook is
-self-contained: it downloads its own data, trains, evaluates, applies its
-adoption/escalation gate and writes a metrics JSON. Nothing in this folder
-needs the `researchgpt` package to be installed on Kaggle.
+Every GPU training run in ResearchGPT lives here. Each notebook trains,
+evaluates, applies its adoption/escalation gate and writes a metrics JSON.
+Neither needs the `researchgpt` package installed on Kaggle.
+
+They differ in one way that matters: **notebook 01 builds its own data from the
+Hub; notebook 02 needs `train_triples.jsonl` uploaded as a Kaggle Dataset**,
+because BM25 hard-negative mining needs the whole pooled corpus.
 
 | Notebook | Task | Trains | Status |
 |---|---|---|---|
 | `01_train_verifier_scifact.ipynb` | **T-302 / T-303** | The claim verifier (`deberta-v3-small`, 3-way NLI) | **Ready to run** |
-| `02_train_reranker_scireviewgen.ipynb` | T-332 | The cross-encoder reranker | Blocked — needs Phase 3B (T-330/T-331 build its triples) |
+| `02_train_reranker_scireviewgen.ipynb` | **T-332 / T-333** | The cross-encoder reranker | **Ready to run** (needs a data upload — see below) |
 
-> **Why the verifier goes first.** It is the graded component *and* the
-> required training component. TASKLIST T-332 says so explicitly: *"Train the
-> verifier (T-303) first — it is the graded component and takes priority on the
-> quota."* The reranker is a weight swap that the pipeline never depends on.
+> **Verifier first, and that ordering is not arbitrary.** TASKLIST T-332: *"Train
+> the verifier (T-303) first — it is the graded component and takes priority on
+> the quota."* The verifier passed its T-307 gate at macro-F1 0.769 on
+> 2026-08-27, so the quota is now free for the reranker.
 
 ---
 
@@ -130,3 +133,90 @@ byte-identical, and `tests/test_phase3_acceptance.py` enforces it.
 
 Changing the seed changes the training set. That is fine, but re-run the local
 `python -m researchgpt.verify.scifact_pairs` too, or the two stop matching.
+
+
+---
+
+## 02 — Reranker fine-tune (T-332 / T-333)
+
+Fine-tunes the cross-encoder that reranks retrieved papers at T-210. This is the
+**second** trained model and it is the one that answers Ammann et al.'s warning,
+quoted in your own literature review, that their gains *"rely on a strong,
+domain-aligned cross-encoder reranker"* — while ours is a 22M MiniLM trained on
+**web search**, not science (`SESSION_CONTEXT §5.6`).
+
+### ⚠️ Before you start — this notebook needs a data upload
+
+Unlike the verifier notebook, **this one cannot rebuild its own training data**.
+The BM25 hard-negative mining needs the whole pooled corpus, which is not
+something to redo inside a training notebook.
+
+Build the triples locally, then upload them:
+
+```bash
+python -m researchgpt.rerank.triples --chapters 3000
+# -> data/rerank/train_triples.jsonl   (~99 MB, 75,395 pairs)
+```
+
+Then on Kaggle: **Datasets → New Dataset → upload `train_triples.jsonl`**, give
+it any name, and in the notebook use **Add Input → Datasets** to attach it. The
+notebook globs `/kaggle/input/**/train_triples.jsonl`, so the dataset name does
+not matter.
+
+Already built, from the 2026-08-27 run:
+
+| | |
+|---|---|
+| pairs | **75,395** (15,079 positive / 60,316 negative, exactly 1:4) |
+| queries | 3,000 chapters, **1,381 distinct surveys** |
+| unique cited abstracts | 13,929 |
+| **random-fallback negatives** | **0.0%** — every negative is a genuine BM25 hard negative |
+
+### Steps
+
+1. Import `02_train_reranker_scireviewgen.ipynb` at
+   <https://www.kaggle.com/code>.
+2. **Add Input → Datasets** → attach the dataset holding `train_triples.jsonl`.
+3. Settings: **Accelerator = GPU T4 x2**, **Internet = On**. (Kaggle ignores the
+   notebook's own request on import — set it yourself and confirm.)
+4. **Run All.** Expect **20–30 minutes**.
+5. Watch section 3: it must end `OK: N survey groups, M held out, none on both
+   sides`. If that assert ever fires, stop — the split leaked.
+6. Download **`reranker-scireviewgen.zip`** and **`reranker_metrics.json`**.
+
+### Then, locally
+
+```bash
+python -m researchgpt.rerank.export_onnx --checkpoint data/models/reranker-scireviewgen
+python -m researchgpt.rerank.evaluate    --tuned-onnx data/models/reranker-onnx
+```
+
+That is T-333 (ONNX + int8) and T-334/T-335 (the adoption gate). The evaluation
+uses T-212's **cached** pool, so it costs no OpenAlex budget.
+
+### The two things that decide whether this ships
+
+**1. The gate is out-of-domain, and the notebook cannot run it.**
+Section 7 prints an *in-domain* comparison on SciReviewGen. **That is not the
+decision.** SciReviewGen is frozen at S2ORC 2020-07-05 and skews biomedical;
+your corpus is CS/agentic-RAG. A large in-domain gain with no out-of-domain gain
+means you **fitted the benchmark, not the task** (`TRAINING_SPEC §2.4`). T-335
+decides on your own 25-paper bibliography, locally, after quantization.
+
+Current stock baseline on that set, for comparison: **nDCG@10 0.2277,
+Recall@20 0.4815, Precision@12 0.0926**.
+
+**2. If it does not beat stock, keep stock and report the negative result.**
+That is not a failure — the pipeline is unaffected because this was always a
+weight swap, and the verifier already satisfies the training requirement on its
+own. TASKLIST's Aug 30 kill switch says exactly this. *A fine-tune that did not
+help is an honest contribution.*
+
+### If the gain is ~0
+
+Suspect **the hard negatives (T-331) first**, before the training config —
+TASKLIST says so directly. Check
+`eval/rerank_triples_t330.json → random_fallback_share_of_negatives`. If it is
+high, BM25 could not find confusable documents and the model was handed an easy
+task it could already do. On the current build that value is **0.0**, so this is
+not the explanation unless the triples are rebuilt smaller.

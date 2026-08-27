@@ -1,0 +1,21 @@
+{
+  "task": "T-330/T-331",
+  "split": "train",
+  "chapters": 3000,
+  "distinct_surveys": 1381,
+  "chapters_per_survey": 2.172338884866039,
+  "max_positives_per_chapter": 8,
+  "negatives_per_positive": 4,
+  "seed": 20260827,
+  "pairs": 75395,
+  "positives": 15079,
+  "negatives": 60316,
+  "queries": 3000,
+  "documents": 13929,
+  "bm25_depth": 50,
+  "mean_hard_candidates_per_query": 47.550333333333334,
+  "queries_short_of_hard_negatives": 0,
+  "random_fallback_negatives": 0,
+  "random_fallback_share_of_negatives": 0.0,
+  "leakage_note": "Split by survey_title, never by row: one survey contributes many chapters, so a row-level split puts the same survey on both sides and inflates the tuned score (TRAINING_SPEC 2.2)."
+}
