@@ -629,7 +629,23 @@ This is the graded component *and* the required training component. **Start it t
 
   **`configs/default.yaml` is unchanged — the stock reranker stays.** This is the honest negative result T-335 and the Aug 30 kill switch both anticipated; the pipeline is unaffected because this was always a weight swap, and the verifier satisfies the training requirement on its own.
 
-  **Most likely cause, and the cheap retry:** the run used **10 epochs**, not the **2** `TRAINING_SPEC §2.3` specifies, and `CrossEncoder.fit()` has no evaluator or best-checkpoint selection — so the 10th-epoch weights shipped unconditionally. Re-running at `EPOCHS = 2` costs ~12 minutes of GPU against the 62 already spent and is the obvious next experiment.
+  🔴 **RETRIED AT 2 EPOCHS (12.9 min, 2026-08-27). STILL FAILS. Epochs were not the root cause.**
+
+  | | in-domain nDCG@10 | control violations | off-topic score range |
+  |---|---|---|---|
+  | stock | 0.4524 | **0/15** | ≈ −11 |
+  | **2-epoch** | 0.7828 | **11/15 (73%)** | +2.9 … +5.0 |
+  | 10-epoch | 0.7840 | **15/15 (100%)** | +6.8 … +9.7 |
+
+  Two things fall out. **The extra 8 epochs bought nothing**: in-domain nDCG@10 0.7828 vs 0.7840, so the model had converged by epoch 2 and 49 further GPU-minutes changed −0.001. And **epochs only modulate the damage, they do not cause it** — halving them halved the off-topic scores and the violation rate, but the model still ranks unrelated documents above its own median candidate on 73% of queries.
+
+  ★ **The real cause is in T-331, and it is the opposite of what that task warns about.** *Every negative in the training set is a BM25 hard negative drawn from SciReviewGen's own pool of cited abstracts.* So every negative is a plausible scientific abstract that some survey chapter really did cite, and BM25 retrieved it *for that query*. The model is therefore only ever asked **"which of these topically-adjacent scientific abstracts belongs to THIS chapter?"** — it is never once shown a document that is simply irrelevant to everything, and so never learns to reject one.
+
+  **Supporting evidence:** both tuned models score the *scientific* off-topic controls (soil nitrogen, wind turbines) **above** the humanities one (opera libretti), at both epoch counts. The learned signal tracks *"is this a SciReviewGen-style cited abstract?"*, not *"is this relevant to the query?"*
+
+  ⚠️ **T-331 says "Hard negatives are the whole point. Random negatives make the task trivial."** That is correct about why hard negatives are *necessary* — but taken to **100%** it removes the easy-negative signal that keeps the model calibrated on obvious irrelevance. **The fix is a mixture, not a switch:** roughly 3 hard + 1 genuinely-random negative per positive. Rebuilding the triples and re-running costs ~40 minutes end to end.
+
+  **Not spent, pending a scheduling decision.** M1 (2026-08-31) has not started and Phase 3C touches the critical path nowhere. If the mixture is not tried, the negative result stands and is reportable as-is — arguably a stronger methods finding than a clean win.
 
   ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
 - [ ] **T-336** 🧠 **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
