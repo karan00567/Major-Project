@@ -49,6 +49,14 @@ ALLOWED_MODELS: frozenset[str] = frozenset(
     }
 )
 
+#: Literature sources that actually have a connector in ``tools/search_sources.py``.
+#: ``SourcesConfig`` validates against this so a config can never name a source
+#: that does not exist — the failure mode that hid T-214 for a day, when
+#: ``configs/default.yaml`` listed ``semantic_scholar`` and nothing implemented it.
+IMPLEMENTED_SOURCES: frozenset[str] = frozenset(
+    {"openalex", "arxiv", "semantic_scholar"}
+)
+
 #: Provider inferred from model name; used by ``core/llm.py`` to pick a client.
 MODEL_PROVIDER: dict[str, str] = {
     "gemma-4-31b-it": "google",
@@ -207,6 +215,17 @@ class SourcesConfig(BaseModel):
     enabled: list[str] = ["openalex", "arxiv"]
     max_per_source: int = 25
 
+    @field_validator("enabled")
+    @classmethod
+    def _implemented(cls, v: list[str]) -> list[str]:
+        unknown = [s for s in v if s not in IMPLEMENTED_SOURCES]
+        if unknown:
+            raise ValueError(
+                f"sources.enabled names {unknown}, which have no connector in "
+                f"tools/search_sources.py. Implemented: {sorted(IMPLEMENTED_SOURCES)}"
+            )
+        return v
+
 
 class ReviewConfig(BaseModel):
     min_papers: int = 20
@@ -253,6 +272,7 @@ CritiqueDecision = Decision
 
 __all__ = [
     "ALLOWED_MODELS",
+    "IMPLEMENTED_SOURCES",
     "MODEL_PROVIDER",
     "VenueTier",
     "Verdict",

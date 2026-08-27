@@ -1,0 +1,111 @@
+{
+  "year_min": 2019,
+  "tally": {
+    "exact_title": 8,
+    "doi_lookup": 10,
+    "short_query": 9,
+    "out_of_window": 0
+  },
+  "papers": [
+    {
+      "doi": "10.1002/jrsm.1715",
+      "title": "Can large language models replace humans in systematic reviews? Evaluating GPT \u20104's efficacy in screening and extracting data from peer\u2010reviewed and grey literature in multiple languages",
+      "year": 2024,
+      "doi_lookup": true,
+      "openalex_year": 2024,
+      "exact_title": false,
+      "short_query_text": "large language models replace",
+      "short_query": true
+    },
+    {
+      "doi": "10.1007/s11704-024-40231-1",
+      "title": "A survey on large language model based autonomous agents",
+      "year": 2024,
+      "doi_lookup": true,
+      "openalex_year": 2024,
+      "exact_title": true,
+      "short_query_text": "survey large language model",
+      "short_query": true
+    },
+    {
+      "doi": "10.1016/j.ipm.2025.104369",
+      "title": "Towards evidence-aware retrieval-augmented generation via self-corrective chain-of-thought",
+      "year": 2025,
+      "doi_lookup": true,
+      "openalex_year": 2025,
+      "exact_title": true,
+      "short_query_text": "evidence-aware retrieval-augmented generation self-corrective",
+      "short_query": true
+    },
+    {
+      "doi": "10.1016/j.nlp.2025.100179",
+      "title": "A synergistic multi-stage RAG architecture for boosting context relevance in data science literature",
+      "year": 2025,
+      "doi_lookup": true,
+      "openalex_year": 2025,
+      "exact_title": false,
+      "short_query_text": "synergistic multi-stage rag architecture",
+      "short_query": false
+    },
+    {
+      "doi": "10.1093/bioinformatics/btae238",
+      "title": "Improving medical reasoning through retrieval and self-reflection with retrieval-augmented large language models",
+      "year": 2024,
+      "doi_lookup": true,
+      "openalex_year": 2024,
+      "exact_title": true,
+      "short_query_text": "improving medical reasoning through",
+      "short_query": true
+    },
+    {
+      "doi": "10.18653/v1/2023.emnlp-main.741",
+      "title": "FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation",
+      "year": 2023,
+      "doi_lookup": true,
+      "openalex_year": 2023,
+      "exact_title": true,
+      "short_query_text": "factscore fine-grained atomic evaluation",
+      "short_query": true
+    },
+    {
+      "doi": "10.18653/v1/2023.findings-acl.418",
+      "title": "SciReviewGen: A Large-scale Dataset for Automatic Literature Review Generation",
+      "year": 2023,
+      "doi_lookup": true,
+      "openalex_year": 2023,
+      "exact_title": true,
+      "short_query_text": "scireviewgen large-scale dataset automatic",
+      "short_query": true
+    },
+    {
+      "doi": "10.18653/v1/2024.acl-long.810",
+      "title": "ChatDev: Communicative Agents for Software Development",
+      "year": 2024,
+      "doi_lookup": true,
+      "openalex_year": 2024,
+      "exact_title": true,
+      "short_query_text": "chatdev communicative agents software",
+      "short_query": true
+    },
+    {
+      "doi": "10.18653/v1/2024.emnlp-main.813",
+      "title": "Chain-of-Note: Enhancing Robustness in Retrieval-Augmented Language Models",
+      "year": 2024,
+      "doi_lookup": true,
+      "openalex_year": 2024,
+      "exact_title": true,
+      "short_query_text": "chain-of-note enhancing robustness retrieval-augmented",
+      "short_query": true
+    },
+    {
+      "doi": "10.18653/v1/2024.naacl-long.389",
+      "title": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity",
+      "year": 2024,
+      "doi_lookup": true,
+      "openalex_year": 2024,
+      "exact_title": true,
+      "short_query_text": "adaptive-rag learning adapt retrieval-augmented",
+      "short_query": true
+    }
+  ]
+}

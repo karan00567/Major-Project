@@ -4,11 +4,27 @@
 !.env.example
 
 # Runtime artefacts (T-008)
-data/
-outputs/
+# ⚠️ ANCHORED with a leading slash — these must match ONLY the runtime
+# directories at the repo root. Unanchored, `data/` also matched the source
+# package `src/researchgpt/data/`, so the entire Phase 2 data layer (chunker,
+# embeddings, vectorstore, bm25_index, metadata_db — including two ★
+# critical-path tasks) was silently excluded from the first commit. Found
+# 2026-08-26. Never un-anchor these.
+/data/
+/outputs/
 
 # Review decks (T-008)
 *.pptx
+
+# Trained-model archives downloaded from Kaggle (T-303, T-332).
+# The verifier checkpoint alone is a 496 MB zip. It arrives at the repo root
+# from the browser, where nothing was ignoring it — `git add -A` would have
+# committed half a gigabyte of weights. Weights are reproducible from the
+# notebook; the repo holds the code that makes them, not the artefacts.
+# Unzip them into /data/models/ (already ignored) and delete the archive.
+*.zip
+*.safetensors
+*.onnx
 
 # Python
 .venv/
@@ -36,3 +52,6 @@ Thumbs.db
 
 # Claude local permission log (machine-specific)
 .claude/settings.local.json
+
+# T-212/T-213 gathered pool cache (large, regenerable)
+eval/cache/

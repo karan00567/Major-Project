@@ -1,0 +1,114 @@
+{
+  "gold_size": 35,
+  "union_size": 447,
+  "recalls": {
+    "20": 0.0,
+    "40": 0.0,
+    "60": 0.02857142857142857,
+    "100": 0.08571428571428572,
+    "447": 0.37142857142857144
+  },
+  "gate_recall_at_60": 0.02857142857142857,
+  "gate_pass": false,
+  "per_query": [
+    {
+      "query": "agentic retrieval augmented generation",
+      "retrieved": 40,
+      "gold_hits": 0
+    },
+    {
+      "query": "automated literature review generation",
+      "retrieved": 25,
+      "gold_hits": 1
+    },
+    {
+      "query": "scientific survey generation",
+      "retrieved": 29,
+      "gold_hits": 1
+    },
+    {
+      "query": "scientific claim verification",
+      "retrieved": 40,
+      "gold_hits": 2
+    },
+    {
+      "query": "citation accuracy language models",
+      "retrieved": 25,
+      "gold_hits": 0
+    },
+    {
+      "query": "hallucination large language models",
+      "retrieved": 25,
+      "gold_hits": 2
+    },
+    {
+      "query": "retrieval augmented generation evaluation",
+      "retrieved": 37,
+      "gold_hits": 3
+    },
+    {
+      "query": "multi-agent large language model",
+      "retrieved": 40,
+      "gold_hits": 0
+    },
+    {
+      "query": "systematic review automation",
+      "retrieved": 33,
+      "gold_hits": 0
+    },
+    {
+      "query": "cross-encoder reranking retrieval",
+      "retrieved": 25,
+      "gold_hits": 1
+    },
+    {
+      "query": "attributed question answering citations",
+      "retrieved": 25,
+      "gold_hits": 0
+    },
+    {
+      "query": "scientific information extraction",
+      "retrieved": 40,
+      "gold_hits": 1
+    },
+    {
+      "query": "citation text generation",
+      "retrieved": 35,
+      "gold_hits": 2
+    },
+    {
+      "query": "evidence retrieval fact checking",
+      "retrieved": 25,
+      "gold_hits": 0
+    },
+    {
+      "query": "RAG survey",
+      "retrieved": 29,
+      "gold_hits": 1
+    }
+  ],
+  "missed": [
+    "10.1002/jrsm.1715",
+    "10.1007/s10462-024-10844-w",
+    "10.1007/s10462-026-11605-7",
+    "10.1007/s11704-024-40231-1",
+    "10.1007/s44336-024-00009-2",
+    "10.1016/j.ipm.2025.104369",
+    "10.1016/j.nlp.2025.100179",
+    "10.1093/bioinformatics/btae238",
+    "10.1093/bioinformatics/btae420",
+    "10.1109/jstsp.2025.3579203",
+    "10.1109/tccn.2025.3528892",
+    "10.1109/tkde.2025.3608716",
+    "10.1145/3543507.3583505",
+    "10.1145/3701228",
+    "10.1145/3805774",
+    "10.18653/v1/2023.emnlp-main.398",
+    "10.18653/v1/2023.emnlp-main.741",
+    "10.18653/v1/2023.findings-acl.418",
+    "10.18653/v1/2024.acl-long.810",
+    "10.18653/v1/2024.emnlp-main.813",
+    "10.18653/v1/2024.naacl-long.389",
+    "10.18653/v1/2025.findings-acl.264"
+  ]
+}

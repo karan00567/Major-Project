@@ -8,6 +8,17 @@ from sentence_transformers import CrossEncoder
 
 from researchgpt.core.models import Chunk
 
+#: handoffs/phase2_complete.md §4.4 — the suite logged "unauthenticated
+#: requests" because HF_TOKEN sits in .env and nothing loaded it. Hub reads the
+#: env var, so a single load_dotenv() at import is the whole fix. Never raises:
+#: an absent .env just leaves the anonymous path in place.
+try:  # pragma: no cover - environment plumbing
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:
+    pass
+
 
 class Reranker:
     def __init__(

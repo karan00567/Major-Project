@@ -1,0 +1,180 @@
+{
+  "generated": "T-212 (harness corrected 2026-08-26; see module docstring)",
+  "ranked": true,
+  "max_per_source": 100,
+  "gold_size": 35,
+  "union_size": 1937,
+  "recalls": {
+    "20": {
+      "doi_only": 0.02857142857142857,
+      "doi_or_title": 0.02857142857142857
+    },
+    "40": {
+      "doi_only": 0.02857142857142857,
+      "doi_or_title": 0.02857142857142857
+    },
+    "60": {
+      "doi_only": 0.02857142857142857,
+      "doi_or_title": 0.02857142857142857
+    },
+    "100": {
+      "doi_only": 0.05714285714285714,
+      "doi_or_title": 0.05714285714285714
+    },
+    "1937": {
+      "doi_only": 0.6857142857142857,
+      "doi_or_title": 0.7142857142857143
+    }
+  },
+  "gate_recall_at_60": 0.02857142857142857,
+  "gate_recall_at_60_doi_only": 0.02857142857142857,
+  "gate_pass": false,
+  "per_query": [
+    {
+      "query": "agentic retrieval augmented generation",
+      "retrieved": 144,
+      "gold_hits": 0,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "automated literature review generation",
+      "retrieved": 170,
+      "gold_hits": 2,
+      "sources": [
+        "openalex",
+        "semantic_scholar"
+      ]
+    },
+    {
+      "query": "scientific survey generation",
+      "retrieved": 104,
+      "gold_hits": 2,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "scientific claim verification",
+      "retrieved": 107,
+      "gold_hits": 2,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "citation accuracy language models",
+      "retrieved": 100,
+      "gold_hits": 1,
+      "sources": [
+        "openalex"
+      ]
+    },
+    {
+      "query": "hallucination large language models",
+      "retrieved": 166,
+      "gold_hits": 6,
+      "sources": [
+        "openalex",
+        "semantic_scholar"
+      ]
+    },
+    {
+      "query": "retrieval augmented generation evaluation",
+      "retrieved": 110,
+      "gold_hits": 7,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "multi-agent large language model",
+      "retrieved": 217,
+      "gold_hits": 2,
+      "sources": [
+        "arxiv",
+        "openalex",
+        "semantic_scholar"
+      ]
+    },
+    {
+      "query": "systematic review automation",
+      "retrieved": 106,
+      "gold_hits": 1,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "cross-encoder reranking retrieval",
+      "retrieved": 100,
+      "gold_hits": 1,
+      "sources": [
+        "openalex"
+      ]
+    },
+    {
+      "query": "attributed question answering citations",
+      "retrieved": 192,
+      "gold_hits": 1,
+      "sources": [
+        "openalex",
+        "semantic_scholar"
+      ]
+    },
+    {
+      "query": "scientific information extraction",
+      "retrieved": 118,
+      "gold_hits": 1,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "citation text generation",
+      "retrieved": 103,
+      "gold_hits": 5,
+      "sources": [
+        "arxiv",
+        "openalex"
+      ]
+    },
+    {
+      "query": "evidence retrieval fact checking",
+      "retrieved": 100,
+      "gold_hits": 0,
+      "sources": [
+        "openalex"
+      ]
+    },
+    {
+      "query": "RAG survey",
+      "retrieved": 150,
+      "gold_hits": 7,
+      "sources": [
+        "arxiv",
+        "openalex",
+        "semantic_scholar"
+      ]
+    }
+  ],
+  "missed": [
+    "10.1002/jrsm.1715",
+    "10.1007/s11704-024-40231-1",
+    "10.1016/j.ipm.2025.104369",
+    "10.1016/j.nlp.2025.100179",
+    "10.1093/bioinformatics/btae238",
+    "10.18653/v1/2023.emnlp-main.741",
+    "10.18653/v1/2023.findings-acl.418",
+    "10.18653/v1/2024.acl-long.810",
+    "10.18653/v1/2024.emnlp-main.813",
+    "10.18653/v1/2024.naacl-long.389"
+  ]
+}

@@ -1,4 +1,4 @@
-"""Federated literature search: OpenAlex + arXiv.
+"""Federated literature search: OpenAlex + arXiv + Semantic Scholar.
 
 Verified API facts (handoffs/phase2.md, measured 2026-08-25) are followed
 exactly — do not "simplify" the abstract de-inversion, DOI normalisation,
@@ -7,13 +7,18 @@ HTTPS arXiv endpoint, or synthetic 10.48550/arxiv.* join key.
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 import time
 import xml.etree.ElementTree as ET
 from typing import Any
+
 import httpx
 
 from researchgpt.core.models import Paper
+
+log = logging.getLogger(__name__)
 
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 _VERSION_RE = re.compile(r"v\d+$", re.IGNORECASE)
@@ -268,6 +273,204 @@ def _arxiv_entry_to_paper(entry: ET.Element) -> Paper | None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Semantic Scholar (T-214)
+#
+# SUPPLEMENTARY source. The pipeline must run fine without it, so every failure
+# path here degrades to [] rather than raising - a run that dies because a
+# best-effort source was throttled is a defect, not a symptom.
+#
+# Measured keyless 2026-08-25: 1 of 4 rapid requests succeeded; with backoff,
+# 2 of 3 queries succeeded and 1 failed after 6 attempts. Unreliable-without-a-
+# key is the EXPECTED case (see T-215 for the key application).
+#
+# Worth having anyway, despite the flakiness: abstracts arrive as plain text
+# (no de-inversion, unlike OpenAlex) and ``externalIds`` carries DOI + ArXiv +
+# DBLP + PubMed at once, which is the only thing in the pipeline that can
+# bridge an arXiv preprint to its published DOI for T-203 dedup.
+# ---------------------------------------------------------------------------
+
+_S2_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
+
+_S2_FIELDS = ",".join(
+    (
+        "paperId",
+        "externalIds",
+        "title",
+        "abstract",
+        "year",
+        "venue",
+        "authors",
+        "citationCount",
+        "isOpenAccess",
+        "openAccessPdf",
+        "publicationTypes",
+    )
+)
+
+#: Delays between the (up to) ``_S2_MAX_ATTEMPTS`` tries. Module-level so the
+#: acceptance suite can zero it out instead of sleeping through a 60s storm.
+_BACKOFF_SCHEDULE: tuple[float, ...] = (2.0, 4.0, 8.0, 16.0, 30.0)
+_S2_MAX_ATTEMPTS = 6
+#: S2 asks for politeness even when requests succeed.
+_POLITE_SLEEP_S: float = 1.0
+
+#: S2 caps ``limit`` at 100 per page.
+_S2_MAX_LIMIT = 100
+
+
+def search_semantic_scholar(
+    query: str,
+    *,
+    year_min: int | None = None,
+    max_results: int = 25,
+    api_key: str | None = None,
+    _transport: Any = None,
+) -> list[Paper]:
+    """Search Semantic Scholar. Best-effort: never raises, may return ``[]``.
+
+    ``api_key`` falls back to ``S2_API_KEY`` in the environment; absent is the
+    normal case and only costs reliability, not correctness.
+
+    ``_transport`` is a private test seam (an ``httpx`` transport) so the
+    acceptance suite can exercise the 429 path without a live storm. It is not
+    part of the T-214 contract - do not depend on it from pipeline code.
+    """
+    key = api_key or os.getenv("S2_API_KEY") or None
+    headers = {"x-api-key": key} if key else {}
+
+    papers: list[Paper] = []
+    offset = 0
+
+    with httpx.Client(
+        timeout=60.0, follow_redirects=True, headers=headers, transport=_transport
+    ) as client:
+        while len(papers) < max_results:
+            limit = min(_S2_MAX_LIMIT, max_results - len(papers))
+            params = {
+                "query": query,
+                "limit": limit,
+                "offset": offset,
+                "fields": _S2_FIELDS,
+            }
+            if year_min is not None:
+                params["year"] = f"{year_min}-"
+
+            data = _s2_get(client, params)
+            if data is None:
+                # Throttled or errored out. Whatever was already collected is
+                # still valid and still better than nothing; the first-page
+                # case - the one T-214 specifies - returns [] exactly as asked.
+                break
+
+            results = data.get("data") or []
+            if not results:
+                break
+            for result in results:
+                paper = _s2_result_to_paper(result)
+                if paper is not None:
+                    papers.append(paper)
+                    if len(papers) >= max_results:
+                        break
+            if len(results) < limit:
+                break
+            offset += len(results)
+            if _POLITE_SLEEP_S:
+                time.sleep(_POLITE_SLEEP_S)
+
+    return papers[:max_results]
+
+
+def _s2_get(client: httpx.Client, params: dict[str, Any]) -> dict[str, Any] | None:
+    """One page, with 429 backoff. ``None`` means "give up quietly"."""
+    for attempt in range(_S2_MAX_ATTEMPTS):
+        try:
+            resp = client.get(_S2_SEARCH_URL, params=params)
+        except httpx.HTTPError as exc:
+            log.warning("semantic_scholar: transport error (%s); degrading", type(exc).__name__)
+            return None
+
+        if resp.status_code == 429:
+            if attempt + 1 >= _S2_MAX_ATTEMPTS:
+                log.warning(
+                    "semantic_scholar: throttled (429) after %d attempts; "
+                    "returning no results for this query. This is expected "
+                    "without an S2_API_KEY (T-215) and is not a run failure.",
+                    _S2_MAX_ATTEMPTS,
+                )
+                return None
+            delay = _BACKOFF_SCHEDULE[min(attempt, len(_BACKOFF_SCHEDULE) - 1)]
+            if delay:
+                time.sleep(delay)
+            continue
+
+        if resp.status_code >= 400:
+            log.warning(
+                "semantic_scholar: HTTP %d; degrading to no results", resp.status_code
+            )
+            return None
+
+        try:
+            return resp.json()
+        except ValueError:
+            log.warning("semantic_scholar: unparseable JSON body; degrading")
+            return None
+
+    return None
+
+
+def _s2_result_to_paper(result: dict[str, Any]) -> Paper | None:
+    paper_id = result.get("paperId")
+    title = result.get("title")
+    if not paper_id or not title:
+        return None
+
+    external = result.get("externalIds") or {}
+
+    authors: list[str] = []
+    for author in result.get("authors") or []:
+        name = (author or {}).get("name")
+        if name:
+            authors.append(name)
+
+    oa_pdf = result.get("openAccessPdf") or {}
+    pub_types = result.get("publicationTypes") or []
+
+    return Paper(
+        paper_id=paper_id,
+        doi=normalise_doi(external.get("DOI")),
+        title=" ".join(str(title).split()),
+        authors=authors,
+        year=result.get("year"),
+        venue=result.get("venue") or None,
+        venue_tier=_s2_venue_tier(result),  # type: ignore[arg-type]
+        abstract=result.get("abstract") or None,
+        url=oa_pdf.get("url") or None,
+        source="semantic_scholar",
+        citation_count=result.get("citationCount"),
+        is_preprint="JournalArticle" not in pub_types,
+    )
+
+
+def _s2_venue_tier(result: dict[str, Any]) -> str:
+    """Venue tier from an S2 record. Deliberately conservative - SPEC 14.2
+    forbids inventing a tier the source does not evidence."""
+    pub_types = result.get("publicationTypes") or []
+    venue = (result.get("venue") or "").strip()
+    if not venue:
+        return "preprint" if "JournalArticle" not in pub_types else "unknown"
+    upper = venue.upper()
+    if "ARXIV" in upper:
+        return "preprint"
+    if "IEEE" in upper:
+        return "ieee"
+    if any(tok in upper for tok in ("ACL", "EMNLP", "NAACL", "COLING")):
+        return "acl"
+    if "JournalArticle" in pub_types or "Conference" in pub_types:
+        return "peer_reviewed"
+    return "unknown"
+
+
 __all__ = [
     "deinvert_abstract",
     "normalise_doi",
@@ -275,4 +478,5 @@ __all__ = [
     "infer_venue_tier",
     "search_openalex",
     "search_arxiv",
+    "search_semantic_scholar",
 ]

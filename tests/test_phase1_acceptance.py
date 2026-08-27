@@ -19,7 +19,7 @@ from researchgpt.core.llm import (
     extract_json,
 )
 from researchgpt.core.logging import TraceLogger
-from researchgpt.core.models import ALLOWED_MODELS, LLMConfig
+from researchgpt.core.models import ALLOWED_MODELS, IMPLEMENTED_SOURCES, LLMConfig, SourcesConfig
 
 
 def test_t107_trace_logger() -> None:
@@ -199,6 +199,26 @@ def test_t108_cli() -> None:
     print("T-108 OK")
 
 
+def test_sources_enabled_must_be_implemented() -> None:
+    """A config may not name a source that has no connector.
+
+    This is the failure that let T-214 go missing: `configs/default.yaml`
+    listed `semantic_scholar` in `sources.enabled` for a day while no such
+    function existed anywhere in `src/`. Nothing failed, because nothing
+    checked - the config was simply wrong and silent about it.
+    """
+    cfg = load_config("configs/default.yaml")
+    assert set(cfg.sources.enabled) <= IMPLEMENTED_SOURCES, cfg.sources.enabled
+
+    try:
+        SourcesConfig(enabled=["openalex", "crossref"])
+        raise AssertionError("expected ValidationError for unimplemented source")
+    except ValidationError as exc:
+        assert "crossref" in str(exc)
+
+    print(f"sources guard OK (implemented={sorted(IMPLEMENTED_SOURCES)})")
+
+
 if __name__ == "__main__":
     test_t107_trace_logger()
     test_t104_extract_json()
@@ -207,4 +227,5 @@ if __name__ == "__main__":
     test_t104_rate_limit()
     test_t105_config()
     test_t108_cli()
+    test_sources_enabled_must_be_implemented()
     print("ALL PHASE-1 ACCEPTANCE CHECKS PASSED")
