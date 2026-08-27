@@ -571,6 +571,10 @@ This is the graded component *and* the required training component. **Start it t
 
   ⚠️ **One thing the smoke test nearly hid.** Stock and fine-tuned printed *identical* metrics to four decimals, which looks exactly like a no-op trainer. Verified directly that `CrossEncoder.fit()` does mutate the model — raw scores moved by up to **3.49** — so the identical metrics were coarse metrics over 2 dev queries, not broken training. *Worth knowing before someone reads a flat table on Kaggle and concludes the run failed.*
 
+  🔴 **FAILED ON THE FIRST REAL KAGGLE RUN, and it is a failure the local CPU smoke test could not have caught.** `AttributeError: 'DataParallel' object has no attribute 'preprocess'` — Kaggle's **GPU T4 x2 exposes two devices**, so `sentence-transformers` wraps the model in `torch.nn.DataParallel`, and `BinaryCrossEntropyLoss` then calls `self.model.preprocess(...)`, which the wrapper does not forward. Training dies partway through `model.fit()`. *No single-GPU or CPU test can reproduce this; it needs two visible devices.*
+
+  **Fixed** by setting `CUDA_VISIBLE_DEVICES=0` as the very first statement of section 1 — **before torch initialises CUDA** — plus an assert in section 2 that only one device is visible. A 22M cross-encoder gains nothing from a second GPU; DataParallel would mostly add transfer overhead. ⚠️ On recurrence the kernel must be **restarted**: the pin has no effect once CUDA is initialised.
+
   ⚠️ **This notebook needs a data upload**, unlike the verifier one: BM25 hard-negative mining needs the whole pooled corpus, so `data/rerank/train_triples.jsonl` (~99 MB) must be attached as a Kaggle Dataset. The notebook globs `/kaggle/input/**/train_triples.jsonl`, so the dataset name does not matter. Steps are in the README.
 - [ ] **T-333** ⌨️ ONNX export + int8 dynamic quantization, matching the verifier's deployment path. *Done when: the quantized model reproduces float logits within tolerance and per-query CPU latency is measured.* **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/export_onnx.py`.
 

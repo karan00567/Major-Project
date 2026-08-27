@@ -172,6 +172,23 @@ Already built, from the 2026-08-27 run:
 | unique cited abstracts | 13,929 |
 | **random-fallback negatives** | **0.0%** — every negative is a genuine BM25 hard negative |
 
+### 🔴 Known Kaggle failure this notebook now guards against
+
+**`AttributeError: 'DataParallel' object has no attribute 'preprocess'`**
+
+Kaggle's *GPU T4 x2* exposes **two** devices. `sentence-transformers` then wraps
+the model in `torch.nn.DataParallel`, and `BinaryCrossEntropyLoss` calls
+`self.model.preprocess(...)` — an attribute `DataParallel` does not forward. The
+run dies partway through `model.fit()`. Hit on 2026-08-27.
+
+Section 1 now sets `CUDA_VISIBLE_DEVICES=0` **before torch initialises CUDA**,
+and section 2 asserts only one GPU is visible. A 22M cross-encoder gains nothing
+from a second GPU anyway.
+
+⚠️ If you ever hit this again, **restart the kernel** and Run All — the pin only
+works if it executes before CUDA is initialised, so re-running section 1 alone
+on a live kernel will not help.
+
 ### Steps
 
 1. Import `02_train_reranker_scireviewgen.ipynb` at
