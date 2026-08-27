@@ -365,3 +365,75 @@ def test_reranker_falls_back_when_a_configured_model_is_missing():
 
     r = Reranker(model_name="data/models/definitely-not-here")
     assert r._model_name == STOCK_MODEL
+
+
+# --------------------------------------------------------------------------
+# T-335 promotion conditions — enforced, not merely documented
+# --------------------------------------------------------------------------
+
+
+def test_stock_reranker_scores_are_calibrated():
+    from researchgpt.tools.reranker import STOCK_MODEL, Reranker
+
+    assert Reranker(model_name=STOCK_MODEL).scores_are_calibrated is True
+
+
+def test_filter_by_score_works_on_a_calibrated_model():
+    from researchgpt.core.models import Chunk
+    from researchgpt.tools.reranker import STOCK_MODEL, Reranker
+
+    r = Reranker(model_name=STOCK_MODEL)
+    c = Chunk(chunk_id="a", paper_id="a", text="x", start_char=0, end_char=1)
+    assert r.filter_by_score([(c, 0.9), (c, 0.1)], 0.5) == [(c, 0.9)]
+
+
+def test_condition_1_score_thresholding_is_blocked_on_a_tuned_model():
+    """T-335 condition 1. The tuned reranker rates unrelated documents
+    positively, so a score cutoff would silently admit them. A future author
+    reaching for one must hit a loud error, not a subtle behaviour change."""
+    import pathlib
+
+    import pytest as _pytest
+
+    from researchgpt.tools.reranker import Reranker, UncalibratedScoreError
+
+    tuned = pathlib.Path("data/models/reranker-onnx")
+    if not tuned.exists():
+        _pytest.skip("tuned reranker not built in this checkout")
+    r = Reranker(model_name=str(tuned))
+    assert r.scores_are_calibrated is False
+    with _pytest.raises(UncalibratedScoreError, match="ordering-only"):
+        r.filter_by_score([], 0.5)
+
+
+def test_nothing_in_the_pipeline_thresholds_on_a_reranker_score():
+    """T-335 condition 1, checked against the source rather than assumed.
+    RRF fuses by RANK; if a score comparison ever appears next to a rerank
+    call, the promotion's premise has quietly expired."""
+    import pathlib
+
+    src = pathlib.Path("src/researchgpt")
+    offenders = []
+    for path in src.rglob("*.py"):
+        if path.name in {"evaluate.py", "reranker.py", "retrieval_eval.py"}:
+            continue  # eval harnesses and the guard itself legitimately see scores
+        text = path.read_text(encoding="utf-8")
+        if ".rerank(" in text and any(
+            op in text for op in ("min_score", "score >", "score >=", "score <")
+        ):
+            offenders.append(str(path))
+    assert not offenders, (
+        f"{offenders} appears to threshold on a reranker score. The adopted model "
+        f"is ordering-only (T-335); use top_k or switch to the stock model."
+    )
+
+
+def test_config_names_the_adopted_reranker_and_documents_its_conditions():
+    import pathlib
+
+    cfg = pathlib.Path("configs/default.yaml").read_text(encoding="utf-8")
+    assert "reranker: data/models/reranker-onnx" in cfg
+    # The conditions must travel with the config, or the next reader ships a
+    # miscalibrated model into a context that does threshold on scores.
+    assert "ORDERING ONLY" in cfg
+    assert "98.2%" in cfg

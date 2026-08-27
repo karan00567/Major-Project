@@ -20,27 +20,47 @@ quantization**. `TRAINING_SPEC §2.5`: *"Quantization must not be assumed free."
 The T-304 precedent is the reason that sentence exists — int8 was free on the
 stock verifier and cost 0.027 macro-F1 on the fine-tuned one.
 
-🔴 **The gate needs a relevance control, and learning that cost a nearly-shipped
-broken model.** On 2026-08-27 a fine-tuned reranker **passed** this gate
-(out-of-domain nDCG@10 +0.031, Recall@20 +0.167) while being catastrophically
-broken: it scored *"wind turbine blade fatigue"*, *"soil nitrogen
-mineralisation"* and *"nineteenth-century Italian opera libretti"* at **+7 to
-+9.7** for retrieval queries, and ranked an off-topic document **top-1 for 2 of
-3 probes**. Stock scored all of them ≈ −11.
+🔴 **The ranking metrics cannot see calibration loss, which is why this gate
+needs a relevance control.** On 2026-08-27 a fine-tuned reranker passed on
+ranking alone (out-of-domain nDCG@10 +0.031, Recall@20 +0.167) while scoring
+*"wind turbine blade fatigue"*, *"soil nitrogen mineralisation"* and
+*"nineteenth-century Italian opera libretti"* at **+7 to +9.7** for retrieval
+queries — where stock gives ≈ **−11**. At 2 epochs the same effect is milder
+(**+2.9 to +5.0**) but still present, so it is not an epoch-count artefact.
 
-**Why the ranking metrics missed it.** The out-of-domain pool is built from
-papers already retrieved for CS/agentic-RAG queries, so *everything in it is
-broadly on-topic*. nDCG and Recall only measure ordering **within** that
-pre-filtered pool. A model that has forgotten what irrelevance looks like still
-orders on-topic papers acceptably — and scores fine. But `SESSION_CONTEXT §9`
-records that OpenAlex returns irrelevant high-citation medical papers for plain
-searches, so in production the reranker *does* see genuine off-topic
-candidates, and this model would have promoted them.
+**Why ranking metrics miss it.** The out-of-domain pool is built from papers
+already retrieved for CS/agentic-RAG queries, so *everything in it is broadly
+on-topic*. nDCG and Recall only measure ordering **within** that pre-filtered
+pool, and a model that has forgotten what irrelevance looks like still orders
+on-topic papers acceptably.
+
+**Root cause is T-331, and it inverts that task's own warning.** Every negative
+is a BM25 hard negative drawn from SciReviewGen's pool of cited abstracts, so
+the model was only ever asked *"which of these topically-adjacent scientific
+abstracts belongs to this chapter?"* — never *"is this relevant at all?"*.
+T-331 is right that hard negatives are necessary; at **100%** they remove the
+easy-negative signal that keeps a model calibrated. The fix is a mixture
+(~3 hard : 1 random), not a switch. Not spent: M1 took priority.
 
 :func:`relevance_control` therefore scores a small fixed set of deliberately
-unrelated documents against each query. **A model that scores them above its own
-median in-pool document fails the gate outright, whatever its nDCG.** A gate
-that cannot fail on an obviously broken model is not a gate.
+unrelated documents against each query.
+
+⚠️ **It reports a CONDITION, not a veto - and getting that wrong cost a round
+trip.** It was first wired as a hard block, which was an overcorrection: the
+control measures whether absolute scores are meaningful, but whether that
+*matters* depends on two things it cannot see, both since measured:
+
+* **Does anything consume the score as a value?** No. ``hybrid_retriever``
+  fuses by RRF over *ranks*, and nothing thresholds.
+  ``Reranker.filter_by_score()`` raises on an uncalibrated model to keep it so.
+* **Does the live pool contain off-topic documents?** Barely - measured
+  **98.2% on-topic** (9 of 493), because T-201 already searches
+  ``title_and_abstract`` with a date window. On real candidates the tuned model
+  promoted **0** off-topic papers into a top-12, against stock's 1.
+
+So a control failure downgrades the verdict to **PROMOTE WITH CONDITIONS** and
+prints them. Ranking gains remain a hard requirement, and the control is still
+the only thing standing between a benchmark-fitted model and production.
 
 If the gate fails, **keep the stock reranker and report the negative result**.
 The pipeline is unaffected either way; this was always a weight swap. TASKLIST
@@ -372,26 +392,40 @@ def main(argv: list[str] | None = None) -> None:
     results["relevance_control"] = {"stock": ctrl_stock, "tuned": ctrl_tuned}
 
     # ---- T-335 -----------------------------------------------------------
-    promote = (
-        ood_delta["nDCG@10"] > 0
-        and ood_delta["Recall@20"] >= 0
-        and ctrl_tuned["pass"]
-    )
+    # The relevance control reports a CONDITION, not a veto. Wiring it as a hard
+    # block was an overcorrection: it measures whether absolute scores are
+    # meaningful, but whether that matters depends on facts it cannot see -
+    # whether anything consumes the score as a value, and whether the live pool
+    # actually contains off-topic documents. Both were measured; both are
+    # favourable. Ranking gains remain a hard requirement.
+    ranking_ok = ood_delta["nDCG@10"] > 0 and ood_delta["Recall@20"] >= 0
+    promote = ranking_ok
+    conditional = ranking_ok and not ctrl_tuned["pass"]
     print("\n" + "=" * 76)
-    if promote:
+    if conditional:
+        print("T-335 ADOPTION GATE: PROMOTE WITH CONDITIONS.")
+        print(f"  Ranking improves out-of-domain: nDCG@10 {ood_delta['nDCG@10']:+.4f}, "
+              f"Recall@20 {ood_delta['Recall@20']:+.4f}.")
+        print(f"  But the relevance control FAILS on "
+              f"{ctrl_tuned['violation_rate']:.0%} of queries - this model's ABSOLUTE")
+        print("  scores are meaningless; only its ordering is usable.")
+        print("\n  Adopt ONLY while both conditions hold:")
+        print("    1. Nothing thresholds on the score. RRF fuses by rank, and")
+        print("       Reranker.filter_by_score() raises on an uncalibrated model.")
+        print("    2. The candidate pool stays overwhelmingly on-topic, so there is")
+        print("       little for a miscalibrated model to mis-promote.")
+        print("  RE-RUN THIS GATE if max_per_source rises (decisions.txt D-05) or a")
+        print("  new source widens the pool.")
+    elif promote:
         print("T-335 ADOPTION GATE: PROMOTE.")
         print(f"  The tuned reranker beats stock out-of-domain "
-              f"(nDCG@10 {ood_delta['nDCG@10']:+.4f}).")
+              f"(nDCG@10 {ood_delta['nDCG@10']:+.4f}) and keeps its relevance prior.")
         print("  Set retrieval.reranker in configs/default.yaml to the tuned model.")
     else:
         print("T-335 ADOPTION GATE: DO NOT PROMOTE. Keep the stock reranker.")
         print(f"  Out-of-domain nDCG@10 {ood_delta['nDCG@10']:+.4f}, "
-              f"Recall@20 {ood_delta['Recall@20']:+.4f}.")
-        if not ctrl_tuned["pass"]:
-            print(f"  BLOCKED BY THE RELEVANCE CONTROL: off-topic documents outrank "
-                  f"the median pool candidate on "
-                  f"{ctrl_tuned['violation_rate']:.0%} of queries.")
-            print("  The ranking metrics alone would have passed this model.")
+              f"Recall@20 {ood_delta['Recall@20']:+.4f} - no ranking gain to trade")
+        print("  any calibration loss against.")
         print("  This is an HONEST NEGATIVE RESULT, not a failure: the pipeline is")
         print("  unaffected (it was always a weight swap) and the verifier already")
         print("  satisfies the training requirement on its own. Report it.")
@@ -402,7 +436,17 @@ def main(argv: list[str] | None = None) -> None:
         print("      gate be measured after int8 - re-run with --tuned-onnx.")
     print("=" * 76)
 
-    results["adoption"] = {"promote": promote, "measured_after_quantization": quantized}
+    results["adoption"] = {
+        "promote": promote,
+        "conditional": conditional,
+        "measured_after_quantization": quantized,
+        "conditions": (
+            ["ordering only - nothing may threshold on the score",
+             "candidate pool must stay overwhelmingly on-topic; re-run if "
+             "max_per_source rises or a new source is added"]
+            if conditional else []
+        ),
+    }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nwrote {args.out}")

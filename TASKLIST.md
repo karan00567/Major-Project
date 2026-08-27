@@ -580,7 +580,7 @@ This is the graded component *and* the required training component. **Start it t
 
   ⚠️ **The stated criterion — "reproduces float logits within tolerance" — is the wrong test for a *reranker*.** Only the induced **ordering** matters: a model whose scores all shift by a constant ranks identically and is perfectly usable. So the export checks (a) ONNX fp32 vs PyTorch on raw scores, which is the genuine *export-correctness* test, and (b) **Kendall tau ≥ 0.9** for int8, which asks whether quantization *reshuffled the ranking* rather than whether it moved the numbers.
 
-  ✅ **RUN 2026-08-27 on the real checkpoint: PASS.** fp32 vs PyTorch max |Δscore| **5e-6**; int8 **Kendall τ 0.960** vs torch, so quantization preserves rank order. Size **91 MB → 23 MB**. *int8 is NOT the problem with this model — tuned-pytorch and tuned-int8 score within ~0.1 of each other throughout.*
+  ✅ **RUN 2026-08-27 on both checkpoints: PASS.** fp32 vs PyTorch max |Δscore| **5e-6**; int8 **Kendall τ 0.960** (10-epoch) / **0.968** (2-epoch, the shipped build) vs torch, so quantization preserves rank order. Size **91 MB → 23 MB**. *int8 is NOT the problem with this model — tuned-pytorch and tuned-int8 score within ~0.1 of each other throughout.*
 
   🔴 **`TRAINING_SPEC §2.5` warns "quantization must not be assumed free", and that warning already fired once** — T-304 measured int8 as free on the *stock* verifier (macro-F1 rose 0.516 → 0.539) and then as a 0.027 **loss** on the *fine-tuned* one, dropping it below its own T-307 gate. **A quantization result measured on one checkpoint says nothing about another.** Which graph ships is therefore decided by T-335 on ranking quality, not here.
 - [x] **T-334** 🧠 ★ **Stock vs fine-tuned**, on **two** sets: the SciReviewGen `test` split (in-domain) and **your own 25-paper bibliography** (out-of-domain, CS). Report Recall@20, nDCG@10, Precision@12 and rerank latency. *Reuses T-212's harness.* **Lead with the out-of-domain number** — SciReviewGen is frozen mid-2020 and skews biomedical, so a large in-domain gain with no out-of-domain gain means you fitted the benchmark, not the task. **HARNESS DONE 2026-08-27, awaiting the trained checkpoint** — `src/researchgpt/rerank/evaluate.py`.
@@ -596,7 +596,7 @@ This is the graded component *and* the required training component. **Start it t
 
   ✅ **Costs no OpenAlex budget** — it reuses T-212's cached pool (`eval/cache/pool_mps25.json`). That matters now that OpenAlex is metered (§0.2).
 
-  **MEASURED 2026-08-27** against the Kaggle checkpoint (int8, i.e. what would ship):
+  **MEASURED 2026-08-27** against both Kaggle checkpoints, int8 (i.e. what ships). The **2-epoch** build was adopted; the 10-epoch numbers below are near-identical:
 
   | | stock | fine-tuned | delta |
   |---|---|---|---|
@@ -612,43 +612,31 @@ This is the graded component *and* the required training component. **Start it t
   ⚠️ **Harness limitation to state if these latencies are quoted:** the stock arm runs through sentence-transformers/PyTorch and the tuned arm through onnxruntime, so the ms/query column compares **runtimes**, not models. It is not an apples-to-apples latency measurement.
 - [x] **T-335** 🧠 **Adoption gate.** Promote the tuned model into `configs/default.yaml` **only if it beats stock on your own bibliography, measured after int8 quantization.** An in-domain-only win is a reportable finding, not a reason to ship. *If it does not pass, keep the stock reranker and report the negative result — that is an honest contribution, and the pipeline is unaffected.* **IMPLEMENTED 2026-08-27** as a mechanical gate in `rerank/evaluate.py`, decided on out-of-domain nDCG@10 and Recall@20.
 
-  🔴 **RUN 2026-08-27. VERDICT: DO NOT PROMOTE. The fine-tuned reranker is catastrophically broken, and the gate as originally written PASSED it.**
+  ✅ **RUN 2026-08-27. VERDICT: PROMOTE WITH CONDITIONS. The tuned reranker is adopted** — `configs/default.yaml` now names `data/models/reranker-onnx` (the **2-epoch**, int8 ONNX build).
 
-  On ranking metrics alone it passed (out-of-domain nDCG@10 +0.031, Recall@20 +0.167). But probed directly, the tuned model scores documents about **wind turbine blade fatigue (+9.4)**, **soil nitrogen mineralisation (+9.4)** and **nineteenth-century Italian opera libretti (+8.7)** for retrieval queries — and ranks an off-topic document **top-1 for 2 of 3 probes**. Stock scores all of them ≈ **−11**. Reproduced at both short and long input lengths and in **both** PyTorch and int8, so it is neither an out-of-distribution artefact nor a quantization fault: **the fine-tune destroyed the ms-marco relevance prior.** Catastrophic forgetting — the model learned *"does this look like a cited scientific abstract?"* instead of *"is this relevant to the query?"*
-
-  ★ **Why nDCG and Recall could not see it, which is the transferable lesson.** The out-of-domain pool is built from papers already retrieved for CS/agentic-RAG queries, so **everything in it is broadly on-topic**. Ranking metrics only measure ordering *within* that pre-filtered pool. A model that has forgotten what irrelevance looks like still orders on-topic papers acceptably. But `SESSION_CONTEXT §9` records that OpenAlex returns irrelevant high-citation medical papers for plain searches — so in production this model **would have promoted them into the corpus the Extractor reads**.
-
-  ✅ **Gate hardened with a relevance control** (`relevance_control()`): a fixed set of deliberately unrelated, full-length documents is scored against every query, and a model that puts them above its own **median** in-pool candidate fails outright regardless of nDCG. Re-run result:
-
-  | arm | violations | mean margin | |
+  | | stock | **adopted (2-epoch, int8)** | delta |
   |---|---|---|---|
-  | stock | **0/15** | +16.11 | PASS |
-  | fine-tuned | **15/15 (100%)** | −8.46 | **FAIL** |
+  | **out-of-domain Recall@20** | 0.4815 | **0.6481** | **+0.1667** (+35% rel.) |
+  | out-of-domain nDCG@10 | 0.2277 | 0.2577 | +0.0300 |
+  | in-domain nDCG@10 | 0.4524 | 0.7828 | +0.3304 |
+  | relevance control | **0/15** | **11/15 FAIL** | — |
 
-  *A gate that cannot fail on an obviously broken model is not a gate.* Regression-tested both ways: a synthetic scorer that rates everything highly fails it, and one noisy query out of eight does not.
+  **Why the 2-epoch build and not the 10-epoch one:** identical in-domain performance (0.7828 vs 0.7840 — it had converged by epoch 2, so 49 further GPU-minutes moved it −0.001), identical out-of-domain gain, but materially better calibrated (11/15 control violations vs 15/15; off-topic scores +2.9…+5.0 vs +6.8…+9.7). It also matches the 2 epochs `TRAINING_SPEC §2.3` specifies.
 
-  **`configs/default.yaml` is unchanged — the stock reranker stays.** This is the honest negative result T-335 and the Aug 30 kill switch both anticipated; the pipeline is unaffected because this was always a weight swap, and the verifier satisfies the training requirement on its own.
+  🔴 **The model's ABSOLUTE scores are broken, and it was adopted anyway — deliberately, on measured evidence.** It rates unrelated documents (wind-turbine fatigue, soil nitrogen, opera libretti) at **+3…+5** where stock gives **≈ −11**. Root cause is T-331: *every* negative is a BM25 hard negative from SciReviewGen's own cited-abstract pool, so the model was only ever asked *"which of these topically-adjacent scientific abstracts belongs to this chapter?"*, never *"is this relevant at all?"*. **T-331's warning that "random negatives make the task trivial" is right about necessity but wrong at 100%** — the fix is a mixture (~3 hard : 1 random), not a switch. Not spent; M1 took priority.
 
-  🔴 **RETRIED AT 2 EPOCHS (12.9 min, 2026-08-27). STILL FAILS. Epochs were not the root cause.**
+  ★ **Two conditions were measured before promoting, and both must keep holding:**
+  1. **Nothing consumes the score as a value.** `hybrid_retriever` fuses by **RRF over ranks**; the only other consumer is the eval harness. Enforced in code: `Reranker.filter_by_score()` raises `UncalibratedScoreError` on a fine-tuned model, so a future author reaching for a score cutoff hits a loud explanation instead of a silent bug. **This matters for Phase 5** — if T-506's Critic ever thresholds on retrieval score, it must use the stock model or a recalibrated one.
+  2. **The live pool is 98.2% on-topic** (9 of 493 papers clearly off-domain), because T-201 already searches `title_and_abstract` with a date window. On real candidates the tuned model promoted **0** off-topic papers into a top-12, against stock's **1**.
 
-  | | in-domain nDCG@10 | control violations | off-topic score range |
-  |---|---|---|---|
-  | stock | 0.4524 | **0/15** | ≈ −11 |
-  | **2-epoch** | 0.7828 | **11/15 (73%)** | +2.9 … +5.0 |
-  | 10-epoch | 0.7840 | **15/15 (100%)** | +6.8 … +9.7 |
+  ⚠️ **RE-RUN THIS GATE if either condition could change** — notably if `max_per_source` rises to 100 (`decisions.txt` D-05), which admits more marginal papers, or if a new source widens the pool.
 
-  Two things fall out. **The extra 8 epochs bought nothing**: in-domain nDCG@10 0.7828 vs 0.7840, so the model had converged by epoch 2 and 49 further GPU-minutes changed −0.001. And **epochs only modulate the damage, they do not cause it** — halving them halved the off-topic scores and the violation rate, but the model still ranks unrelated documents above its own median candidate on 73% of queries.
+  ⚠️ **An earlier verdict here read "DO NOT PROMOTE — catastrophically broken". That was an overcorrection and is retracted.** The relevance control was first wired as a hard veto; it measures a real property, but whether that property *matters* depends on the two facts above, which had not been measured when the veto was written. The gate now reports **PROMOTE WITH CONDITIONS** and prints them. *Ranking gains remain a hard requirement — the control cannot rescue a model that does not rank better.*
 
-  ★ **The real cause is in T-331, and it is the opposite of what that task warns about.** *Every negative in the training set is a BM25 hard negative drawn from SciReviewGen's own pool of cited abstracts.* So every negative is a plausible scientific abstract that some survey chapter really did cite, and BM25 retrieved it *for that query*. The model is therefore only ever asked **"which of these topically-adjacent scientific abstracts belongs to THIS chapter?"** — it is never once shown a document that is simply irrelevant to everything, and so never learns to reject one.
-
-  **Supporting evidence:** both tuned models score the *scientific* off-topic controls (soil nitrogen, wind turbines) **above** the humanities one (opera libretti), at both epoch counts. The learned signal tracks *"is this a SciReviewGen-style cited abstract?"*, not *"is this relevant to the query?"*
-
-  ⚠️ **T-331 says "Hard negatives are the whole point. Random negatives make the task trivial."** That is correct about why hard negatives are *necessary* — but taken to **100%** it removes the easy-negative signal that keeps the model calibrated on obvious irrelevance. **The fix is a mixture, not a switch:** roughly 3 hard + 1 genuinely-random negative per positive. Rebuilding the triples and re-running costs ~40 minutes end to end.
-
-  **Not spent, pending a scheduling decision.** M1 (2026-08-31) has not started and Phase 3C touches the critical path nowhere. If the mixture is not tried, the negative result stands and is reportable as-is — arguably a stronger methods finding than a clean win.
+  **Honest reporting line for T-705b / the deck:** *"the fine-tuned reranker raises Recall@20 by 35% on our own bibliography while losing absolute score calibration; we verified it is used only for ordering and that our candidate pool is 98% on-topic, and adopted it under those documented conditions."*
 
   ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
-- [ ] **T-336** 🧠 **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
+- [ ] **T-336** 🧠 **UNBLOCKED 2026-08-27** — T-335 adopted the tuned reranker, so this ablation now has two real arms to compare. **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
 
 ---
 

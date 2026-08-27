@@ -33,6 +33,15 @@ log = logging.getLogger(__name__)
 #: Fallback when a configured local model is absent. Also the T-210 default.
 STOCK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
+
+class UncalibratedScoreError(RuntimeError):
+    """Raised when code tries to use a fine-tuned reranker score as a VALUE.
+
+    See :attr:`Reranker.scores_are_calibrated`. This exists so that a future
+    author reaching for score thresholding hits a loud, explanatory failure
+    instead of a silent behavioural bug.
+    """
+
 #: handoffs/phase2_complete.md §4.4 — the suite logged "unauthenticated
 #: requests" because HF_TOKEN sits in .env and nothing loaded it. Hub reads the
 #: env var, so a single load_dotenv() at import is the whole fix. Never raises:
@@ -60,6 +69,9 @@ class Reranker:
 
         resolved = self._resolve(model_name)
         self._model_name = resolved
+        # Only the stock ms-marco checkpoint has calibrated absolute scores.
+        # Anything local is one of our fine-tunes -- see scores_are_calibrated.
+        self._calibrated = resolved == STOCK_MODEL
         onnx_path = self._find_onnx(resolved)
         if onnx_path is not None:
             self._load_onnx(onnx_path, resolved)
@@ -121,6 +133,51 @@ class Reranker:
     def last_latency_ms(self) -> int:
         return self._last_latency_ms
 
+    @property
+    def scores_are_calibrated(self) -> bool:
+        """Whether this model's scores mean anything in absolute terms.
+
+        ⚠️ **False for the fine-tuned reranker, and that is not a bug we can
+        fix by retraining differently within this schedule.** Measured
+        2026-08-27 (T-335): the SciReviewGen fine-tune raises Recall@20 on our
+        own gold set from 0.4815 to 0.6481, but it scores documents about wind
+        turbine fatigue, soil nitrogen and Italian opera libretti at **+3 to
+        +5** for retrieval queries, where the stock model gives ≈ **−11**.
+
+        The cause is in the training data (T-331): every negative is a BM25
+        hard negative drawn from SciReviewGen's own pool of cited abstracts, so
+        the model was only ever asked *"which of these topically-adjacent
+        scientific abstracts belongs to this chapter?"* and never *"is this
+        relevant at all?"*.
+
+        **It was adopted anyway, deliberately and on evidence**: nothing in the
+        pipeline consumes the score as a value (``hybrid_retriever`` fuses by
+        RRF over *ranks*), and the live candidate pool measured **98.2%
+        on-topic**, so the tuned model promoted **0** off-topic papers into a
+        top-12 against the stock model's 1.
+
+        **The condition of that adoption is this property.** Ranking: fine.
+        Thresholding, confidence, or any absolute interpretation: invalid.
+        """
+        return self._calibrated
+
+    def filter_by_score(self, scored: list[tuple[Chunk, float]], min_score: float):
+        """Reject candidates below ``min_score`` — only valid on a calibrated model.
+
+        Deliberately raises rather than warns on the tuned model. A score
+        threshold that silently passes irrelevant documents is exactly the
+        failure T-335 was hardened to catch, and it would surface downstream as
+        a hallucination rather than as a retrieval bug.
+        """
+        if not self._calibrated:
+            raise UncalibratedScoreError(
+                f"{self._model_name!r} produces ordering-only scores (T-335): it "
+                f"rates unrelated documents positively. Rank with it, do not "
+                f"threshold on it. Use top_k in rerank(), or switch to "
+                f"{STOCK_MODEL} if you genuinely need a score cutoff."
+            )
+        return [(c, s) for c, s in scored if s >= min_score]
+
     def rerank(
         self, query: str, chunks: list[Chunk], top_k: int = 12
     ) -> list[tuple[Chunk, float]]:
@@ -142,4 +199,4 @@ class Reranker:
         return ranked[:top_k]
 
 
-__all__ = ["Reranker", "STOCK_MODEL"]
+__all__ = ["Reranker", "STOCK_MODEL", "UncalibratedScoreError"]
