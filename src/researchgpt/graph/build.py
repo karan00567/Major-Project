@@ -196,7 +196,12 @@ def build_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None):
     return graph.compile()
 
 
-def build_loop_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None):
+def build_loop_graph(
+    cfg: Any,
+    llm: LLMClient,
+    trace: TraceLogger | None = None,
+    checkpointer: Any = None,
+):
     """T-507 / T-509 — the six-agent graph with the Critic loop.
 
     Topology, and why it is this shape::
@@ -220,6 +225,11 @@ def build_loop_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None)
     model because M1 does not depend on verification; this graph does not,
     because a six-agent graph missing the graded agent is not the thing it
     claims to be.
+
+    Pass ``checkpointer=graph.checkpoint.checkpointer()`` (T-508) to make the
+    run resumable. Invoke with ``config=thread_config(run_id)``; re-invoking
+    with the same ``run_id`` continues after the last completed node instead of
+    restarting from the Planner.
     """
     from langgraph.graph import END, START, StateGraph
 
@@ -261,7 +271,7 @@ def build_loop_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None)
             END_NODE: END,
         },
     )
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
 
 __all__ = [
