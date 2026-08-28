@@ -245,3 +245,65 @@ def test_a_recorded_run_replays_through_the_normal_endpoints(runs):
     with client.stream("GET", "/api/runs/demo/events") as r:
         body = "".join(chunk for chunk in r.iter_text())
     assert "run_start" in body and "event: done" in body
+
+
+# --------------------------------------------------------------------------
+# T-607 — the data contract Panel 3 depends on
+# --------------------------------------------------------------------------
+
+
+def _normalise(s: str) -> str:
+    """Must stay identical to PanelEvidence.vue::normalise."""
+    import re
+
+    s = re.sub(r"\[\d+\]", " ", s or "")
+    s = re.sub(r"[*_`#]", " ", s)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def test_verified_claims_are_locatable_in_the_review():
+    """Panel 3 highlights a sentence by matching NORMALISED text, not offsets.
+
+    🔴 The Verifier strips `[n]` markers when it decomposes and the Writer's
+    markdown carries them, so a byte offset into review.md points at the wrong
+    place. If the two normalisations ever drift apart the panel silently
+    highlights nothing and the graded "money shot" renders as plain prose -
+    with no error anywhere. This asserts the contract from the Python side so a
+    pipeline change cannot break the front end unnoticed.
+
+    Measured on the fixture 2026-08-28: 19 of 19 claims located.
+    """
+    import json
+    import pathlib
+
+    run = pathlib.Path("outputs/runs/fixture")
+    if not (run / "claims.json").exists():
+        pytest.skip("fixture not built in this checkout")
+
+    claims = json.loads((run / "claims.json").read_text(encoding="utf-8"))
+    review = (run / "review.md").read_text(encoding="utf-8")
+    verified = claims["verified"]
+    assert verified, "fixture has no verified claims to inspect"
+
+    haystack = _normalise(review)
+    missing = [c["claim_id"] for c in verified if _normalise(c["text"]) not in haystack]
+
+    assert not missing, (
+        f"{len(missing)}/{len(verified)} verified claims cannot be found in "
+        f"review.md ({missing[:5]}). Panel 3 would highlight nothing."
+    )
+
+
+def test_every_verified_claim_carries_its_evidence():
+    """A verdict without its evidence makes Panel 3 an assertion about the
+    system rather than a demonstration of it."""
+    import json
+    import pathlib
+
+    path = pathlib.Path("outputs/runs/fixture/claims.json")
+    if not path.exists():
+        pytest.skip("fixture not built in this checkout")
+
+    claims = json.loads(path.read_text(encoding="utf-8"))
+    without = [c["claim_id"] for c in claims["verified"] if not c.get("evidence")]
+    assert not without, f"verified claims with no evidence span: {without[:5]}"
