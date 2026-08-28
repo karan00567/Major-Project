@@ -212,7 +212,9 @@ class LLMClient:
                 f"MAX_EVIDENCE_PER_THEME)."
             )
 
-        provider = MODEL_PROVIDER[resolved_model]
+        # An explicit provider wins: the same open-weight model is served by
+        # more than one host, and MODEL_PROVIDER can only name one.
+        provider = getattr(self._cfg, "provider", None) or MODEL_PROVIDER[resolved_model]
         prompt_hash = hashlib.sha256(
             f"{resolved_model}|{resolved_temp}|{resolved_max}|"
             f"{getattr(self._cfg, 'reasoning_effort', None)}|{prompt}".encode("utf-8")
@@ -445,6 +447,8 @@ class LLMClient:
             return self._google_complete(model, prompt, temperature, max_tokens)
         if provider == "groq":
             return self._groq_complete(model, prompt, temperature, max_tokens)
+        if provider == "baseten":
+            return self._baseten_complete(model, prompt, temperature, max_tokens)
         raise LLMError(f"Unknown provider {provider!r} for model {model!r}")
 
     def _google_complete(
@@ -493,6 +497,47 @@ class LLMClient:
                 "(all parts were thought-only or missing text)"
             )
         return "".join(texts)
+
+    def _baseten_complete(
+        self, model: str, prompt: str, temperature: float, max_tokens: int
+    ) -> str:
+        """Baseten Model APIs. OpenAI-compatible, so this mirrors Groq exactly.
+
+        ⚠️ **A PAID provider, outside TASKLIST §0.1.** See
+        ``LLMConfig.provider``. The run config records it so a survey produced
+        this way cannot be reported as a $0 artefact by accident.
+        """
+        key = os.getenv("BASETEN_API_KEY")
+        if not key:
+            raise LLMError(
+                "BASETEN_API_KEY is missing from the environment / .env "
+                "(required when llm.provider is 'baseten')"
+            )
+        url = "https://inference.baseten.co/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {key}"}
+        body = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        effort = getattr(self._cfg, "reasoning_effort", None)
+        if effort:
+            body["reasoning_effort"] = effort
+        with httpx.Client(timeout=120.0) as client:
+            resp = client.post(url, headers=headers, json=body)
+            resp.raise_for_status()
+            data = resp.json()
+
+        try:
+            content = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise LLMError(
+                f"Malformed Baseten response for model {model!r}: missing content"
+            ) from exc
+        if content is None:
+            raise LLMError(f"Empty Baseten response for model {model!r}")
+        return content
 
     def _groq_complete(
         self, model: str, prompt: str, temperature: float, max_tokens: int
@@ -552,6 +597,15 @@ class LLMClient:
         path = self._cache_path(prompt_hash)
         record = {
             "model": model,
+            # Recorded but deliberately NOT part of the cache key. The same
+            # open-weight model served by a different host produces equivalent
+            # output, so a response fetched from a paid host is a legitimate
+            # cache hit for a later free-tier run - which is exactly how the
+            # $0 reproduction stays cheap. But in a project about provenance,
+            # "which host produced this text" must still be answerable per
+            # response, not merely per run.
+            "provider": getattr(self._cfg, "provider", None)
+            or MODEL_PROVIDER.get(model),
             "prompt": prompt,
             "response": response,
             "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),

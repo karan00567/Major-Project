@@ -66,8 +66,35 @@ llm:
   # silently injects fabricated content (SPEC 14.2 forbids exactly this).
   #
   # Restore 120b once its daily window refills, if the two runs are comparable.
-  model: openai/gpt-oss-20b        # Extractor / Critic / Writer
-  planner_model: openai/gpt-oss-20b    # Planner
+  # ============================================================== TEMPORARY
+  # 🔴 PAID PROVIDER, FOR 2026-08-28 ONLY. REVERT TOMORROW.
+  #
+  # This BREAKS TASKLIST 0.1 ("no paid models, no paid tiers, no trial
+  # credits, at any point in this project"), knowingly and on the human's
+  # explicit instruction, to unblock one T-409 test run after Groq's free tier
+  # ran out of DAILY tokens on both gpt-oss models.
+  #
+  # What is preserved: the MODEL. Baseten serves the same open-weight
+  # `openai/gpt-oss-120b` that the T-004 bake-off selected as PRIMARY, so this
+  # run's output is comparable to a free-tier run rather than better than one.
+  # Only the host is paid. Measured cost: ~4,730 tokens per extraction,
+  # ~118,000 for 25 papers, roughly $0.02.
+  #
+  # The provider is stamped into outputs/runs/<id>/config.json and into every
+  # cache entry, so no artefact produced this way can be reported as $0 by
+  # accident.
+  #
+  # TOMORROW, REVERT TO:
+  #     model: openai/gpt-oss-20b
+  #     planner_model: openai/gpt-oss-20b
+  #     provider: null
+  #     requests_per_minute: 30
+  #     tokens_per_minute: 8000
+  #     review.max_papers: 10        <-- the human's instruction, see below
+  # ==========================================================================
+  model: openai/gpt-oss-120b       # T-004 PRIMARY. Same weights, paid host.
+  planner_model: openai/gpt-oss-120b
+  provider: baseten                # TEMPORARY - see the block above
   temperature: 0.1
   # 4096 -> 2048. Measured over 55 cached extractions: median response 571
   # tokens, p90 948, max 1,682. 4096 reserved 2.4x the largest response ever
@@ -96,8 +123,14 @@ llm:
   # Now: llm.py estimates prompt+max_tokens, refuses an impossible request
   # immediately with TokenBudgetExceeded, and paces on a rolling 60 s token
   # ledger. requests_per_minute returns to Groq's real 30; tokens govern.
-  requests_per_minute: 30
-  tokens_per_minute: 8000
+  # TEMPORARY (2026-08-28): Baseten is a paid endpoint with no 8,000 TPM free
+  # cap, so the token pacing that Groq needs is switched off. Setting
+  # tokens_per_minute to 0 also disables the TokenBudgetExceeded pre-flight,
+  # which is correct here - that guard exists for a small free-tier bucket.
+  # RESTORE 30 / 8000 when reverting to Groq, or the first free-tier run will
+  # walk straight back into the 429 storm of 2026-08-28.
+  requests_per_minute: 60
+  tokens_per_minute: 0
   # ★ gpt-oss are REASONING models. max_tokens budgets the reasoning trace AND
   # the visible answer together, so at the provider's default effort the trace
   # can eat the whole budget and return EMPTY content.

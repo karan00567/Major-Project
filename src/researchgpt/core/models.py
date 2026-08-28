@@ -207,6 +207,21 @@ class LLMConfig(BaseModel):
     #: is a transcription task, not a reasoning one.
     reasoning_effort: Optional[str] = "low"
     max_retries: int = 5
+    #: Overrides MODEL_PROVIDER for models served by more than one host.
+    #:
+    #: ⚠️ TASKLIST §0.1 is a $0 rule about PROVIDERS, not about weights: "no
+    #: paid models, no paid tiers, no trial credits, at any point". `baseten`
+    #: is a PAID host and is therefore outside that rule. It exists as an
+    #: escape hatch for one measured situation - Groq's free tier caps at
+    #: 200,000 tokens per DAY per model, which four T-409 attempts exhausted on
+    #: 2026-08-28 - and the model served is the same open-weight
+    #: `openai/gpt-oss-120b` the T-004 bake-off selected, so output is
+    #: comparable rather than better.
+    #:
+    #: ★ Any run using a paid provider MUST record it: `output/writers.py`
+    #: stamps the provider into the run config, so a survey produced this way
+    #: cannot be quietly reported as a $0 artefact.
+    provider: Optional[str] = None
     cache_dir: str = "data/llm_cache"
 
     @field_validator("model", "planner_model")
