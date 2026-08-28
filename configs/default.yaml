@@ -40,8 +40,35 @@ llm:
   model: openai/gpt-oss-120b       # Extractor / Critic / Writer — 27x faster
   planner_model: openai/gpt-oss-120b   # Planner
   temperature: 0.1
-  max_tokens: 4096
-  requests_per_minute: 15          # free-tier throttle (T-104)
+  # 4096 -> 2048. Measured over 55 cached extractions: median response 571
+  # tokens, p90 948, max 1,682. 4096 reserved 2.4x the largest response ever
+  # produced, and that reservation is charged against TPM. Agents override:
+  # extractor 2,048, writer 2,560 (prose sections need more than JSON).
+  max_tokens: 2048
+  # GROQ FREE-TIER LIMITS, verified live 2026-08-28 against
+  # x-ratelimit-* headers and console.groq.com/docs/rate-limits.
+  # Identical for openai/gpt-oss-120b, openai/gpt-oss-20b and qwen/qwen3.6-27b:
+  #
+  #     RPM     30          requests per minute
+  #     RPD  1,000          requests per DAY
+  #     TPM  8,000          tokens per minute   <-- THE ONE THAT BINDS
+  #     TPD 200,000         tokens per day
+  #
+  # T-409 was refused constantly while holding 999 of 1,000 daily requests.
+  # This project is token-bound, not request-bound, and the throttle used to
+  # pace only requests - which is why lowering it 15 -> 4 changed nothing.
+  #
+  # Providers reserve `prompt + max_tokens` against the TPM bucket at
+  # admission. With the old max_tokens 4096 and extractor prompts up to 18,000
+  # chars (~4,500 tokens), the largest requests reserved ~8,600 tokens - more
+  # than the entire bucket - so they could never be served at ANY rate. They
+  # burned 5 retries x 60 s each and were written as blank insights.
+  #
+  # Now: llm.py estimates prompt+max_tokens, refuses an impossible request
+  # immediately with TokenBudgetExceeded, and paces on a rolling 60 s token
+  # ledger. requests_per_minute returns to Groq's real 30; tokens govern.
+  requests_per_minute: 30
+  tokens_per_minute: 8000
   max_retries: 5
   cache_dir: data/llm_cache        # prompt-hash cache (T-104)
 

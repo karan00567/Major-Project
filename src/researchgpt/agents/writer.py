@@ -54,6 +54,18 @@ THEME_ORDER: tuple[tuple[str, str], ...] = (
 #: stops fitting usefully in one prompt and citation precision degrades.
 MAX_EVIDENCE_PER_THEME = 14
 
+#: Output budget for one section. Larger than the extractor's because this
+#: writes prose, not a small JSON object: M1's "Methods and Architectures"
+#: section came back at 6,751 characters (~1,690 tokens).
+#:
+#: 🔴 Not free headroom. Providers reserve `prompt + max_tokens` against the
+#: per-minute TOKEN bucket at admission, so an oversized value is spent budget.
+#: Groq's free tier is 8,000 TPM. If a section ever raises
+#: TokenBudgetExceeded, lower MAX_EVIDENCE_PER_THEME rather than this -
+#: truncating the model mid-section produces uncited prose, which the Writer
+#: then rejects outright, so a smaller output budget costs whole sections.
+MAX_COMPLETION_TOKENS = 2_560
+
 #: A section this long with no citation at all is unverifiable prose, not a
 #: literature review.
 #:
@@ -179,7 +191,7 @@ class Writer(Agent):
             evidence, cited = self._evidence_block(subset, insights)
             prompt = load("writer_v1", theme=f"{heading} - {facet}", evidence=evidence)
             try:
-                raw = self._llm.complete(prompt)
+                raw = self._llm.complete(prompt, max_tokens=MAX_COMPLETION_TOKENS)
             except Exception as exc:
                 self._emit("section_failed",
                            {"theme": heading, "error": f"{type(exc).__name__}: {exc}"},
@@ -193,7 +205,10 @@ class Writer(Agent):
                 self._emit("section_uncited_retry",
                            {"theme": heading, "chars": len(text)}, iteration)
                 try:
-                    raw = self._llm.complete(prompt + "\n\n" + _UNCITED_RETRY)
+                    raw = self._llm.complete(
+                        prompt + "\n\n" + _UNCITED_RETRY,
+                        max_tokens=MAX_COMPLETION_TOKENS,
+                    )
                     text, dropped, used = self._resolve_citations(
                         raw.strip(), len(cited))
                 except Exception as exc:

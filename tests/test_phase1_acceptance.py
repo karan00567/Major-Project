@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -238,3 +239,123 @@ if __name__ == "__main__":
     test_t108_cli()
     test_sources_enabled_must_be_implemented()
     print("ALL PHASE-1 ACCEPTANCE CHECKS PASSED")
+
+
+# --------------------------------------------------------------------------
+# T-104 — token budgeting. Added 2026-08-28 after T-409 was throttled to a halt.
+#
+# The adapter paced REQUESTS while the provider limited TOKENS. Groq's free
+# tier is 8,000 TPM against 1,000 requests/day, so the run was refused
+# constantly while holding 999 unused requests. Worse, `prompt + max_tokens` is
+# reserved at admission, so the largest requests exceeded the whole bucket and
+# could never succeed at any rate - they burned 5 retries x 60 s and were then
+# written as blank insights.
+# --------------------------------------------------------------------------
+
+
+def _llm_cfg(**over):
+    from researchgpt.core.models import LLMConfig
+
+    base = dict(model="openai/gpt-oss-120b", requests_per_minute=0,
+                tokens_per_minute=8000, max_tokens=2048, cache_dir="data/llm_cache")
+    base.update(over)
+    return LLMConfig(**base)
+
+
+def test_estimate_tokens_rounds_up() -> None:
+    """Under-estimating costs a 429 storm; over-estimating costs a little
+    throughput. The error is priced asymmetrically, so it must never round
+    down to zero."""
+    from researchgpt.core.llm import estimate_tokens
+
+    assert estimate_tokens("") >= 1
+    assert estimate_tokens("a" * 400) >= 100
+    assert estimate_tokens("a" * 4000) > estimate_tokens("a" * 400)
+
+
+def test_request_larger_than_the_whole_budget_fails_before_any_http() -> None:
+    """The T-409 bug. This must raise instantly, not retry.
+
+    No network is configured in this test; if the guard did not fire first, the
+    call would attempt a real request and fail differently.
+    """
+    from researchgpt.core.llm import LLMClient, TokenBudgetExceeded
+
+    client = LLMClient(_llm_cfg(tokens_per_minute=8000, max_tokens=4096))
+    huge = "word " * 5000  # ~6,250 tokens; + 4,096 max_tokens = over 8,000
+
+    try:
+        client.complete(huge, use_cache=False)
+        raise AssertionError("expected TokenBudgetExceeded")
+    except TokenBudgetExceeded as exc:
+        msg = str(exc)
+        # The message must name the knobs, or the next person re-lives this.
+        assert "can NEVER succeed" in msg
+        assert "max_tokens" in msg
+        assert "8,000" in msg
+    print("T-104 TokenBudgetExceeded OK")
+
+
+def test_token_guard_accounts_for_max_tokens_not_just_the_prompt() -> None:
+    """A prompt that fits alone but not once max_tokens is reserved.
+
+    This is the exact subtlety that made the bug invisible: the prompt looked
+    comfortably under the limit.
+    """
+    from researchgpt.core.llm import LLMClient, TokenBudgetExceeded, estimate_tokens
+
+    prompt = "word " * 1200                      # ~1,500 tokens
+    assert estimate_tokens(prompt) < 8000, "prompt alone must fit, or the test is void"
+
+    client = LLMClient(_llm_cfg(tokens_per_minute=8000, max_tokens=7000))
+    try:
+        client.complete(prompt, use_cache=False)
+        raise AssertionError("expected TokenBudgetExceeded once max_tokens is counted")
+    except TokenBudgetExceeded:
+        pass
+
+
+def test_token_ledger_paces_within_the_rolling_window() -> None:
+    """Requests that fit are admitted without sleeping; the ledger records them."""
+    from researchgpt.core.llm import LLMClient
+
+    client = LLMClient(_llm_cfg(tokens_per_minute=8000))
+    t0 = time.monotonic()
+    for _ in range(3):
+        client._throttle_tokens(1000)          # 3,000 of 8,000 - all fit
+    assert time.monotonic() - t0 < 1.0, "requests inside the budget must not sleep"
+    assert sum(n for _, n in client._token_ledger) == 3000
+
+
+def test_token_pacing_disabled_when_tokens_per_minute_is_zero() -> None:
+    """Escape hatch: a paid tier or a local model should not be paced."""
+    from researchgpt.core.llm import LLMClient
+
+    client = LLMClient(_llm_cfg(tokens_per_minute=0))
+    t0 = time.monotonic()
+    client._throttle_tokens(999_999)
+    assert time.monotonic() - t0 < 1.0
+    assert client._token_ledger == []
+
+
+def test_agent_output_budgets_fit_groqs_bucket() -> None:
+    """Every agent's worst-case request must fit in 8,000 TPM.
+
+    Sized from measurement, not round numbers: extractor responses were a
+    median of 571 tokens and a max of 1,682 over 55 cached calls.
+    """
+    from researchgpt.agents.extractor import MAX_COMPLETION_TOKENS as EXTRACT_OUT
+    from researchgpt.agents.extractor import MAX_PROMPT_CHARS
+    from researchgpt.agents.writer import MAX_COMPLETION_TOKENS as WRITE_OUT
+    from researchgpt.core.llm import estimate_tokens
+
+    budget = 8000
+    worst_extract = estimate_tokens("x" * MAX_PROMPT_CHARS) + EXTRACT_OUT
+    assert worst_extract <= budget, (
+        f"worst-case extraction is {worst_extract} tokens against a {budget} "
+        f"budget - it can never be served. Lower MAX_PROMPT_CHARS or "
+        f"MAX_COMPLETION_TOKENS."
+    )
+    # The largest extractor response ever observed was 1,682 tokens.
+    assert EXTRACT_OUT >= 1682, "output budget is below an observed real response"
+    assert WRITE_OUT > EXTRACT_OUT, "sections are prose and need more room than JSON"

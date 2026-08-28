@@ -60,6 +60,20 @@ MAX_REPAIRS = 2
 #: free tier, not a design preference.
 MAX_PROMPT_CHARS = 18_000
 
+#: Output budget for one extraction. Sized from evidence, not from a round
+#: number: over 55 cached extractions the response was a median of 571 tokens,
+#: p90 948, and a maximum of 1,682. 2,048 covers the observed worst case with
+#: ~20% headroom.
+#:
+#: 🔴 This is not free headroom. Providers reserve `prompt + max_tokens`
+#: against the per-minute TOKEN bucket when they admit a request, so the old
+#: global 4,096 - 2.4x the largest response ever produced - was spent budget.
+#: With Groq's 8,000 TPM free tier and prompts up to MAX_PROMPT_CHARS
+#: (~4,500 tokens), it pushed the largest requests to ~8,600 tokens: over the
+#: whole bucket, and therefore unservable at ANY request rate. Measured on
+#: T-409, 2026-08-28.
+MAX_COMPLETION_TOKENS = 2_048
+
 #: Leave the source text at least this much room, so trimming examples is never
 #: preferable to trimming the paper we are trying to read.
 MIN_SOURCE_CHARS = 1_500
@@ -172,7 +186,7 @@ class Extractor(Agent):
                 _REPAIR_PROMPT
             ).substitute(error=last_error or "", previous=raw[:3000])
             try:
-                raw = self._llm.complete(sent)
+                raw = self._llm.complete(sent, max_tokens=MAX_COMPLETION_TOKENS)
                 payload = extract_json(raw)
                 insight, echoes = self._to_insight(paper, payload)
             except Exception as exc:

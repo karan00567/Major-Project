@@ -177,8 +177,20 @@ class LLMConfig(BaseModel):
     model: str
     planner_model: Optional[str] = None
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
-    max_tokens: int = 4096
-    requests_per_minute: int = 15
+    #: Lowered 4096 -> 2048 on 2026-08-28. Providers reserve `prompt +
+    #: max_tokens` against the per-minute TOKEN budget at admission, so an
+    #: oversized value is not free headroom - it is spent budget. Measured over
+    #: 55 cached extractions: median response 571 tokens, p90 948, max 1,682.
+    #: 4096 was reserving 2.4x the largest response ever produced.
+    max_tokens: int = 2048
+    #: Groq free tier is 30 RPM for the gpt-oss models. Tokens, not requests,
+    #: are what this project actually runs out of - see tokens_per_minute.
+    requests_per_minute: int = 30
+    #: ★ The limit that actually binds. Groq free tier: 8,000 TPM for
+    #: openai/gpt-oss-120b / -20b and qwen3.6-27b (verified live 2026-08-28 via
+    #: x-ratelimit-limit-tokens, and against console.groq.com/docs/rate-limits).
+    #: 0 disables token pacing.
+    tokens_per_minute: int = 8000
     max_retries: int = 5
     cache_dir: str = "data/llm_cache"
 

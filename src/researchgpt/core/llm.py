@@ -33,6 +33,40 @@ class RateLimitExceeded(RuntimeError):
     """Raised after max_retries consecutive 429 responses."""
 
 
+class TokenBudgetExceeded(ValueError):
+    """A single request cannot fit in the per-minute token budget.
+
+    ★ This is not a rate problem and no amount of waiting or slowing down fixes
+    it. Providers reserve ``prompt + max_tokens`` against the TPM bucket when
+    they admit a request, so if that sum exceeds the whole bucket the request
+    is refused **every time, at any request rate**.
+
+    🔴 **Measured on T-409, 2026-08-28.** Groq free tier is 8,000 TPM. With
+    ``max_tokens: 4096`` and extractor prompts up to 18,000 chars (~4,500
+    tokens), the largest requests reserved ~8,600 tokens and could never be
+    served. They burned all five retries at a 60 s ``Retry-After`` each - five
+    minutes of sleeping per paper - and were then written as blank insights by
+    the extractor's fail-soft path. Lowering ``requests_per_minute`` 15 -> 4
+    changed nothing, because spacing is irrelevant when one request does not
+    fit in the bucket.
+
+    Failing loudly and instantly here is what T-104 asks for: *"a rate-limit
+    guardrail that aborts loudly instead of looping silently."* The message
+    names the two knobs that actually resolve it.
+    """
+
+
+def estimate_tokens(text: str) -> int:
+    """Approximate token count. Deliberately crude and deliberately high.
+
+    Four characters per token is the usual English rule of thumb. We do not
+    tokenize for real because the budget check only has to be *conservative* -
+    over-estimating costs a little throughput, under-estimating costs a 429
+    storm, so the error is priced asymmetrically and we round up.
+    """
+    return len(text) // 4 + 1
+
+
 class LLMError(RuntimeError):
     """Raised for missing keys, HTTP failures, or malformed provider responses."""
 
@@ -102,6 +136,8 @@ class LLMClient:
         self._request_count = 0
         self._cache_hits = 0
         self._last_request_mono: float | None = None
+        #: Rolling 60-second (monotonic_ts, tokens) ledger for TPM pacing.
+        self._token_ledger: list[tuple[float, int]] = []
         self._cache_dir = pathlib.Path(cfg.cache_dir)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -135,6 +171,24 @@ class LLMClient:
                 f"(TASKLIST §0.1). Permitted: {sorted(ALLOWED_MODELS)}"
             )
 
+        # Token pre-flight, BEFORE the cache read: a request that cannot fit in
+        # the per-minute bucket must fail loudly and instantly rather than
+        # burning max_retries x 60 s of Retry-After to arrive at the same place.
+        # Cheap to compute, and the check must not depend on cache state.
+        tpm = getattr(self._cfg, "tokens_per_minute", 0)
+        cost_tokens = estimate_tokens(prompt) + resolved_max
+        if tpm > 0 and cost_tokens > tpm:
+            raise TokenBudgetExceeded(
+                f"One request needs ~{cost_tokens:,} tokens "
+                f"(~{estimate_tokens(prompt):,} prompt + {resolved_max:,} max_tokens) "
+                f"but the per-minute budget is only {tpm:,}. Providers reserve "
+                f"prompt + max_tokens at admission, so this request can NEVER "
+                f"succeed - slowing the request rate will not help. Fix one of: "
+                f"lower max_tokens for this call, or shorten the prompt "
+                f"(the extractor's MAX_PROMPT_CHARS / the writer's "
+                f"MAX_EVIDENCE_PER_THEME)."
+            )
+
         provider = MODEL_PROVIDER[resolved_model]
         prompt_hash = hashlib.sha256(
             f"{resolved_model}|{resolved_temp}|{resolved_max}|{prompt}".encode("utf-8")
@@ -159,7 +213,7 @@ class LLMClient:
         consecutive_429 = 0
         last_exc: Exception | None = None
         for attempt in range(self._cfg.max_retries + 1):
-            self._throttle()
+            self._throttle(cost_tokens)
             t0 = time.monotonic()
             try:
                 text = self._dispatch(
@@ -295,17 +349,49 @@ class LLMClient:
             f"after {consecutive_429} consecutive 429 responses"
         ) from last_exc
 
-    def _throttle(self) -> None:
+    def _throttle(self, cost_tokens: int = 0) -> None:
+        """Pace by BOTH requests and tokens.
+
+        The request throttle alone was never enough: this project is
+        token-bound, not request-bound. On the T-409 run the account had 999 of
+        1,000 daily requests left while being refused constantly on an 8,000
+        TPM bucket.
+        """
         rpm = self._cfg.requests_per_minute
-        if rpm <= 0:
-            return
-        min_interval = 60.0 / rpm
-        now = time.monotonic()
-        if self._last_request_mono is not None:
-            elapsed = now - self._last_request_mono
-            if elapsed < min_interval:
-                time.sleep(min_interval - elapsed)
+        if rpm > 0:
+            min_interval = 60.0 / rpm
+            now = time.monotonic()
+            if self._last_request_mono is not None:
+                elapsed = now - self._last_request_mono
+                if elapsed < min_interval:
+                    time.sleep(min_interval - elapsed)
+
+        self._throttle_tokens(cost_tokens)
         self._last_request_mono = time.monotonic()
+
+    def _throttle_tokens(self, cost_tokens: int) -> None:
+        """Sleep until ``cost_tokens`` fits in the rolling 60-second budget.
+
+        A ledger of (timestamp, tokens) for the last minute. Entries older than
+        60 s have already been refunded by the provider's own window, so they
+        are dropped. If the new request does not fit in what remains, wait
+        exactly long enough for the oldest entry to age out - not a fixed
+        backoff, which either wastes time or under-waits.
+        """
+        tpm = getattr(self._cfg, "tokens_per_minute", 0)
+        if tpm <= 0 or cost_tokens <= 0:
+            return
+
+        while True:
+            now = time.monotonic()
+            self._token_ledger = [(t, n) for t, n in self._token_ledger if now - t < 60.0]
+            spent = sum(n for _, n in self._token_ledger)
+            if spent + cost_tokens <= tpm or not self._token_ledger:
+                break
+            oldest = min(t for t, _ in self._token_ledger)
+            time.sleep(max(0.05, 60.0 - (now - oldest)))
+
+        self._token_ledger.append((time.monotonic(), cost_tokens))
 
     @staticmethod
     def _backoff_seconds(attempt: int, response: httpx.Response) -> float:
