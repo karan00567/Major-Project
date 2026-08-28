@@ -1,0 +1,332 @@
+{
+  "multi agent retrieval literature review": {
+    "stock": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 7.133626937866211,
+          "title": "ScholarGenie: A Multi-Agentic System for Automated Literature Summarizat",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 6.842307090759277,
+          "title": "Multi-Agent Retrieval Augmented Generation for Clinical Decision Support",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 5.434754371643066,
+          "title": "LatteReview: A Multi-Agent Framework for Systematic Review Automation Us",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 5.114238739013672,
+          "title": "Retrieval-Augmented Large Language Model Agents for Automated Scientific",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 4.33402156829834,
+          "title": "RAGentA: Multi-Agent Retrieval-Augmented Generation for Attributed Quest",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 0,
+      "best_gold_rank": 39
+    },
+    "tuned-OLD (4 hard : 0 random)": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 7.375842094421387,
+          "title": "ProxyIE: Parameter-Free Adaptation for Scientific Information Extraction",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 7.227885723114014,
+          "title": "Structured information extraction from scientific text with large langua",
+          "gold": true
+        },
+        {
+          "rank": 3,
+          "score": 7.124526500701904,
+          "title": "Ensemble Labeling Towards Scientific Information Extraction (ELSIE)",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 7.064464092254639,
+          "title": "Automatic Visual Citation Generation for Text-to-Image Generation",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 7.019145965576172,
+          "title": "Fact or Fiction: Verifying Scientific Claims",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 1,
+      "best_gold_rank": 2
+    },
+    "tuned-NEW (3 hard : 2 random)": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 2.3471856117248535,
+          "title": "Do AI Models Invent References? A Verification Audit of Citations in AI-",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 1.7012118101119995,
+          "title": "Chain-of-Thought Improves Text Generation with Citations in Large Langua",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 1.571745753288269,
+          "title": "ScholarGenie: A Multi-Agentic System for Automated Literature Summarizat",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 1.3631384372711182,
+          "title": "This Reference Does Not Exist: An Exploration of LLM Citation Accuracy a",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 1.2309436798095703,
+          "title": "LatteReview: A Multi-Agent Framework for Systematic Review Automation Us",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 2,
+      "best_gold_rank": 9
+    }
+  },
+  "automated literature review generation": {
+    "stock": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 9.187557220458984,
+          "title": "Automated literature research and review-generation method based on larg",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 8.842071533203125,
+          "title": "Automated Literature Review Using NLP Techniques and LLM-Based Retrieval",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 8.353043556213379,
+          "title": "Large Language Models for Automated Literature Review: An Evaluation of ",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 7.748664855957031,
+          "title": "ScholarGenie: A Multi-Agentic System for Automated Literature Summarizat",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 7.594492435455322,
+          "title": "The Concept of System for Automated Scientific Literature Reviews Genera",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 0,
+      "best_gold_rank": 28
+    },
+    "tuned-OLD (4 hard : 0 random)": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 7.634779930114746,
+          "title": "Content Knowledge Identification with Multi-agent Large Language Models ",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 7.3954081535339355,
+          "title": "MechAgents: Large language model multi-agent collaborations can solve me",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 7.274929046630859,
+          "title": "SMoA: Improving Multi-agent Large Language Models with Sparse Mixture-of",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 7.249867916107178,
+          "title": "A Multi-Agent Large Language Model Framework for Marketing Decision-Maki",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 7.155518054962158,
+          "title": "The Evolution of Reranking Models in Information Retrieval: From Heurist",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 1,
+      "best_gold_rank": 8
+    },
+    "tuned-NEW (3 hard : 2 random)": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 3.161628484725952,
+          "title": "The Concept of System for Automated Scientific Literature Reviews Genera",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 3.045246124267578,
+          "title": "Automated Literature Review Using NLP Techniques and LLM-Based Retrieval",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 2.871457099914551,
+          "title": "Large Language Models for Automated Literature Review: An Evaluation of ",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 2.770920991897583,
+          "title": "Automated literature research and review-generation method based on larg",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 2.3285679817199707,
+          "title": "ScholarGenie: A Multi-Agentic System for Automated Literature Summarizat",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 0,
+      "best_gold_rank": 19
+    }
+  },
+  "scientific claim verification": {
+    "stock": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 9.348134994506836,
+          "title": "SciClaimHunt: A Large Dataset for Evidence-based Scientific Claim Verifi",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 8.800251960754395,
+          "title": "Scientific Claim Verification with VERT5ERINI",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 8.798654556274414,
+          "title": "Using machine learning to verify scientific claims",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 8.563188552856445,
+          "title": "Abstract, Rationale, Stance: A Joint Model for Scientific Claim Verifica",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 8.551064491271973,
+          "title": "MultiVerS: Improving scientific claim verification with weak supervision",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 0,
+      "best_gold_rank": 16
+    },
+    "tuned-OLD (4 hard : 0 random)": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 6.493515968322754,
+          "title": "A Multi-Agent Large Language Model Framework for Marketing Decision-Maki",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 6.39994478225708,
+          "title": "FlashCheck: Exploration of Efficient Evidence Retrieval for Fast Fact-Ch",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 6.29132604598999,
+          "title": "MechAgents: Large language model multi-agent collaborations can solve me",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 6.208870887756348,
+          "title": "Content Knowledge Identification with Multi-agent Large Language Models ",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 6.034287452697754,
+          "title": "ChatGPT and Bard exhibit spontaneous citation fabrication during psychia",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 1,
+      "best_gold_rank": 8
+    },
+    "tuned-NEW (3 hard : 2 random)": {
+      "top": [
+        {
+          "rank": 1,
+          "score": 3.6628127098083496,
+          "title": "Using machine learning to verify scientific claims",
+          "gold": false
+        },
+        {
+          "rank": 2,
+          "score": 3.596627712249756,
+          "title": "SciClaimHunt: A Large Dataset for Evidence-based Scientific Claim Verifi",
+          "gold": false
+        },
+        {
+          "rank": 3,
+          "score": 3.3412556648254395,
+          "title": "Scientific Claim Verification with VERT5ERINI",
+          "gold": false
+        },
+        {
+          "rank": 4,
+          "score": 3.115480899810791,
+          "title": "Abstract, Rationale, Stance: A Joint Model for Scientific Claim Verifica",
+          "gold": false
+        },
+        {
+          "rank": 5,
+          "score": 3.036677360534668,
+          "title": "QMUL-SDS at SCIVER: Step-by-Step Binary Classification for Scientific Cl",
+          "gold": false
+        }
+      ],
+      "gold_in_top10": 0,
+      "best_gold_rank": 17
+    }
+  }
+}

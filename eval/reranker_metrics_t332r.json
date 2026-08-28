@@ -1,0 +1,68 @@
+{
+  "task": "T-332R",
+  "note": "Retrain of T-332 with MIXED negatives after the T-335 revert.",
+  "base_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "seed": 20260827,
+  "mix_seed": 20260828,
+  "epochs": 2,
+  "learning_rate": 2e-05,
+  "batch_size": 32,
+  "max_length": 512,
+  "dev_frac": 0.1,
+  "negatives": {
+    "hard_per_positive": 3,
+    "random_per_positive": 3,
+    "hard_share_of_negatives": 0.6,
+    "hard_negatives_dropped": 15079,
+    "previous_run": "4 hard : 0 random (notebook 02)"
+  },
+  "counts": {
+    "train_pairs": 82056,
+    "dev_pairs": 8418,
+    "survey_groups": 2342,
+    "dev_surveys": 234,
+    "document_pool": 13929
+  },
+  "in_domain": {
+    "stock": {
+      "nDCG@10": 0.4692413127676325,
+      "Recall@20": 0.8343781218781219,
+      "Precision@12": 0.23717948717948723,
+      "queries": 286
+    },
+    "fine_tuned": {
+      "nDCG@10": 0.7054522147147256,
+      "Recall@20": 0.9457542457542457,
+      "Precision@12": 0.3257575757575758,
+      "queries": 286
+    }
+  },
+  "relevance_control": {
+    "stock": {
+      "queries": 200,
+      "violations": 1,
+      "violation_rate": 0.005,
+      "mean_margin": 5.758835917375982,
+      "mean_control_score": -11.082815475463867,
+      "mean_pool_median": -5.323979558087886
+    },
+    "fine_tuned": {
+      "queries": 200,
+      "violations": 88,
+      "violation_rate": 0.44,
+      "mean_margin": -0.00818267822265625,
+      "mean_control_score": -3.31601318359375,
+      "mean_pool_median": -3.3241958618164062
+    },
+    "off_topic_controls": 4
+  },
+  "gate": {
+    "min_ndcg_gain": 0.001,
+    "max_control_violation_rate": 0.2,
+    "ranking_pass": true,
+    "control_pass": false,
+    "verdict": "STOP - relevance prior still broken"
+  },
+  "train_seconds": 900.0723168849945,
+  "gate_note": "This gate is a PRE-FILTER. The adoption decision is T-335, run locally against the project's own 25-paper bibliography, after int8 quantization."
+}

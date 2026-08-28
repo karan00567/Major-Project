@@ -495,14 +495,20 @@ def test_t406_a_short_uncited_fragment_is_not_rejected(cfg):
     assert 200 <= MIN_CITED_SECTION_CHARS <= 1000
 
 
-def test_config_names_the_stock_reranker_after_the_t335_revert():
-    """T-335 was reverted on M1 evidence: the tuned model put an IoT paper
-    above the most relevant paper in a real Planner-generated pool."""
+def test_config_names_the_retrained_reranker_after_t332r():
+    """T-335 was reverted on M1 evidence - the tuned model put an IoT paper
+    above the most relevant paper in a real Planner-generated pool - and then
+    re-adopted on 2026-08-28 once T-332R retrained it with mixed negatives and
+    the relevance control came back clean (0/15, from 11/15).
+
+    Phase 4 cares because the graph builds its Ranker from this value.
+    """
     import pathlib as _p
 
     cfg_text = (_p.Path("configs/default.yaml")).read_text(encoding="utf-8")
-    assert "reranker: cross-encoder/ms-marco-MiniLM-L-6-v2" in cfg_text
-    assert "T-335 REVERTED" in cfg_text
+    assert "reranker: data/models/reranker-mixed-onnx" in cfg_text
+    assert "T-335 RE-ADOPTED" in cfg_text
+    assert "REVERTED" in cfg_text, "the reversal is why the retrain exists; keep it"
 
 
 # --------------------------------------------------------------------------

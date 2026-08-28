@@ -428,24 +428,65 @@ def test_nothing_in_the_pipeline_thresholds_on_a_reranker_score():
     )
 
 
-def test_config_names_the_stock_reranker_after_the_t335_revert():
-    """T-335 adopted the tuned reranker, then REVERTED it on M1 evidence.
+def test_config_names_the_retrained_reranker_and_records_why():
+    """T-335 moved twice: adopted, reverted on M1, re-adopted on the retrain.
 
-    The adoption rested on "the live pool is 98.2% on-topic", measured on
-    T-212's cached pool of 15 hand-written, tightly-scoped queries. The Planner
-    generates 20+ broader queries, and on the first real run the tuned model
-    ranked an IoT-monitoring paper above the single most relevant paper in the
-    pool. The condition did not generalise; the relevance control was right.
+    The full history travels with the config, because the reversal is the part
+    a future reader most needs and the part a diff would hide. Two specific
+    traps are recorded there:
 
-    The reason travels with the config so the next reader does not re-adopt it
-    from the in-domain numbers alone.
+    * the notebook's own gate said STOP, measured on a SciReviewGen dev pool
+      saturated with hard negatives, where "beat the median candidate" is a far
+      harder bar than on a real ~98%-on-topic retrieval pool;
+    * the adopted model's absolute scores are compressed, so ordering is usable
+      and thresholds are not.
     """
     import pathlib
 
     cfg = pathlib.Path("configs/default.yaml").read_text(encoding="utf-8")
-    assert "reranker: cross-encoder/ms-marco-MiniLM-L-6-v2" in cfg
-    assert "T-335 REVERTED" in cfg
-    assert "mixed negatives" in cfg.lower() or "MIXED negatives" in cfg
+    assert "reranker: data/models/reranker-mixed-onnx" in cfg
+    assert "T-335 RE-ADOPTED" in cfg
+    # The reversal must not be edited out; it is why the retrain exists.
+    assert "REVERTED" in cfg
+    assert "MIXED negatives" in cfg
+    # Condition 1 is load-bearing for Phase 5 and must stay stated.
+    assert "CONDITION 1 STILL BINDS" in cfg
+
+
+def test_adopted_reranker_ranks_the_m1_failure_case_correctly():
+    """The concrete regression: M1 ranked an off-topic paper above LiRA.
+
+    This is the smallest reproduction of the failure that caused the revert. It
+    asserts ordering only - the property the pipeline actually consumes - not
+    absolute scores, which are compressed on any fine-tuned build.
+    """
+    from researchgpt.core.config import load_config
+    from researchgpt.core.models import Chunk
+    from researchgpt.tools.reranker import Reranker
+
+    cfg = load_config("configs/default.yaml")
+    texts = [
+        "LiRA: a multi-agent framework for reliable literature review generation.",
+        "Wind turbine blade fatigue under cyclic aerodynamic loading in composite spars.",
+        "Multi-agent retrieval augmented generation for scientific survey writing.",
+    ]
+    chunks = [
+        Chunk(chunk_id=str(i), paper_id=str(i), text=t, start_char=0, end_char=len(t))
+        for i, t in enumerate(texts)
+    ]
+    ranked = Reranker(cfg.retrieval.reranker).rerank(
+        "multi agent retrieval literature review", chunks, top_k=3
+    )
+    order = [c.text for c, _ in ranked]
+
+    assert order[0].startswith("LiRA"), (
+        f"the most relevant paper is not first; got {order[0]!r}. This is the "
+        "M1 failure that caused the T-335 revert."
+    )
+    assert "Wind turbine" in order[-1], (
+        "an unrelated document is not ranked last - the relevance prior is gone "
+        "again, which is exactly what the mixed-negative retrain restored."
+    )
 
 
 # --------------------------------------------------------------------------

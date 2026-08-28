@@ -656,7 +656,7 @@ This is the graded component *and* the required training component. **Start it t
   **Honest reporting line for T-705b / the deck:** *"the fine-tuned reranker raised Recall@20 by 35% on a curated bibliography and improved every in-domain ranking metric, yet we rejected it: a relevance control showed it had stopped recognising irrelevance, and on the first real pipeline run it ranked an IoT-monitoring paper above the most relevant paper in the pool. We traced the cause to training exclusively on BM25 hard negatives."*
 
   ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
-- [ ] **T-332R** ⌨️ ★ **Reranker retrain with MIXED negatives (3 hard : 1 random)** — the remediation T-335 specified when it reverted the tuned model. **NOTEBOOK DONE 2026-08-28** — `notebook-kaggle-traning/03_train_reranker_mixed_negatives.ipynb` (23 cells) + README section 03. *Done when: the Kaggle run completes and section 10 prints its verdict.*
+- [x] **T-332R** ⌨️ ★ **Reranker retrain with MIXED negatives** — ✅ **RUN 2026-08-28 at 3 hard : 2 random. ADOPTED.** — the remediation T-335 specified when it reverted the tuned model. **NOTEBOOK DONE 2026-08-28** — `notebook-kaggle-traning/03_train_reranker_mixed_negatives.ipynb` (23 cells) + README section 03. *Done when: the Kaggle run completes and section 10 prints its verdict.*
 
   **Changes exactly one variable.** Base model, seed, epochs, lr, batch size, max length, warmup, weight decay, dev fraction **and the survey split** are all held identical to T-332, so the two runs are directly comparable. `tests/test_phase3c_acceptance.py::test_mixed_notebook_changes_only_the_negatives` fails if any of them drift.
 
@@ -676,7 +676,27 @@ This is the graded component *and* the required training component. **Start it t
   **Smoke-tested, not just written.** All 11 code cells executed locally on CPU against the real 75,395-pair file with a 200-example stand-in for training. The stock relevance control printed an off-topic score of **−10.74**, matching the local harness's ≈ −11 — confirming the notebook reads un-activated logits exactly as the gate does.
 
   ⚠️ **Still off the critical path.** The pipeline ships with the stock reranker either way; this remains a weight swap. If the run fails both gate conditions, the Aug 30 kill switch applies — keep stock, report the negative result, move on.
-- [ ] **T-336** 🧠 **UNBLOCKED 2026-08-27** — T-335 adopted the tuned reranker, so this ablation now has two real arms to compare. **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
+
+  🔴 **THE NOTEBOOK'S OWN GATE SAID STOP, AND IT WAS WRONG.** Section 10 reported a **44% control violation rate** and printed `STOP - relevance prior still broken`. The local T-335 gate, run on the same checkpoint, reports **0/15 violations** and **PROMOTE**. Both numbers are correct; they measure different pools.
+
+  **Why they disagree, because this will come up again.** The notebook's control runs on the **SciReviewGen dev pool**, where every candidate is either a true positive or a *BM25 hard negative* — so the "median candidate" it must beat is itself a topically adjacent document. On a real 493-paper retrieval pool that is ~98% on-topic, the median is an ordinary paper and the bar is the one that matters. **T-335 on the project's own bibliography is the authority** (`TRAINING_SPEC §2.4`); the notebook gate is a pre-filter and it was tuned too strict. *Do not re-revert on the notebook number.*
+
+  **T-334/T-335 measured on the int8 ONNX build — what actually ships:**
+
+  | arm | nDCG@10 | Recall@20 | Precision@12 | relevance control |
+  |---|---|---|---|---|
+  | stock | 0.2277 | 0.4815 | 0.0926 | **0/15 PASS** |
+  | **tuned (3:2 mixed)** | **0.2425** | **0.5926** | **0.1019** | **0/15 PASS** |
+  | delta | +0.0149 | **+0.1111** | +0.0093 | — |
+
+  In-domain nDCG@10 **0.2646 → 0.6545**. T-333 export clean: fp32 max |Δ| 5e-6, int8 Kendall τ **0.9637**, 90.96 MB → 23.16 MB.
+
+  ★ **The M1 failure case is fixed, and there is now a regression test for it** (`test_adopted_reranker_ranks_the_m1_failure_case_correctly`). On the query that caused the revert, *"multi agent retrieval literature review"*: the new model puts **2 gold papers in the top 10 (best rank 9)** where stock puts **0 (best rank 39)**, and ranks LiRA first with the wind-turbine control at −5.44. On *"automated literature review generation"* and *"scientific claim verification"* its top-5 is topically correct on every row — where the OLD tuned model returned marketing decision-making and computational mechanics. Full A/B: `eval/reranker_ab_probe_t335.json`.
+
+  ⚠️ **The ratio that shipped is 3 hard : 2 random (60/40), not the 3:1 the notebook defaults to.** The metrics JSON reports `random_per_positive: 3` from the config cell while the data was built at 2 — cells were re-run out of order across several attempts. **The artefact is what counts and it is consistent**: 75,395 negatives = 45,237 hard + 30,158 random, `hard_share_of_negatives` 0.60. Rebuild at exactly 3:2 if this is ever re-run.
+
+  ⚠️ **Condition 1 still binds and now matters more.** This model's scores are **compressed** (+1…+3.7 where stock gives +9). Ordering is correct; absolute values are not comparable to stock and must never be thresholded. `Reranker.filter_by_score()` raises `UncalibratedScoreError` on any non-stock model, which covers this one automatically. **Phase 5: if T-506's Critic wants a retrieval-score cutoff, it must use the stock model or a recalibrated one.**
+- [ ] **T-336** 🧠 **UNBLOCKED 2026-08-28 (re-confirmed)** — T-332R's model was adopted, so this ablation now has two real arms to compare. *The 2026-08-27 unblock was withdrawn when T-335 reverted; it is live again.* **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
 
 ---
 
