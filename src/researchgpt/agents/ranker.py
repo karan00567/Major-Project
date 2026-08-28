@@ -27,7 +27,10 @@ thresholds on its score — see ``Reranker.scores_are_calibrated``.
 
 from __future__ import annotations
 
-import tempfile
+import hashlib
+import json
+import pathlib
+import time
 from typing import Any
 
 from researchgpt.agents.base import Agent
@@ -39,6 +42,14 @@ from researchgpt.graph.state import ReviewState
 from researchgpt.tools.hybrid_retriever import HybridRetriever
 from researchgpt.tools.reranker import Reranker
 
+#: Persisted, not a temp dir. Under data/, which is gitignored.
+DEFAULT_STORE_PATH = "data/vectorstore"
+
+#: Embedding cache: sha256(model + chunk text) -> vector. Embeddings are a pure
+#: function of (model, text), so a chunk re-embedded in a later run is wasted
+#: CPU. Chunk ids are NOT stable across runs, so the key must be the text.
+EMBED_CACHE = pathlib.Path("data/embed_cache")
+
 
 class Ranker(Agent):
     """Embeds, indexes, retrieves per sub-question, and reorders the corpus."""
@@ -49,7 +60,60 @@ class Ranker(Agent):
     def __init__(self, cfg: Any, trace: Any = None, store_path: str | None = None) -> None:
         super().__init__(trace=trace)
         self._cfg = cfg
-        self._store_path = store_path
+        #: Persisted by default (2026-08-28). It used to fall back to a
+        #: TemporaryDirectory, so the collection was destroyed on exit.
+        #:
+        #: ⚠️ Persisting the STORE is not where the time goes, and it is worth
+        #: being precise because the opposite was assumed: the 2026-08-28 run
+        #: spent 212 s in this agent, of which embedding 640 chunks is roughly
+        #: 27 s and the rest is ~3,840 cross-encoder inferences. Chroma is
+        #: noise either way. The saving comes from EMBED_CACHE below, which
+        #: persistence makes worth having; the reranker cost is irreducible
+        #: because it depends on the query, which changes every run.
+        self._store_path = store_path or DEFAULT_STORE_PATH
+
+    def _encode_cached(self, embedder: Any, chunks: list[Any]) -> list[list[float]]:
+        """Embed only the chunks we have not embedded before.
+
+        Keyed on sha256(model + text), because an embedding is a pure function
+        of those two and chunk ids are not stable between runs. A miss is
+        written back immediately, so a crashed run still leaves its work
+        behind - the same reasoning as the LLM prompt cache (T-104).
+        """
+        EMBED_CACHE.mkdir(parents=True, exist_ok=True)
+        model = self._cfg.embeddings.model
+        keys, vectors, missing_ix = [], [None] * len(chunks), []
+
+        for i, chunk in enumerate(chunks):
+            key = hashlib.sha256(f"{model}|{chunk.text}".encode()).hexdigest()
+            keys.append(key)
+            path = EMBED_CACHE / f"{key}.json"
+            if path.exists():
+                try:
+                    vectors[i] = json.loads(path.read_text(encoding="utf-8"))
+                    continue
+                except (OSError, json.JSONDecodeError):
+                    pass          # corrupt entry: fall through and re-embed
+            missing_ix.append(i)
+
+        if missing_ix:
+            fresh = embedder.encode([chunks[i].text for i in missing_ix])
+            for i, vec in zip(missing_ix, fresh, strict=False):
+                vectors[i] = vec
+                try:
+                    (EMBED_CACHE / f"{keys[i]}.json").write_text(
+                        json.dumps(vec), encoding="utf-8")
+                except OSError:
+                    pass          # a cache write must never kill a run
+
+        self._emit(
+            "embed_cache",
+            {"chunks": len(chunks), "hits": len(chunks) - len(missing_ix),
+             "misses": len(missing_ix),
+             "hit_rate": round((len(chunks) - len(missing_ix)) / max(len(chunks), 1), 4)},
+            0,
+        )
+        return [v if v is not None else [] for v in vectors]
 
     def run(self, state: ReviewState) -> dict[str, Any]:
         chunks = list(state.get("chunks") or [])
@@ -73,13 +137,13 @@ class Ranker(Agent):
         embedder = Embedder(model_name=self._cfg.embeddings.model,
                             device=self._cfg.embeddings.device,
                             batch_size=self._cfg.embeddings.batch_size)
-        vectors = embedder.encode([c.text for c in chunks])
+        embed_t0 = time.perf_counter()
+        vectors = self._encode_cached(embedder, chunks)
+        embed_ms = int((time.perf_counter() - embed_t0) * 1000)
 
         tmp = None
         path = self._store_path
-        if path is None:
-            tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
-            path = tmp.name
+        rerank_t0 = time.perf_counter()
         try:
             store = VectorStore(path=path, collection=f"run_{state.get('run_id', 'x')}")
             store.add(chunks, vectors)
@@ -129,6 +193,10 @@ class Ranker(Agent):
             {"queries": len(queries), "chunks": len(chunks), "papers": len(papers),
              "ranked": len(ranked_ids), "unranked_tail": len(papers) - len(ranked_ids),
              "reranker": cfg.reranker if cfg.rerank else None,
+             # Where the time ACTUALLY goes, so the next person tuning this
+             # does not optimise the wrong stage as we nearly did.
+             "embed_ms": embed_ms,
+             "rerank_ms": int((time.perf_counter() - rerank_t0) * 1000),
              "top_10": [ (by_id[i].title or "")[:60] for i in ranked_ids[:10] ]},
             iteration,
         )

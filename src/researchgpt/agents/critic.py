@@ -101,10 +101,14 @@ class Critic(Agent):
             state.get("sub_questions") or [], state.get("retrieval_log") or []
         )
         grounding = state.get("grounding_score")
-        prior = [d.get("decision") for d in (state.get("decision_log") or [])]
+        log_entries = state.get("decision_log") or []
+        prior = [d.get("decision") for d in log_entries]
+        # Corpus size at the last decision, to tell "RETRIEVE helped" from
+        # "RETRIEVE ran and changed nothing".
+        prior_papers = log_entries[-1].get("papers", 0) if log_entries else 0
 
         decision, reasons = self._decide(
-            review, iteration, len(papers), report, grounding, prior
+            review, iteration, len(papers), report, grounding, prior, prior_papers
         )
         feedback = self._feedback(decision, reasons, report)
 
@@ -167,6 +171,7 @@ class Critic(Agent):
         report: dict,
         grounding: float | None,
         prior: list[str],
+        prior_papers: int = 0,
     ) -> tuple[str, list[str]]:
         reasons: list[str] = []
 
@@ -186,10 +191,24 @@ class Critic(Agent):
             return WRITE, reasons
 
         # Gate 1 - corpus size. Nothing else is worth assessing on 3 papers.
+        #
+        # ★ Escalates like gate 2 does, and for the same reason. Without this
+        # a thin corpus produced RETRIEVE forever: the Retriever re-runs the
+        # SAME plan, dedup means it adds nothing, and the Critic asks again -
+        # burning an iteration per pass to stand still until the cap forces
+        # WRITE. If searching harder did not grow the corpus, the plan is what
+        # is wrong, which is precisely what REPLAN is for.
         if n_papers < review.min_papers:
             reasons.append(
                 f"{n_papers} papers retained, below min_papers={review.min_papers}"
             )
+            if RETRIEVE in prior and n_papers <= prior_papers:
+                reasons.append(
+                    f"a previous RETRIEVE left the corpus at {n_papers} papers "
+                    f"(was {prior_papers}); searching harder is not working, so "
+                    f"the plan is the problem"
+                )
+                return REPLAN, reasons
             return RETRIEVE, reasons
 
         # Gate 2 - coverage. RETRIEVE first; escalate to REPLAN only if a

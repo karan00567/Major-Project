@@ -373,3 +373,37 @@ def test_iteration_advances_only_on_a_loop_back():
         "a WRITE must not advance the counter; the Critic is visited twice per "
         "iteration and double-counting would halve the loop budget"
     )
+
+
+def test_corpus_gate_escalates_to_replan_when_retrieve_changed_nothing():
+    """Gate 1 used to return RETRIEVE forever.
+
+    The Retriever re-runs the SAME plan, dedup means it adds nothing, and the
+    Critic asks again - burning an iteration per pass to stand still until the
+    cap forces WRITE. A thin corpus could therefore never reach REPLAN, so the
+    loop could never demonstrate its escalation path on real data.
+    """
+    thin = [paper("p1")]
+    first = Critic(Cfg()).run(critic_state(papers=thin))
+    assert first["decision"] == RETRIEVE
+
+    # RETRIEVE ran and the corpus did not grow.
+    stuck = critic_state(
+        papers=thin,
+        iteration=1,
+        decision_log=[{"iteration": 0, "decision": RETRIEVE, "papers": 1}],
+    )
+    second = Critic(Cfg()).run(stuck)
+    assert second["decision"] == REPLAN
+    assert "searching harder is not working" in second["critic_feedback"]
+
+
+def test_corpus_gate_keeps_retrieving_while_it_is_still_helping():
+    """Escalation must not fire when RETRIEVE is actually growing the corpus."""
+    growing = critic_state(
+        papers=[paper(f"p{i}") for i in range(9)],
+        iteration=1,
+        decision_log=[{"iteration": 0, "decision": RETRIEVE, "papers": 3}],
+    )
+    out = Critic(Cfg()).run(growing)
+    assert out["decision"] == RETRIEVE, "gave up while retrieval was still working"

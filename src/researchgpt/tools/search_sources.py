@@ -253,8 +253,18 @@ def search_arxiv(query: str, *, max_results: int = 25) -> list[Paper]:
                 "max_results": n,
             }
             # Mandatory HTTPS — http:// returns 301 with empty body.
-            resp = client.get("https://export.arxiv.org/api/query", params=params)
-            resp.raise_for_status()
+            #
+            # 🔴 arXiv was the ONLY source without backoff, and it showed:
+            # OpenAlex handles 429 explicitly and Semantic Scholar retries with
+            # delay, but this was a bare raise_for_status(). arXiv asks for
+            # <= 1 request / 3 s and throttles bursts, so three acceptance
+            # tests calling search_arxiv back to back turned a throttle into a
+            # test failure (2026-08-28: test_t203_dedup and test_t204_pdf both
+            # died on httpx.HTTPStatusError while OpenAlex sat at 83% of its
+            # daily budget — the wrong host got the blame).
+            resp = _arxiv_get_with_backoff(client, params)
+            if resp is None:
+                break          # throttled past patience: return what we have
             batch = _parse_arxiv_feed(resp.text)
             if not batch:
                 break
@@ -266,6 +276,43 @@ def search_arxiv(query: str, *, max_results: int = 25) -> list[Paper]:
             time.sleep(3.0)
 
     return papers[:max_results]
+
+
+#: arXiv's stated politeness rule is <= 1 request / 3 s. Bursts get 403/429.
+_ARXIV_MAX_ATTEMPTS = 4
+_ARXIV_BACKOFF_S = (3.0, 6.0, 12.0)
+
+
+def _arxiv_get_with_backoff(client: Any, params: dict) -> Any:
+    """One arXiv page, retried on throttling. ``None`` means give up quietly.
+
+    Quietly, not loudly: arXiv is a *secondary* source. OpenAlex is the
+    mandatory one (TASKLIST §0.2), so losing an arXiv page costs some preprint
+    coverage, not the run. Raising here would abort a 25-minute pipeline over a
+    politeness limit.
+    """
+    for attempt in range(_ARXIV_MAX_ATTEMPTS):
+        try:
+            resp = client.get("https://export.arxiv.org/api/query", params=params)
+        except httpx.HTTPError:
+            if attempt == _ARXIV_MAX_ATTEMPTS - 1:
+                return None
+            time.sleep(_ARXIV_BACKOFF_S[min(attempt, len(_ARXIV_BACKOFF_S) - 1)])
+            continue
+        if resp.status_code in (403, 429, 503):
+            if attempt == _ARXIV_MAX_ATTEMPTS - 1:
+                log.warning(
+                    "arxiv: throttled (HTTP %s) after %d attempts; returning what "
+                    "we have. arXiv is a secondary source - OpenAlex is the "
+                    "mandatory one - so this degrades coverage, not the run.",
+                    resp.status_code, _ARXIV_MAX_ATTEMPTS,
+                )
+                return None
+            time.sleep(_ARXIV_BACKOFF_S[min(attempt, len(_ARXIV_BACKOFF_S) - 1)])
+            continue
+        resp.raise_for_status()
+        return resp
+    return None
 
 
 def _parse_arxiv_feed(xml_text: str) -> list[Paper]:

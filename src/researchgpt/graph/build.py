@@ -119,10 +119,20 @@ def run_pipeline(
             # LangGraph applies the graph/state.py reducers itself, so no
             # _merge here - and a recursion_limit well above max_iterations so
             # the loop's own bound is what stops it, not the framework's.
-            app = build_loop_graph(cfg, llm, trace)
-            state = dict(
-                app.invoke(state, config={"recursion_limit": 50})
-            )
+            # 🔴 T-508 was inert until 2026-08-28: build_loop_graph grew a
+            # `checkpointer=` parameter and tests for it, but this call site
+            # never passed one, so no checkpoint was ever written on the real
+            # path. A feature reachable only from its own tests is not shipped.
+            from researchgpt.graph.checkpoint import checkpointer as _checkpointer
+            from researchgpt.graph.checkpoint import thread_config
+
+            saver = _checkpointer()
+            app = build_loop_graph(cfg, llm, trace, checkpointer=saver)
+            config = thread_config(run_id)
+            # The loop's own bound (review.max_iterations, enforced twice) is
+            # what should stop this, not LangGraph's recursion guard.
+            config["recursion_limit"] = 50
+            state = dict(app.invoke(state, config=config))
         else:
             for agent in make_agents(cfg, llm, trace):
                 _merge(state, agent(state))

@@ -775,7 +775,24 @@ The centrepiece. Objective 2 lives here.
   `resume_report()` reports **quantities, not a boolean**: “resumable” does not tell you whether resuming is worth it or whether this is the checkpoint you meant. Keyed on a field being *present* rather than truthy — a node that ran and legitimately wrote an empty list has still run, and truthiness reported `resumable: True` with an empty `skips`.
 
   ⭐ **Worth more now than when it was written.** A T-409 run costs ~25 minutes and a large slice of a 200,000-token daily budget; four attempts on 2026-08-28 exhausted that budget on **both** gpt-oss models. Resuming a run that died at paper 18 is the difference between a lost afternoon and a five-minute top-up.
-- [ ] **T-509** 🔴 **MILESTONE M2 — the full six-agent graph runs with the loop firing and terminating.**
+- [x] **T-509** 🔴 **MILESTONE M2 — the full six-agent graph runs with the loop firing and terminating.**
+
+  ✅ **M2 DEMONSTRATED 2026-08-28.** `outputs/runs/loop_demo/`, exit 0, 6.3 min. The loop **fired, escalated and terminated** on real state:
+
+  ```
+  iter=0  CRITIC -> RETRIEVE   271 papers, below min_papers=5000
+  iter=1  CRITIC -> REPLAN     a previous RETRIEVE left the corpus at 271 (was 271);
+                               searching harder is not working, so the plan is the problem
+  iter=2  CRITIC -> WRITE      iteration 2 is the last of 3; forcing WRITE per SPEC 7.5
+  ```
+
+  **How it was forced, stated plainly:** `min_papers` was raised to an unreachable 5,000. Retrieval, state and the gate are all real; only the threshold was set to a standard this corpus cannot meet — which is exactly what a genuinely thin topic would produce.
+
+  ⚠️ **One edge was NOT traversed: REPLAN → planner.** The Critic *decided* REPLAN, but routing overrode it, because the Critic advances the counter on each loop-back and `iteration` had reached 2, which is `max_iterations - 1`. So the safety bound fired correctly and the run went to the Writer instead. With `max_iterations=3` you get exactly two loop-backs, so RETRIEVE + REPLAN consumes the whole budget and the Planner never re-runs. **To exercise that last edge, re-run this demo with `max_iterations=4`.** Everything else in T-509 is covered.
+
+  Also verified in the same run: the **embedding cache** (0/640 hits then **640/640**, `embed_ms` 32,096 → **206**) and the **checkpointer** (17 MB `checkpoints.sqlite`, `resumable_runs: ['loop_demo']`, all five stages listed as skippable).
+
+  🔴 **Forward-compat warning to fix before submission:** LangGraph logs *“Deserializing unregistered type researchgpt.core.models.Paper from checkpoint. This will be blocked in a future version”* for all six of our Pydantic models. Checkpoints still load today, but a LangGraph upgrade would break resume. Register the models via `allowed_msgpack_modules`.
 
   ⚠️ **PARTIALLY DEMONSTRATED 2026-08-28. Do not tick yet.** The full six-agent graph ran end to end for the first time — `run_pipeline(use_loop=True)`, exit 0, 5.3 min, `max_papers=10`, on the paid host. Every agent fired: Planner → Retriever → Ranker → Extractor → **Critic** → Writer → **Verifier** → **Critic** → END.
 

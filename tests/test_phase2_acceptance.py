@@ -637,3 +637,29 @@ if __name__ == "__main__":
     test_t214_live()
     test_t213_first_stage_survives_a_large_pool()
     print("ALL PHASE-2 ACCEPTANCE CHECKS PASSED")
+
+
+def test_arxiv_throttling_degrades_instead_of_raising() -> None:
+    """arXiv was the only source without backoff, and it showed.
+
+    🔴 2026-08-28: test_t203_dedup and test_t204_pdf both died on
+    httpx.HTTPStatusError while OpenAlex sat at 83% of its daily budget - the
+    wrong host got the blame. arXiv asks for <= 1 request / 3 s and throttles
+    bursts; a bare raise_for_status() turned that into a hard failure.
+
+    arXiv is a SECONDARY source (OpenAlex is mandatory under TASKLIST §0.2), so
+    a throttle must cost coverage, never the run.
+    """
+    from unittest.mock import MagicMock, patch
+
+    from researchgpt.tools.search_sources import search_arxiv
+
+    throttled = MagicMock()
+    throttled.status_code = 403
+
+    with patch("httpx.Client") as ClientCls:
+        ClientCls.return_value.__enter__.return_value.get.return_value = throttled
+        with patch("time.sleep"):            # do not actually wait
+            papers = search_arxiv("anything", max_results=5)
+
+    assert papers == [], "a throttled arXiv must return empty, not raise"
