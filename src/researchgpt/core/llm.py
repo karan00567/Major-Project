@@ -56,6 +56,29 @@ class TokenBudgetExceeded(ValueError):
     """
 
 
+def rate_limit_reason(response: httpx.Response) -> str:
+    """The provider's own words for WHICH limit was hit.
+
+    🔴 **This exists because its absence cost a day.** On 2026-08-28 the trace
+    recorded only ``status: 429``, so three separate diagnoses were attempted
+    from the ``x-ratelimit-*`` headers - which report the per-MINUTE bucket
+    only. Those headers read a healthy ``8000/8000 remaining`` while the run
+    was being refused on the **daily** budget:
+
+        Rate limit reached for openai/gpt-oss-120b ... on tokens per day
+        (TPD): Limit 200000, Used 197751, Requested 5520.
+
+    **The daily limit appears nowhere except the body of a 429.** Capturing it
+    turns "we are being throttled, unclear why" into a one-line answer, so the
+    reason is logged on every retry from now on.
+    """
+    try:
+        message = str(response.json().get("error", {}).get("message", ""))
+    except Exception:
+        message = ""
+    return message[:400] or "(no error body)"
+
+
 def estimate_tokens(text: str) -> int:
     """Approximate token count. Deliberately crude and deliberately high.
 
@@ -250,12 +273,14 @@ class LLMClient:
                                 "latency_ms": latency_ms,
                                 "attempt": attempt,
                                 "status": status,
+                                "reason": rate_limit_reason(exc.response),
                             },
                         )
                         raise RateLimitExceeded(
                             f"Rate limit exceeded for model {resolved_model!r} "
                             f"after {consecutive_429} consecutive 429 responses "
-                            f"({attempt + 1} attempts)"
+                            f"({attempt + 1} attempts). Provider said: "
+                            f"{rate_limit_reason(exc.response)}"
                         ) from exc
                     wait = self._backoff_seconds(attempt, exc.response)
                     self._log(
@@ -267,6 +292,10 @@ class LLMClient:
                             "attempt": attempt,
                             "status": status,
                             "wait_s": wait,
+                            # WHICH limit. Without this the trace says only
+                            # "429" and the daily budget is indistinguishable
+                            # from the per-minute one - which cost a day.
+                            "reason": rate_limit_reason(exc.response),
                         },
                     )
                     time.sleep(wait)

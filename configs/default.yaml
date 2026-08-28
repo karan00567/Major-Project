@@ -37,8 +37,37 @@
 #   Groq latency is highly variable under load (measured 3.8s-55s same arm).
 
 llm:
-  model: openai/gpt-oss-120b       # Extractor / Critic / Writer — 27x faster
-  planner_model: openai/gpt-oss-120b   # Planner
+  # SWITCHED 120b -> 20b on 2026-08-28, mid-T-409, because the 120b DAILY token
+  # budget ran out. Not a quality decision - a quota one.
+  #
+  #     Rate limit reached for openai/gpt-oss-120b ... on tokens per day (TPD):
+  #     Limit 200000, Used 197751, Requested 5520. Try again in 23m33s.
+  #
+  # ⚠️ TPD is INVISIBLE IN THE HEADERS. x-ratelimit-limit-tokens /
+  # x-ratelimit-remaining-tokens report only the per-MINUTE bucket, and they
+  # read a healthy 8000/8000 while the daily bucket was empty. The daily limit
+  # appears ONLY in the body of a 429. Diagnosing this from headers alone sent
+  # us down a tokens-per-minute rabbit hole; read an actual 429 body next time.
+  #
+  # TPD is per-MODEL, not per-organisation - measured 2026-08-28: 120b refused
+  # while 20b and qwen3.6-27b both served the same 4,250-token request. So the
+  # switch buys a fresh 200,000-token budget.
+  #
+  # ⚠️ T-004 BAKE-OFF DID NOT COVER 20b. TASKLIST 0.1 lists it as "not yet
+  # probed", and this run adopts it without the 5-paper probe (a deliberate
+  # call, to get the flagship survey today rather than tomorrow). CHECK THE
+  # OUTPUT: watch field coverage against 120b's measured 4.6/8, and watch for
+  # the placeholder-echo failure that disqualified qwen - the literal string
+  # "string" appearing in datasets/metrics. If either shows up, this model is
+  # not usable for a hallucination-graded deliverable.
+  #
+  # qwen/qwen3.6-27b also has budget but stays REJECTED: T-004 measured it
+  # echoing schema placeholders into datasets/metrics on 2 of 5 papers, which
+  # silently injects fabricated content (SPEC 14.2 forbids exactly this).
+  #
+  # Restore 120b once its daily window refills, if the two runs are comparable.
+  model: openai/gpt-oss-20b        # Extractor / Critic / Writer
+  planner_model: openai/gpt-oss-20b    # Planner
   temperature: 0.1
   # 4096 -> 2048. Measured over 55 cached extractions: median response 571
   # tokens, p90 948, max 1,682. 4096 reserved 2.4x the largest response ever

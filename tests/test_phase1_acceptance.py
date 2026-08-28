@@ -359,3 +359,66 @@ def test_agent_output_budgets_fit_groqs_bucket() -> None:
     # The largest extractor response ever observed was 1,682 tokens.
     assert EXTRACT_OUT >= 1682, "output budget is below an observed real response"
     assert WRITE_OUT > EXTRACT_OUT, "sections are prose and need more room than JSON"
+
+
+def test_rate_limit_reason_is_captured_from_the_429_body() -> None:
+    """WHICH limit was hit must reach the trace.
+
+    🔴 Diagnosing this from headers alone cost a day on 2026-08-28. The
+    x-ratelimit-* headers report only the per-MINUTE bucket and read a healthy
+    8000/8000 while the run was being refused on the DAILY budget. The daily
+    limit appears nowhere except the body of a 429.
+    """
+    from researchgpt.core.llm import rate_limit_reason
+
+    resp = MagicMock()
+    resp.json.return_value = {
+        "error": {
+            "message": (
+                "Rate limit reached for model `openai/gpt-oss-120b` in "
+                "organization `org_x` service tier `on_demand` on tokens per "
+                "day (TPD): Limit 200000, Used 197751, Requested 5520."
+            ),
+            "type": "tokens",
+            "code": "rate_limit_exceeded",
+        }
+    }
+    reason = rate_limit_reason(resp)
+    assert "tokens per day" in reason
+    assert "200000" in reason
+
+    # A body that is not JSON must not crash the retry path.
+    broken = MagicMock()
+    broken.json.side_effect = ValueError("not json")
+    assert rate_limit_reason(broken) == "(no error body)"
+
+
+def test_rate_limit_error_message_names_the_limit_that_was_hit() -> None:
+    """RateLimitExceeded must carry the provider's own explanation."""
+    from researchgpt.core.llm import LLMClient, RateLimitExceeded
+
+    cfg = LLMConfig(model="gemma-4-31b-it", cache_dir=tempfile.mkdtemp(),
+                    requests_per_minute=0, tokens_per_minute=0, max_retries=1)
+    client = LLMClient(cfg)
+
+    resp = MagicMock()
+    resp.status_code = 429
+    resp.headers = {}
+    resp.json.return_value = {
+        "error": {"message": "... on tokens per day (TPD): Limit 200000, Used 199999."}
+    }
+    resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "429", request=httpx.Request("POST", "https://example.com"), response=resp
+    )
+
+    with patch("httpx.Client") as ClientCls:
+        ClientCls.return_value.__enter__.return_value.post.return_value = resp
+        with patch("time.sleep"):
+            try:
+                client.complete("storm", use_cache=False)
+                raise AssertionError("expected RateLimitExceeded")
+            except RateLimitExceeded as exc:
+                assert "tokens per day" in str(exc), (
+                    "the error must say WHICH limit, or the next person "
+                    "re-diagnoses it from headers that cannot show it"
+                )
