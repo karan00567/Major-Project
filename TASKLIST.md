@@ -7,6 +7,8 @@
 > **Companion documents:** `TRAINING_SPEC.md` (both fine-tuned models — verifier and reranker — and why the generative agents are not trained), `DB_SCHEMA.md` (the Postgres run registry), `PROJECT_PLAN.md` (scope), `SESSION_CONTEXT.md` (constraints and literature findings).
 >
 > Created 2026-08-25. Update the checkboxes in place; do not rewrite the file.
+>
+> **Repo layout changed 2026-08-28.** Every document this file cites — `SESSION_CONTEXT.md`, `RESEARCHGPT_SPEC.md`, `TRAINING_SPEC.md`, `DB_SCHEMA.md`, `decisions.txt`, the literature files — now lives in **`documents/`**. The citations below are left as bare filenames deliberately: they are references, not links, and rewriting several hundred of them would bury the actual history in a diff. Only `README.md`, `TASKLIST.md` and `PROJECT_PLAN.md` remain at the root.
 
 ---
 

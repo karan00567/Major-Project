@@ -275,14 +275,14 @@ def test_t324_match_threshold_is_not_delicately_placed():
 
 
 def test_t326_citation_is_in_refs_bib():
-    bib = (REPO / "refs.bib").read_text(encoding="utf-8")
+    bib = (REPO / "documents" / "refs.bib").read_text(encoding="utf-8")
     assert "kasanishi2023scireviewgen" in bib
     assert "2305.15186" in bib
     assert "CC BY-NC" in bib
 
 
 def test_t326_licence_is_stated_in_the_data_section_source():
-    doc = (REPO / "DATA_PROVENANCE.md").read_text(encoding="utf-8")
+    doc = (REPO / "documents" / "DATA_PROVENANCE.md").read_text(encoding="utf-8")
     assert "CC BY-NC 4.0" in doc
     assert "Kasanishi" in doc
     # The mirror-licence trap must be written down, not just known.

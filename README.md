@@ -72,7 +72,7 @@ GPU and both deployed **quantized to int8 on a CPU-only machine**:
 | Cross-encoder reranker (`MiniLM-L-6`) | 22M | SciReviewGen | Recall@20, own bibliography | 0.4815 | **0.5926** |
 
 The generative agents are **not** fine-tuned, deliberately — see
-`TRAINING_SPEC.md §4`. The thesis is Valsci's: *architecture beats model scale*.
+`documents/TRAINING_SPEC.md §4`. The thesis is Valsci's: *architecture beats model scale*.
 Small trained components at the two real bottlenecks (retrieval quality, claim
 grounding) do more than a larger generator would.
 
@@ -125,7 +125,7 @@ Four panels: run control, live agent progress over SSE, **evidence inspection**
 (click any verified sentence to see the span the Verifier scored it against),
 and dropped claims with human-in-the-loop confirm/override.
 
-See **`SHOWCASE.md`** for the demo runbook.
+See **`documents/SHOWCASE.md`** for the demo runbook.
 
 ### From Python
 
@@ -199,9 +199,27 @@ frontend/      Vue 3 + Vite, four panels, no Pinia
 notebook-kaggle-traning/   the three GPU training notebooks
 ```
 
-**Key documents:** `TASKLIST.md` (the operative backlog), `TRAINING_SPEC.md`
-(both trained models and why the generators are not),
-`DB_SCHEMA.md`, `SHOWCASE.md` (demo runbook), `decisions.txt`.
+### Documents
+
+Everything except the three files below lives in **`documents/`**.
+
+| at root | |
+|---|---|
+| `README.md` | this file |
+| `TASKLIST.md` | **the operative backlog** — the single executable plan |
+| `PROJECT_PLAN.md` | the original 30-day plan (superseded by TASKLIST; kept for scope) |
+
+| in `documents/` | |
+|---|---|
+| `SHOWCASE.md` | **demo runbook** — read this before presenting |
+| `TRAINING_SPEC.md` | both trained models, and why the generators are not trained |
+| `DB_SCHEMA.md` | the run registry schema and its failure semantics |
+| `RESEARCHGPT_SPEC.md` | the system specification |
+| `SESSION_CONTEXT.md` | constraints, literature findings, calibration numbers |
+| `decisions.txt` | the human's answers to D-01…D-16 |
+| `LITERATURE_REVIEW.md`, `PAPER_ANALYSIS.md`, `PAPER_DEEP_DIVE.md` | the reading behind the design |
+| `ARCHITECTURE_REVIEW.md`, `DATA_PROVENANCE.md` | design review and data lineage |
+| `refs.bib`, `*.pptx` | bibliography and the graded decks |
 
 ---
 
