@@ -6,7 +6,7 @@ import PanelRun from './components/PanelRun.vue'
 import PanelProgress from './components/PanelProgress.vue'
 import PanelEvidence from './components/PanelEvidence.vue'
 import PanelDropped from './components/PanelDropped.vue'
-import { getResult, health, listRuns, startReview, streamEvents } from './api.js'
+import { getResult, health, listRuns, postOverride, startReview, streamEvents } from './api.js'
 
 const runs = ref([])
 const runId = ref('')
@@ -35,6 +35,11 @@ async function open(id) {
   error.value = ''
   try {
     result.value = await getResult(id)
+    // T-609: rehydrate what a human already decided, so a reload does not
+    // silently discard judgements that ARE in the audit record.
+    overrides.value = Object.fromEntries(
+      (result.value.human_overrides || []).map((o) => [o.claim_id, o.decision]),
+    )
   } catch (e) {
     error.value = e.message
     return
@@ -64,14 +69,25 @@ async function start({ question, maxPapers }) {
   }
 }
 
-// T-609. Held client-side for now and written back through the trace when the
-// API grows a write endpoint; the shape matches graph/state.py::human_overrides
-// so nothing has to be reinterpreted later.
-function override({ claim, decision }) {
+// T-609. Written back to the run's trace, which is the audit record the report
+// will count overrides from (T-904). Optimistic locally, then reconciled with
+// what the server actually stored - so a failed write cannot leave the UI
+// claiming a judgement that was never recorded.
+async function override({ claim, decision }) {
   const next = { ...overrides.value }
   if (decision === null) delete next[claim.claim_id]
   else next[claim.claim_id] = decision
   overrides.value = next
+
+  try {
+    const stored = await postOverride(runId.value, claim.claim_id, decision)
+    overrides.value = Object.fromEntries(stored.map((o) => [o.claim_id, o.decision]))
+  } catch (e) {
+    error.value = `Override not saved: ${e.message}`
+    overrides.value = Object.fromEntries(
+      (result.value?.human_overrides || []).map((o) => [o.claim_id, o.decision]),
+    )
+  }
 }
 
 function stopStream() {

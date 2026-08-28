@@ -42,6 +42,8 @@ from sse_starlette.sse import EventSourceResponse
 
 from researchgpt.api.schemas import (
     ClaimOut,
+    OverrideOut,
+    OverrideRequest,
     ReviewAccepted,
     ReviewRequest,
     RunResult,
@@ -303,7 +305,103 @@ def run_result(run_id: str) -> RunResult:
         artefacts=sorted(f.name for f in run_dir.iterdir() if f.name in DOWNLOADABLE),
         decisions=list(payload.get("decisions") or []),
         iterations=int(payload.get("iterations") or 0),
+        human_overrides=_overrides_of(run_dir),
     )
+
+
+VALID_DECISIONS = {"confirm", "reinstate"}
+
+
+def _overrides_of(run_dir: pathlib.Path) -> list[OverrideOut]:
+    """Replay the trace's human_override events, last write per claim wins.
+
+    ★ The trace is the single source of truth, not a side file. T-904 fixes its
+    schema and the report's override count will be derived from it, so keeping
+    a second store would create two answers to "what did the human decide?".
+    Replaying also makes a cleared override (decision=null) work naturally: it
+    is just the newest entry for that claim.
+    """
+    latest: dict[str, OverrideOut] = {}
+    for e in _trace_events(run_dir):
+        if e.get("event") != "human_override":
+            continue
+        p = e.get("payload") or {}
+        cid = p.get("claim_id")
+        if not cid:
+            continue
+        latest[cid] = OverrideOut(
+            claim_id=cid, decision=p.get("decision"),
+            note=p.get("note"), ts=str(e.get("ts") or ""),
+        )
+    return [o for o in latest.values() if o.decision]
+
+
+@app.post("/api/runs/{run_id}/overrides", response_model=list[OverrideOut])
+def record_override(run_id: str, req: OverrideRequest) -> list[OverrideOut]:
+    """T-609 — write a human judgement back to the trace.
+
+    `decisions.txt` T-007 (2026-08-25) made HITL mandatory: it is the concrete
+    implementation of Objective 2's "and Human-in-the-loop" clause, and without
+    it that objective is unmet.
+
+    Appends rather than rewrites. The trace is append-only by construction
+    (T-107), so an override is one more line and the history of a changed mind
+    is preserved instead of being overwritten.
+    """
+    run_dir = _run_dir(run_id)
+
+    if req.decision is not None and req.decision not in VALID_DECISIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"decision must be one of {sorted(VALID_DECISIONS)} or null",
+        )
+
+    # Refuse an override against a claim this run never produced: a typo would
+    # otherwise land a judgement in the audit record that refers to nothing.
+    claims = _read_json(run_dir / "claims.json") or {}
+    known = {c.get("claim_id")
+             for c in (claims.get("verified") or []) + (claims.get("dropped") or [])}
+    if known and req.claim_id not in known:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no claim {req.claim_id!r} in run {run_id}",
+        )
+
+    line = json.dumps({
+        "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "run_id": run_id,
+        "agent": "human",
+        "event": "human_override",
+        "iteration": 0,
+        "payload": {"claim_id": req.claim_id, "decision": req.decision,
+                    "note": req.note},
+    }, ensure_ascii=False)
+    trace = run_dir / "trace.jsonl"
+    try:
+        # 🔴 A trace that does not end in a newline would otherwise have this
+        # record concatenated onto its last line, destroying BOTH - in the file
+        # the report derives its figures from. Appending blind is the obvious
+        # implementation and it is wrong; caught by
+        # test_override_survives_a_reload, which uses a fixture with no
+        # trailing newline precisely because real files sometimes do not have
+        # one (an interrupted run, an editor that strips it).
+        needs_newline = False
+        if trace.exists() and trace.stat().st_size:
+            with trace.open("rb") as fh:
+                fh.seek(-1, 2)
+                needs_newline = fh.read(1) != b"\n"
+        with trace.open("a", encoding="utf-8") as fh:
+            fh.write(("\n" if needs_newline else "") + line + "\n")
+    except OSError as exc:
+        raise HTTPException(status_code=500,
+                            detail=f"could not write override: {exc}") from exc
+
+    return _overrides_of(run_dir)
+
+
+@app.get("/api/runs/{run_id}/overrides", response_model=list[OverrideOut])
+def list_overrides(run_id: str) -> list[OverrideOut]:
+    return _overrides_of(_run_dir(run_id))
 
 
 @app.get("/api/runs/{run_id}/artifact/{name}")

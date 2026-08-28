@@ -307,3 +307,72 @@ def test_every_verified_claim_carries_its_evidence():
     claims = json.loads(path.read_text(encoding="utf-8"))
     without = [c["claim_id"] for c in claims["verified"] if not c.get("evidence")]
     assert not without, f"verified claims with no evidence span: {without[:5]}"
+
+
+# --------------------------------------------------------------------------
+# T-609 — human-in-the-loop, persisted
+# --------------------------------------------------------------------------
+
+
+def test_override_survives_a_reload(client):
+    """The criterion that separates "a UI control" from HITL being implemented.
+
+    decisions.txt T-007 (2026-08-25) made HITL mandatory: it is the concrete
+    implementation of Objective 2's "and Human-in-the-loop" clause, and without
+    persistence the claim on deck slide 5 is false.
+    """
+    r = client.post("/api/runs/demo/overrides",
+                    json={"claim_id": "c3", "decision": "reinstate",
+                          "note": "a reviewer disagreed"})
+    assert r.status_code == 200
+    assert r.json()[0]["decision"] == "reinstate"
+
+    # A fresh read - i.e. what a page reload does.
+    reloaded = client.get("/api/runs/demo/result").json()["human_overrides"]
+    assert [o["claim_id"] for o in reloaded] == ["c3"]
+    assert reloaded[0]["note"] == "a reviewer disagreed"
+
+
+def test_overrides_are_appended_not_rewritten(client, runs):
+    """The trace is append-only (T-107), so a changed mind is history, not a
+    silent overwrite. The report counts overrides from this file."""
+    trace = runs / "demo" / "trace.jsonl"
+    before = len(trace.read_text(encoding="utf-8").splitlines())
+
+    client.post("/api/runs/demo/overrides", json={"claim_id": "c3", "decision": "confirm"})
+    client.post("/api/runs/demo/overrides", json={"claim_id": "c3", "decision": "reinstate"})
+
+    after = len(trace.read_text(encoding="utf-8").splitlines())
+    assert after == before + 2, "an override overwrote history instead of appending"
+    # Last write wins for the current view.
+    assert client.get("/api/runs/demo/overrides").json()[0]["decision"] == "reinstate"
+
+
+def test_clearing_an_override_removes_it_from_the_view(client):
+    """A mis-click must be undoable, or the audit record keeps a judgement
+    nobody meant."""
+    client.post("/api/runs/demo/overrides", json={"claim_id": "c3", "decision": "confirm"})
+    assert client.get("/api/runs/demo/overrides").json()
+
+    client.post("/api/runs/demo/overrides", json={"claim_id": "c3", "decision": None})
+    assert client.get("/api/runs/demo/overrides").json() == []
+
+
+def test_override_rejects_an_unknown_claim_or_decision(client):
+    """A typo would otherwise land a judgement in the audit record that refers
+    to nothing."""
+    assert client.post("/api/runs/demo/overrides",
+                       json={"claim_id": "nope", "decision": "confirm"}).status_code == 404
+    assert client.post("/api/runs/demo/overrides",
+                       json={"claim_id": "c3", "decision": "sure"}).status_code == 422
+
+
+def test_override_does_not_touch_the_review(client, runs):
+    """★ An override records a judgement ABOUT a dropped claim. Reinstating the
+    prose into review.md would destroy the very property Panel 4 exists to
+    demonstrate."""
+    review = runs / "demo" / "review.md"
+    before = review.read_text(encoding="utf-8")
+    client.post("/api/runs/demo/overrides",
+                json={"claim_id": "c3", "decision": "reinstate"})
+    assert review.read_text(encoding="utf-8") == before

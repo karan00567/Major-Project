@@ -75,6 +75,29 @@ class ClaimOut(BaseModel):
     evidence: list[EvidenceOut] = []
 
 
+class OverrideRequest(BaseModel):
+    """``POST /api/runs/{id}/overrides`` — T-609.
+
+    ⚠️ This records a human judgement ABOUT a dropped claim. It does not edit
+    the review, and it must not: putting dropped prose back into ``review.md``
+    on a click would destroy the very property the panel exists to demonstrate.
+    """
+
+    claim_id: str = Field(min_length=1)
+    #: ``confirm``  - the Verifier was right to drop it
+    #: ``reinstate`` - a human disagrees and would have kept it
+    #: ``null``     - clear a previous override (a mis-click must be undoable)
+    decision: str | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class OverrideOut(BaseModel):
+    claim_id: str
+    decision: str | None = None
+    note: str | None = None
+    ts: str | None = None
+
+
 class RunResult(BaseModel):
     """``GET /api/runs/{id}/result`` — everything the Vue app renders."""
 
@@ -93,10 +116,15 @@ class RunResult(BaseModel):
     artefacts: list[str] = []
     decisions: list[str] = []
     iterations: int = 0
+    #: T-609. Reconstructed from the trace, so a reload shows what a
+    #: human already decided.
+    human_overrides: list[OverrideOut] = []
 
 
 __all__ = [
     "ReviewRequest",
+    "OverrideRequest",
+    "OverrideOut",
     "ReviewAccepted",
     "RunSummary",
     "ClaimOut",

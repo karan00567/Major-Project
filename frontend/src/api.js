@@ -29,6 +29,14 @@ export const startReview = (question, maxPapers) =>
     body: JSON.stringify({ question, max_papers: maxPapers, use_loop: true }),
   })
 
+// T-609. Persisted to the run's trace, so an override survives a reload.
+export const postOverride = (runId, claimId, decision, note) =>
+  json(`/api/runs/${encodeURIComponent(runId)}/overrides`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ claim_id: claimId, decision, note }),
+  })
+
 export const artifactUrl = (runId, name) =>
   `/api/runs/${encodeURIComponent(runId)}/artifact/${encodeURIComponent(name)}`
 
