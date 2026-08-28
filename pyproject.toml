@@ -55,6 +55,13 @@ api = [
     "uvicorn[standard]>=0.29",
     "sse-starlette>=2.0",
 ]
+# Phase 6B — the Postgres run registry. A SEPARATE extra on purpose: the
+# pipeline must install and run with no database at all (T-625), so nothing in
+# the core dependency set may import sqlalchemy.
+db = [
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+]
 # Phase 3B — SciReviewGen parsing.
 scireviewgen = [
     "datasets>=2.19",

@@ -25,6 +25,7 @@ applies **the same reducer rules** as the compiled graph.
 
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import uuid
 from typing import Any
@@ -112,6 +113,13 @@ def run_pipeline(
                         "max_papers": cfg.review.max_papers},
     }
 
+    # T-624 — registry hooks. Every call is best-effort and returns None when
+    # there is no database (DB_SCHEMA 9), so this block cannot affect the run.
+    from researchgpt.db import registry
+
+    registry.register_run(run_id, research_question, cfg.model_dump())
+    registry.mark_running(run_id)
+
     trace.event("graph", "run_start", {"research_question": research_question,
                                        "max_papers": cfg.review.max_papers,
                                        "model": cfg.llm.model}, 0)
@@ -166,6 +174,19 @@ def run_pipeline(
             state["artefacts"].update(
                 {k: str(v) for k, v in written.items() if v is not None}
             )
+            # Attach each artefact with its size and digest, so the registry can
+            # answer "which run produced this file, and is it intact?".
+            for name, path in written.items():
+                if path is None:
+                    continue
+                try:
+                    blob = pathlib.Path(path).read_bytes()
+                    digest = hashlib.sha256(blob).hexdigest()
+                    size = len(blob)
+                except OSError:
+                    digest, size = None, None
+                registry.attach_artefact(run_id, pathlib.Path(path).name,
+                                         str(path), size, digest)
             trace.event("graph", "artefacts_written",
                         {k: str(v) for k, v in written.items()}, 0)
 
@@ -178,11 +199,23 @@ def run_pipeline(
                         {"reason": "no review produced; every section was rejected "
                                    "or failed. See section_rejected_uncited / "
                                    "section_failed events."}, 0)
+            registry.fail_run(run_id, "no review produced; every section was "
+                                      "rejected or failed")
             raise RuntimeError(
                 "Pipeline produced no review. Every section was rejected or failed - "
                 "check the trace for section_rejected_uncited and section_failed."
             )
 
+        registry.complete_run(run_id, {
+            "papers": len(state.get("papers") or []),
+            "insights": len(state.get("paper_insights") or []),
+            "verified_claims": len(state.get("verified_claims") or []),
+            "dropped_claims": len(state.get("unsupported_claims") or []),
+            "grounding_score": state.get("grounding_score"),
+            "iterations": state.get("iteration", 0),
+            "decisions": [d.get("decision")
+                          for d in (state.get("decision_log") or [])],
+        })
         trace.event(
             "graph", "run_end",
             {"papers": len(state.get("papers") or []),

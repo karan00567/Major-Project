@@ -242,7 +242,23 @@ def start_review(req: ReviewRequest) -> ReviewAccepted:
 
 @app.get("/api/runs", response_model=list[RunSummary])
 def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
-    """Newest first. A filesystem scan, per `T-625`."""
+    """Newest first. Registry if present, filesystem scan otherwise.
+
+    ★ **T-625: this must work with no database at all.** The Vue run list and
+    the T-610 pre-baked demo both depend on it, and the filesystem already
+    holds everything the registry would store, so the fallback loses nothing
+    the demo needs.
+
+    ``registry.list_runs`` returns ``None`` when unavailable and ``[]`` when it
+    is present but empty — the distinction matters, or an empty database would
+    be indistinguishable from an empty disk and we would scan for nothing.
+    """
+    from researchgpt.db import registry
+
+    rows = registry.list_runs(limit)
+    if rows is not None:
+        return [RunSummary(**r) for r in rows]
+
     if not RUNS_DIR.is_dir():
         return []
     dirs = sorted(
