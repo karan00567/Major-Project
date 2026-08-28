@@ -249,15 +249,25 @@ def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
     holds everything the registry would store, so the fallback loses nothing
     the demo needs.
 
-    ``registry.list_runs`` returns ``None`` when unavailable and ``[]`` when it
-    is present but empty — the distinction matters, or an empty database would
-    be indistinguishable from an empty disk and we would scan for nothing.
+    🔴 **The filesystem is the BASE SET; the registry only enriches it.**
+    The obvious implementation — "registry if present, else filesystem" — is
+    wrong, and measurably so: the moment a real Postgres was connected on
+    2026-08-28 the endpoint returned **2 rows against 60 runs on disk**, because
+    the registry had only ever seen the runs made after it was enabled.
+    Enabling an *index* must never make the application show less than reality
+    (`DB_SCHEMA §1`: the filesystem is the record, every run is reconstructible
+    from ``outputs/runs/``).
+
+    So: enumerate the disk, then overlay registry metrics where a row exists.
+    A registry row whose directory is gone is skipped — the artefacts are what
+    this endpoint serves, and they are what has disappeared.
     """
     from researchgpt.db import registry
 
-    rows = registry.list_runs(limit)
-    if rows is not None:
-        return [RunSummary(**r) for r in rows]
+    enriched: dict[str, dict] = {}
+    rows = registry.list_runs(500)
+    if rows:
+        enriched = {r["run_id"]: r for r in rows}
 
     if not RUNS_DIR.is_dir():
         return []
@@ -273,17 +283,23 @@ def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
         end = next((e for e in reversed(events) if e.get("event") == "run_end"), None)
         payload = (end or {}).get("payload") or {}
         claims = _read_json(d / "claims.json") or {}
+        indexed = enriched.get(d.name) or {}
         out.append(
             RunSummary(
                 run_id=d.name,
                 status=_status(d.name, d),
-                question=_question_of(events),
-                started=str(events[0].get("ts")) if events else None,
-                papers=payload.get("papers"),
-                verified_claims=payload.get("verified_claims"),
-                dropped_claims=payload.get("dropped_claims"),
+                question=_question_of(events) or indexed.get("question"),
+                started=str(events[0].get("ts")) if events else indexed.get("started"),
+                papers=payload.get("papers") or indexed.get("papers"),
+                verified_claims=payload.get("verified_claims")
+                if payload.get("verified_claims") is not None
+                else indexed.get("verified_claims"),
+                dropped_claims=payload.get("dropped_claims")
+                if payload.get("dropped_claims") is not None
+                else indexed.get("dropped_claims"),
                 grounding_score=payload.get("grounding_score")
-                or claims.get("grounding_score"),
+                or claims.get("grounding_score")
+                or indexed.get("grounding_score"),
                 artefacts=sorted(
                     f.name for f in d.iterdir() if f.name in DOWNLOADABLE
                 ),

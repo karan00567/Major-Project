@@ -52,7 +52,13 @@ def test_importing_session_without_database_url_does_not_raise(monkeypatch):
 
     import researchgpt.db.session as s
 
+    # The module calls load_dotenv() at import, which would re-populate the
+    # very variable this test deletes. Neutralise it so we are testing "no
+    # DATABASE_URL anywhere", not "no DATABASE_URL for one millisecond".
+    monkeypatch.setattr(s, "load_dotenv", lambda *a, **k: False)
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: False)
     importlib.reload(s)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     assert s.database_url() is None
     assert s.enabled() is False
     assert s.get_engine() is None
@@ -280,7 +286,10 @@ def _live_db() -> bool:
 
 @pytest.mark.skipif(not _live_db(), reason="T-620 not done: no live Postgres")
 def test_round_trip_against_a_real_database():
+    """Exercises the real DDL, real JSONB, and the MutableList flush."""
     run_id = "pytest-registry-roundtrip"
+    _drop_test_row(run_id)          # idempotent: the row survives a prior run
+
     registry.register_run(run_id, "does it round-trip?", {"a": 1})
     registry.mark_running(run_id)
     registry.attach_artefact(run_id, "review.md", "/tmp/review.md", 12, "deadbeef")
@@ -290,8 +299,28 @@ def test_round_trip_against_a_real_database():
     assert row is not None
     assert row["status"] == "completed"
     assert row["papers"] == 3
-    # The MutableList flush: without it this list is empty.
+    # 🔴 The MutableList flush. Without the wrapper in models.py this list is
+    # EMPTY: the append never marks the row dirty and no UPDATE is emitted.
     assert row["artefacts"] == ["review.md"]
+
+    # Attaching the same name twice must replace, not duplicate - run_ids are
+    # reused constantly in this project.
+    registry.attach_artefact(run_id, "review.md", "/tmp/review.md", 99, "cafe")
+    assert registry.get_run(run_id)["artefacts"] == ["review.md"]
+
+
+def _drop_test_row(run_id: str) -> None:
+    from researchgpt.db.models import Run
+    from researchgpt.db.session import get_session
+
+    session = get_session()
+    if session is None:
+        return
+    try:
+        session.query(Run).filter_by(run_id=run_id).delete()
+        session.commit()
+    finally:
+        session.close()
 
 
 @pytest.mark.skipif(not _live_db(), reason="T-620 not done: no live Postgres")
@@ -343,3 +372,55 @@ def test_the_breaker_does_not_trip_when_there_is_simply_no_database(monkeypatch)
     _no_db(monkeypatch)
     registry.register_run("x", "q", {})
     assert db_session._disabled is False
+
+
+def test_enabling_the_registry_never_hides_runs_on_disk(monkeypatch, tmp_path):
+    """🔴 The regression this endpoint shipped with for about ten minutes.
+
+    "Registry if present, else filesystem" is the obvious implementation and it
+    is wrong: the moment a real Postgres was connected on 2026-08-28, the
+    endpoint returned **2 rows against 60 runs on disk**, because the registry
+    had only ever seen runs made after it was enabled.
+
+    Enabling an INDEX must never make the application show less than reality.
+    `DB_SCHEMA §1`: the filesystem is the record. So the disk is the base set
+    and the registry only enriches it.
+    """
+    from fastapi.testclient import TestClient
+
+    import researchgpt.api.app as app_module
+
+    for name in ("alpha", "beta", "gamma"):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "review.md").write_text("# r", encoding="utf-8")
+        (d / "trace.jsonl").write_text(
+            '{"ts":"2026-08-28T10:00:00Z","agent":"graph","event":"run_end",'
+            '"iteration":0,"payload":{}}\n', encoding="utf-8")
+    monkeypatch.setattr(app_module, "RUNS_DIR", tmp_path)
+
+    # A registry that knows about ONE of them, plus a row whose directory is gone.
+    monkeypatch.setattr(
+        "researchgpt.db.registry.list_runs",
+        lambda limit=50: [
+            {"run_id": "beta", "status": "completed", "question": "q",
+             "started": None, "papers": 42, "verified_claims": 5,
+             "dropped_claims": 1, "grounding_score": 0.9, "artefacts": []},
+            {"run_id": "vanished", "status": "completed", "question": "gone",
+             "started": None, "papers": 1, "verified_claims": None,
+             "dropped_claims": None, "grounding_score": None, "artefacts": []},
+        ],
+    )
+
+    rows = TestClient(app_module.app).get("/api/runs").json()
+    ids = {r["run_id"] for r in rows}
+
+    assert ids == {"alpha", "beta", "gamma"}, (
+        "the registry changed which runs are visible; it must only enrich them"
+    )
+    # The registry's metrics reach the row it knows about...
+    beta = next(r for r in rows if r["run_id"] == "beta")
+    assert beta["papers"] == 42
+    # ...and a row whose directory is gone is not served, because the artefacts
+    # this endpoint exists to expose are what disappeared.
+    assert "vanished" not in ids

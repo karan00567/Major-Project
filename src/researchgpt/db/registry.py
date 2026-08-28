@@ -108,12 +108,25 @@ def attach_artefact(run_id: str, name: str, path: str,
         row = session.query(Run).filter_by(run_id=run_id).one_or_none()
         if row is None:
             return None
-        row.artefacts.append({
+
+        record = {
             "name": name,
             "path": str(path),
             "bytes": size_bytes,
             "sha256": sha256,
-        })
+        }
+        # Replace by name rather than append blindly. A run_id is reused all
+        # the time in this project - `flagship`, `fixture`, `loop_demo` are
+        # re-run constantly - and register_run is already idempotent, so a
+        # blind append left the same artefact recorded three times with three
+        # different digests. One record per artefact name per run is the only
+        # shape that answers "is this file intact?".
+        for i, existing in enumerate(row.artefacts):
+            if existing.get("name") == name:
+                row.artefacts[i] = record
+                break
+        else:
+            row.artefacts.append(record)
         return name
 
     return _safe(_with_session, work)

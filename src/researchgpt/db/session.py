@@ -19,7 +19,15 @@ import os
 import threading
 from typing import Any
 
+from dotenv import load_dotenv
+
 log = logging.getLogger(__name__)
+
+# DATABASE_URL lives in .env alongside the API keys, so load it the same way
+# core/llm.py does. Without this the registry is silently disabled whenever the
+# variable is not already exported - which is every plain `pytest` run, and
+# would have made the live tests skip while a working database sat there.
+load_dotenv()
 
 #: Seconds to wait for a TCP connect before giving up on the registry.
 #: Deliberately short: this is an index over data the filesystem already holds,
