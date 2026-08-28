@@ -12,6 +12,30 @@
 
 ## 0. Reality check — read this before anything else
 
+> **STATUS — last updated 2026-08-28.** The block below is the 2026-08-25 entry, kept because
+> the descope decisions it justifies are still in force. **It is no longer a description of the
+> project.**
+
+| | 2026-08-25 (as written) | **2026-08-28 (now)** |
+|---|---|---|
+| Today | 2026-08-25 | **2026-08-28** |
+| Days remaining | 13 | **10** |
+| Code written | **Zero** | **86 of 117 tasks; 284 tests passing** |
+| Milestones | none | **M1 landed 08-27 (4 days early), M2 landed 08-28 (5 days early)** |
+| Phases complete | none | **0, 1, 2*, 3, 3B, 3C, 4, 5, 6, 6B** |
+
+\* Phase 2 is complete except its **recall gate**, which is the one substantive thing still open
+— see the warning below.
+
+🔴 **THE BINDING CONSTRAINT IS NOW RETRIEVAL, NOT TIME.** Union recall against the
+35-paper answer key is **0.057** (T-409, measured 2026-08-28) against a 0.371 baseline and a 0.80
+gate. Retrieval recall is a hard ceiling on everything downstream: the Verifier cannot ground a
+claim against a paper that was never fetched, which is why the flagship run produced **zero
+SUPPORTED claims**. **T-702's ablation — the graded claim — will be measured on that same
+corpus.** §13's Aug 28 kill switch names the response: spend a day on retrieval.
+
+**Original 2026-08-25 entry, for the record:**
+
 | | |
 |---|---|
 | Plan written | 2026-08-06 (30-day plan, Day 1 = 2026-08-07) |
@@ -924,14 +948,20 @@ Grading is weighted to the system visibly working. Build the panels in order; **
 
 ## 11. Cross-cutting — continuous, not a phase
 
-- [ ] **T-901** ⌨️ Unit tests alongside each module. Cursor writes the test in the same prompt as the module; the acceptance criterion *is* the test.
+- [x] **T-901** ⌨️ Unit tests alongside each module. Cursor writes the test in the same prompt as the module; the acceptance criterion *is* the test.  ✅ **SATISFIED CONTINUOUSLY** — **284 tests** across 8 acceptance suites, one per phase. The convention held: the acceptance criterion *is* the test, and several of the most valuable defects this project found were found by writing one — the trace-append corruption (T-609), the unbounded registry connect (T-626), and the registry hiding 58 runs on disk (T-625).
 - [ ] **T-902** 🧠 Review every Cursor diff before commit. Assume hallucinated imports until proven otherwise.
-- [ ] **T-903** 🧠 Commit at every completed task. `git log` is the project timeline evidence.
-- [ ] **T-904** 🧠 Keep the `trace.jsonl` schema stable from T-107 onward. Every report figure depends on it.
+
+  ⚠️ **Not applicable as written.** The two-agent split in §1 assumed Cursor would write the code; in practice Claude Code wrote it directly, so there were no Cursor diffs to review. The underlying risk — unreviewed generated code — was covered instead by T-901's acceptance tests and by `ruff`. Left unticked because the task as phrased never happened.
+- [x] **T-903** 🧠 Commit at every completed task. `git log` is the project timeline evidence.  ✅ **SATISFIED CONTINUOUSLY** — a commit per completed task, each carrying the measurement that justified it. 🔴 **But they are all still LOCAL:** `master` is ~25 commits ahead of `origin/master`, so the entire project lives on one disk and neither co-author can see any of it. This is the cheapest outstanding risk to close.
+- [x] **T-904** 🧠 Keep the `trace.jsonl` schema stable from T-107 onward. Every report figure depends on it.  ✅ **HELD** — the `trace.jsonl` schema is unchanged since T-107, and the decision to keep it stable paid off twice in Phase 6: **SSE tails the trace directly** rather than maintaining a second event bus (T-602), and **HITL overrides are appended to it** rather than to a side file (T-609). One definition of “what happened”, so a browser panel and a report figure cannot disagree.
 
 ---
 
 ## 12. Critical path
+
+> ✅ **RESOLVED 2026-08-28. Both milestones landed early: M1 on 08-27 (4 days early), M2 on 08-28 (5 days early).** The diagram below is kept as the record of what gated what.
+>
+> 🔴 **The critical path has moved.** Nothing on this diagram is blocking any more; **T-212/T-213 (retrieval recall) now gates Phase 7**, because T-702's ablation — the graded claim — is measured on the corpus retrieval produces, and that corpus currently misses 33 of the 35 gold papers.
 
 Only these gate M2. Everything else can slip.
 
@@ -970,6 +1000,21 @@ pipeline writes to disk regardless and T-625 falls back to a filesystem scan.
 
 ## 13. Kill switches — decide these on the date, not in hindsight
 
+> **Outcome as of 2026-08-28** — recorded so a passed date is not silently forgotten:
+>
+> | date | switch | what actually happened |
+> |---|---|---|
+> | Aug 28 | Recall@20 < 0.80 | 🔴 **FIRED, and is still unanswered.** Union recall is **0.057**. The prescribed response — escalate `bge-small` → `bge-base` and spend a day on retrieval — has **not** been done. The “push M1 to Sep 1” clause is moot: M1 landed Aug 27. |
+> | Aug 28 | T-321 gate < 0.95 | Did not fire. Resolution rate **1.0000**. |
+> | Aug 29 | Kaggle verifier not trained | Did not fire. Trained Aug 27, macro-F1 **0.769**. |
+> | Aug 30 | T-322 pairs not produced | Did not fire. Phase 3B complete. |
+> | Aug 30 | Reranker not trained / no gain | Did not fire, but *did* need the retrain: the first fine-tune was reverted, then T-332R's mixed-negative build passed T-335 and was adopted. |
+> | Aug 31 | M1 not landed | Did not fire. **Landed Aug 27.** |
+> | Sep 2 | M2 not landed | Did not fire. **Landed Aug 28.** |
+> | Sep 4 | Vue not started | Did not fire. **Phase 6 complete Aug 28**, all four panels + HITL. |
+> | Sep 4 | Phase 6B registry not working | Did not fire. **Complete Aug 28** against PostgreSQL 18.6. |
+> | Sep 6 | Ablations not run | **Still live.** Phase 7 has not started, and it is now the critical path. |
+
 | Date | If this has not happened | Do this |
 |---|---|---|
 | **Aug 28** | Recall@20 < 0.80 | Escalate `bge-small` → `bge-base`. Spend all of Aug 29 on retrieval. Push M1 to Sep 1. |
@@ -989,12 +1034,23 @@ pipeline writes to disk regardless and T-625 falls back to a filesystem scan.
 
 Carried forward from `SESSION_CONTEXT.md §8`, plus new ones. All appear in Phase 0 or Phase 8 above; repeated here so none is lost:
 
-1. **T-005** — confirm the base-paper switch with your guide. ⬅ *the most valuable ten minutes left*
-2. **T-006** — confirm which MCD notation the rubric means.
-3. **T-007** — decide whether HITL stays in Objective 2.
-4. **T-811** — obtain the Li et al. IPM PDF and resolve its publication year.
-5. **T-812** — verify *Vicinagearth* is Scopus-indexed.
-6. **T-705** — the 50-claim spot-check. Nobody else can do it. *It is no longer your **only** non-circular evidence now that T-325 exists, but it is still the only one measured in **your own domain** — SciReviewGen is biomedical-and-CS survey prose, your corpus is agentic RAG.* Both are needed; they answer different objections.
+**Closed since this list was written:** T-005 (base-paper switch approved), T-006 (MCD notation),
+T-007 (HITL confirmed mandatory — and now implemented and persisted, T-609), T-620 (PostgreSQL 18.6
+installed and connected 2026-08-28).
+
+**Still only you can do these:**
+
+1. **T-705** — the 50-claim spot-check. *Not your only non-circular evidence now that T-325 exists,
+   but still the only one measured in **your own domain**: SciReviewGen is biomedical-and-CS survey
+   prose, your corpus is agentic RAG. Both are needed; they answer different objections.*
+   ⚠️ Needs real output, and the current flagship run has **0 SUPPORTED claims and 0.057 recall** —
+   spot-checking that corpus measures the wrong thing. **Fix retrieval first, then run this.**
+2. **T-811** — obtain the Li et al. IPM PDF and resolve its publication year.
+3. **T-812** — verify *Vicinagearth* is Scopus-indexed.
+4. **T-215** — the free Semantic Scholar API key. Cheap, and it widens retrieval, which is now the
+   binding constraint.
+5. 🔴 **Push these commits.** `master` is ~25 commits ahead of `origin/master` and everything
+   — M1, M2, the whole application — exists on one disk, invisible to both co-authors.
 
 ---
 
