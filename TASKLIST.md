@@ -788,7 +788,23 @@ The centrepiece. Objective 2 lives here.
 
   **How it was forced, stated plainly:** `min_papers` was raised to an unreachable 5,000. Retrieval, state and the gate are all real; only the threshold was set to a standard this corpus cannot meet — which is exactly what a genuinely thin topic would produce.
 
-  ⚠️ **One edge was NOT traversed: REPLAN → planner.** The Critic *decided* REPLAN, but routing overrode it, because the Critic advances the counter on each loop-back and `iteration` had reached 2, which is `max_iterations - 1`. So the safety bound fired correctly and the run went to the Writer instead. With `max_iterations=3` you get exactly two loop-backs, so RETRIEVE + REPLAN consumes the whole budget and the Planner never re-runs. **To exercise that last edge, re-run this demo with `max_iterations=4`.** Everything else in T-509 is covered.
+  ✅ **ALL EDGES TRAVERSED — re-run at `max_iterations=4`, `outputs/runs/loop_demo4/`, exit 0, 11.7 min:**
+
+  ```
+  iter=0  papers=271  RETRIEVE
+  iter=1  papers=271  REPLAN   a previous RETRIEVE left the corpus at 271 (was 271)
+          >>> PLANNER REPLANNING (12 tried queries, 184 chars of critique)
+  iter=2  papers=551  RETRIEVE
+  iter=3  papers=551  WRITE    last of 4; forcing WRITE per SPEC 7.5
+  ```
+
+  ★ **The replan did real work: the corpus went 271 → 551 papers**, and the Critic then chose RETRIEVE rather than REPLAN *because it had grown*. The escalation guard behaves correctly in both directions on live data — escalate when stuck, keep retrieving while it is still helping.
+
+  ★ **The plan genuinely changed: 12 new queries, ZERO repeated** from the rejected plan, so `SPEC §7.5`'s “mandatory plan diff on replan” is satisfied on real data. The T-409 prompt fix survives replanning — all 12 are ordinary technical vocabulary, no invented proper nouns.
+
+  ⚠️ *Why `max_iterations=3` was not enough:* the Critic advances the counter on every loop-back, so RETRIEVE + REPLAN consumed the whole budget and routing forced WRITE before the Planner could re-run. The safety bound was correct; the budget was simply too small to show the edge.
+
+  🔴 **A defect found while setting this up, without which the demo would have been hollow: the Planner never read `critic_feedback`.** Its prompt was built from `research_question` + `constraints` alone, neither of which changes between iterations — so a REPLAN produced an identical prompt, hit the T-104 cache, and returned **the same plan**. The loop would have re-run identical queries and stood still, which is exactly what `assert_plan_changed` exists to catch and it was never called. The Planner now receives the critique and the already-tried queries on a replan.
 
   Also verified in the same run: the **embedding cache** (0/640 hits then **640/640**, `embed_ms` 32,096 → **206**) and the **checkpointer** (17 MB `checkpoints.sqlite`, `resumable_runs: ['loop_demo']`, all five stages listed as skippable).
 
