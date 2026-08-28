@@ -422,3 +422,66 @@ def test_rate_limit_error_message_names_the_limit_that_was_hit() -> None:
                     "the error must say WHICH limit, or the next person "
                     "re-diagnoses it from headers that cannot show it"
                 )
+
+
+def test_reasoning_effort_is_sent_to_groq() -> None:
+    """gpt-oss are reasoning models: max_tokens covers the reasoning trace AND
+    the visible answer.
+
+    🔴 Measured 2026-08-28 on a real 4,488-token extractor prompt at
+    max_tokens=2048: at the provider default the model spent ~2,627 tokens
+    reasoning, hit finish_reason "length", and returned EMPTY content. The
+    extractor logged "No JSON object can be recovered from empty input" and
+    38% of that run's requests were wasted repairs. At effort "low" the same
+    prompt used 626 completion tokens, parsed first time, and filled 6 of 8
+    fields - better than gpt-oss-120b's measured 4.6/8.
+    """
+    cfg = LLMConfig(model="openai/gpt-oss-20b", cache_dir=tempfile.mkdtemp(),
+                    requests_per_minute=0, tokens_per_minute=0)
+    assert cfg.reasoning_effort == "low", "the default must not regress silently"
+    client = LLMClient(cfg)
+
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.raise_for_status = MagicMock()
+    resp.json.return_value = {"choices": [{"message": {"content": '{"ok": 1}'}}]}
+
+    with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
+        with patch("httpx.Client") as ClientCls:
+            inst = ClientCls.return_value.__enter__.return_value
+            inst.post.return_value = resp
+            client.complete("extract this", use_cache=False)
+            body = inst.post.call_args.kwargs["json"]
+
+    assert body["reasoning_effort"] == "low", (
+        "reasoning_effort must reach Groq, or the reasoning trace consumes "
+        "max_tokens and the content comes back empty"
+    )
+
+
+def test_reasoning_effort_changes_the_cache_key() -> None:
+    """A different effort is a different request and must not be served from
+    the cache of the previous one."""
+    cache = tempfile.mkdtemp()
+    a = LLMClient(LLMConfig(model="openai/gpt-oss-20b", cache_dir=cache,
+                            requests_per_minute=0, tokens_per_minute=0,
+                            reasoning_effort="low"))
+    b = LLMClient(LLMConfig(model="openai/gpt-oss-20b", cache_dir=cache,
+                            requests_per_minute=0, tokens_per_minute=0,
+                            reasoning_effort="high"))
+
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.raise_for_status = MagicMock()
+    resp.json.return_value = {"choices": [{"message": {"content": "x"}}]}
+
+    with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}):
+        with patch("httpx.Client") as ClientCls:
+            inst = ClientCls.return_value.__enter__.return_value
+            inst.post.return_value = resp
+            a.complete("same prompt", use_cache=True)
+            b.complete("same prompt", use_cache=True)
+            assert inst.post.call_count == 2, (
+                "the second client reused the first's cache entry despite a "
+                "different reasoning_effort"
+            )

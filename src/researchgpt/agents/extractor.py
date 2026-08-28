@@ -72,7 +72,7 @@ MAX_PROMPT_CHARS = 18_000
 #: (~4,500 tokens), it pushed the largest requests to ~8,600 tokens: over the
 #: whole bucket, and therefore unservable at ANY request rate. Measured on
 #: T-409, 2026-08-28.
-MAX_COMPLETION_TOKENS = 2_048
+MAX_COMPLETION_TOKENS = 2_560
 
 #: Leave the source text at least this much room, so trimming examples is never
 #: preferable to trimming the paper we are trying to read.

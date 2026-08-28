@@ -98,6 +98,22 @@ llm:
   # ledger. requests_per_minute returns to Groq's real 30; tokens govern.
   requests_per_minute: 30
   tokens_per_minute: 8000
+  # ★ gpt-oss are REASONING models. max_tokens budgets the reasoning trace AND
+  # the visible answer together, so at the provider's default effort the trace
+  # can eat the whole budget and return EMPTY content.
+  #
+  # Measured 2026-08-28, real 4,488-token extractor prompt on gpt-oss-20b at
+  # max_tokens=2048:
+  #     default -> finish_reason "length", ~2,627 reasoning tokens, CONTENT
+  #                EMPTY. The extractor then logged "No JSON object can be
+  #                recovered from empty input" and burned its repair budget:
+  #                38% of requests in that run were repairs.
+  #     "low"   -> finish_reason "stop", 626 completion tokens, ~179 reasoning,
+  #                parses first time, 6 of 8 fields filled.
+  #
+  # "low" is not a compromise: 6/8 beats gpt-oss-120b's measured 4.6/8, using
+  # ~3x fewer tokens. Structured extraction is transcription, not reasoning.
+  reasoning_effort: low
   max_retries: 5
   cache_dir: data/llm_cache        # prompt-hash cache (T-104)
 

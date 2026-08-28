@@ -214,7 +214,8 @@ class LLMClient:
 
         provider = MODEL_PROVIDER[resolved_model]
         prompt_hash = hashlib.sha256(
-            f"{resolved_model}|{resolved_temp}|{resolved_max}|{prompt}".encode("utf-8")
+            f"{resolved_model}|{resolved_temp}|{resolved_max}|"
+            f"{getattr(self._cfg, 'reasoning_effort', None)}|{prompt}".encode("utf-8")
         ).hexdigest()
 
         if use_cache:
@@ -496,6 +497,10 @@ class LLMClient:
     def _groq_complete(
         self, model: str, prompt: str, temperature: float, max_tokens: int
     ) -> str:
+        # gpt-oss reasoning models spend max_tokens on reasoning BEFORE any
+        # visible output; without this the trace eats the whole budget and the
+        # content comes back empty. See LLMConfig.reasoning_effort.
+        effort = getattr(self._cfg, "reasoning_effort", None)
         key = os.getenv("GROQ_API_KEY")
         if not key:
             raise LLMError(
@@ -510,6 +515,8 @@ class LLMClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if effort:
+            body["reasoning_effort"] = effort
         with httpx.Client(timeout=120.0) as client:
             resp = client.post(url, headers=headers, json=body)
             resp.raise_for_status()

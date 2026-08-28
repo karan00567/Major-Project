@@ -64,7 +64,12 @@ MAX_EVIDENCE_PER_THEME = 14
 #: TokenBudgetExceeded, lower MAX_EVIDENCE_PER_THEME rather than this -
 #: truncating the model mid-section produces uncited prose, which the Writer
 #: then rejects outright, so a smaller output budget costs whole sections.
-MAX_COMPLETION_TOKENS = 2_560
+#: Raised 2,560 -> 3,072 on 2026-08-28 once reasoning_effort=low cut the
+#: reasoning trace from ~2,600 tokens to ~180, freeing the budget for actual
+#: prose. M1's longest section was ~1,690 tokens, so this leaves real margin
+#: before truncation - and a truncated section loses its closing citations,
+#: which the uncited-prose guard then rejects outright.
+MAX_COMPLETION_TOKENS = 3_072
 
 #: A section this long with no citation at all is unverifiable prose, not a
 #: literature review.
