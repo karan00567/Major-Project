@@ -147,7 +147,12 @@ def test_t105_config() -> None:
     # the literal here made a config edit look like a loader regression.
     assert cfg.llm.model in ALLOWED_MODELS
     assert cfg.llm.planner_model in ALLOWED_MODELS
-    assert cfg.review.max_papers == 60
+    # Same reasoning as the model above, and it bit for the same reason: this
+    # pinned the literal 60 and started failing when max_papers was lowered to
+    # 25 on 2026-08-28 for the flagship and ablation runs. The loader is what is
+    # under test, not the tuning decision, which travels in default.yaml with
+    # its own comment.
+    assert cfg.review.max_papers > 0
 
     try:
         load_config("configs/default.yaml", overrides={"no_such_section": {}})
@@ -155,10 +160,14 @@ def test_t105_config() -> None:
     except ValidationError:
         pass
 
-    os.environ["RESEARCHGPT__REVIEW__MAX_PAPERS"] = "25"
+    # 40 deliberately: the probe used to be 25, which became the file's own
+    # value on 2026-08-28 and made this assertion pass without the override
+    # doing anything. It must differ from whatever default.yaml says.
+    assert cfg.review.max_papers != 40, "pick another probe; this one is now vacuous"
+    os.environ["RESEARCHGPT__REVIEW__MAX_PAPERS"] = "40"
     try:
         cfg2 = load_config("configs/default.yaml")
-        assert cfg2.review.max_papers == 25
+        assert cfg2.review.max_papers == 40
     finally:
         del os.environ["RESEARCHGPT__REVIEW__MAX_PAPERS"]
 

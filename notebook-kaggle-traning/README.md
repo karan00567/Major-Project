@@ -6,12 +6,19 @@ Neither needs the `researchgpt` package installed on Kaggle.
 
 They differ in one way that matters: **notebook 01 builds its own data from the
 Hub; notebook 02 needs `train_triples.jsonl` uploaded as a Kaggle Dataset**,
-because BM25 hard-negative mining needs the whole pooled corpus.
+because BM25 hard-negative mining needs the whole pooled corpus. **Notebook 03
+reuses that same upload** — it rebuilds the negatives in-notebook.
 
 | Notebook | Task | Trains | Status |
 |---|---|---|---|
-| `01_train_verifier_scifact.ipynb` | **T-302 / T-303** | The claim verifier (`deberta-v3-small`, 3-way NLI) | **Ready to run** |
-| `02_train_reranker_scireviewgen.ipynb` | **T-332 / T-333** | The cross-encoder reranker | **Ready to run** (needs a data upload — see below) |
+| `01_train_verifier_scifact.ipynb` | **T-302 / T-303** | The claim verifier (`deberta-v3-small`, 3-way NLI) | ✅ **Run 2026-08-27** — macro-F1 0.516 → 0.769, passed T-307 |
+| `02_train_reranker_scireviewgen.ipynb` | **T-332 / T-333** | The cross-encoder reranker, **4 hard negatives** | ⚠️ **Run 2026-08-27, model REVERTED** — won on ranking, lost its relevance prior (T-335) |
+| `03_train_reranker_mixed_negatives.ipynb` | **T-332R** | The same reranker, **3 hard : 1 random** | ⭐ **RUN THIS ONE** — reuses notebook 02's upload, no new dataset |
+
+> **Run notebook 03, not notebook 02.** Notebook 02 is kept because its run is
+> reported in the evaluation chapter — a fine-tune that won every ranking metric
+> and was rejected on a calibration control is a finding, not a dead end — but
+> its negatives are the thing notebook 03 exists to fix.
 
 > **Verifier first, and that ordering is not arbitrary.** TASKLIST T-332: *"Train
 > the verifier (T-303) first — it is the graded component and takes priority on
@@ -237,3 +244,136 @@ TASKLIST says so directly. Check
 high, BM25 could not find confusable documents and the model was handed an easy
 task it could already do. On the current build that value is **0.0**, so this is
 not the explanation unless the triples are rebuilt smaller.
+
+---
+
+## 03 — Reranker **retrain** with mixed negatives (T-332R)
+
+A re-run of notebook 02 that changes **exactly one variable**: what the
+negatives are made of. Everything else — base model, seed, epochs, learning
+rate, batch size, max length, warmup, weight decay, dev fraction, and the
+survey split itself — is held identical, and
+`tests/test_phase3c_acceptance.py::test_mixed_notebook_changes_only_the_negatives`
+fails if any of them drift.
+
+### Why there is a third notebook
+
+Notebook 02's model **won on every ranking metric and was rejected anyway.**
+
+| | stock | notebook 02's model |
+|---|---|---|
+| out-of-domain Recall@20 | 0.4815 | **0.6481** (+35% rel.) |
+| in-domain nDCG@10 | 0.2646 | **0.7500** |
+| **live relevance-control violations** | **0 / 15** | **11 / 15** |
+| **off-topic absolute score** | **≈ −11** | **+3 … +5** |
+
+On the first real pipeline run (M1) it ranked an **IoT-monitoring paper above
+LiRA** — the single most relevant paper in the pool — for the query
+`multi agent retrieval literature review`. It had not learned to rank better; it
+had stopped being able to recognise irrelevance.
+
+**Cause:** T-331 mined **100% BM25 hard negatives**. Every negative was a
+topically adjacent scientific abstract, so the model was only ever asked *"which
+of these plausible science abstracts belongs to this chapter?"* and never *"is
+this relevant at all?"*. T-331's warning that *"random negatives make the task
+trivial"* is right about **necessity** and wrong at **100%**. The fix is a
+mixture, not a switch.
+
+### ✅ No new upload — attach the same Kaggle Dataset
+
+Unlike notebook 02, this one needs **nothing new uploaded**. It reads the
+identical `train_triples.jsonl` and rebuilds the negatives in-notebook.
+
+That works because **every one of the 13,929 cited abstracts already appears in
+that file** — each document is a positive for at least one chapter, since the
+corpus *is* the set of cited abstracts. Verified locally before the notebook was
+written.
+
+| | notebook 02 | notebook 03 |
+|---|---|---|
+| queries | 3,000 | 3,000 |
+| positives | 15,079 | 15,079 |
+| negatives | 60,316 | **60,316** |
+| positive : negative | 1 : 4 | **1 : 4** |
+| negative composition | **4 hard** | **3 hard + 1 random** |
+
+Measured locally on the real file: **75.0% hard / 25.0% random, ratio 1:4.0
+exactly, 68,380 training pairs** — the same 68,380 the previous Kaggle run
+reported, which confirms the split did not move.
+
+**Which hard negatives are dropped:** the weakest one per positive. The file
+preserves BM25 rank order, so the three that stay are the highest-ranked and
+most confusable.
+
+### Steps
+
+1. Import `03_train_reranker_mixed_negatives.ipynb` at
+   <https://www.kaggle.com/code>.
+2. **Add Input → Datasets** → attach **the same dataset as notebook 02**.
+3. Settings: **Accelerator = GPU T4 x2**, **Internet = On**. (Kaggle ignores the
+   notebook's own request on import — set it yourself and confirm.)
+4. **Run All.** Expect **30–45 minutes** end to end — ~20–30 min of training plus
+   the before/after ranking and relevance measurements.
+5. Watch three things:
+   - **Section 4** must print `OK: 1:4 ratio held, composition is 75% hard /
+     25% random`. Its spot-check prints one hard and one random negative for the
+     same query — the hard one should look topically adjacent, the random one
+     should not.
+   - **Section 5** must end `OK: N survey groups, M held out, none on both
+     sides`. If that assert fires, stop — the split leaked.
+   - **Section 10** prints the verdict.
+6. Download **`reranker-mixed-negatives.zip`** and
+   **`reranker_metrics_mixed.json`** — but only if section 10 says `PROCEED`.
+
+### Section 10's gate is a pre-filter, not the decision
+
+Two conditions, both fixed in section 1 **before** the run — the same discipline
+`decisions.txt` D-09 applied to the verifier's 0.75 threshold:
+
+| condition | threshold | why |
+|---|---|---|
+| ranking gain | `nDCG@10` delta ≥ 0.001 | losing the discriminative signal along with the miscalibration is not progress |
+| relevance retained | control violation rate ≤ 20% | notebook 02's model was at ~73% |
+
+**The adoption decision is still T-335**, run locally against your own 25-paper
+bibliography, after int8 quantization. All the notebook gate does is stop you
+spending a 91 MB download and a local eval cycle on a model that already failed
+the one property it was retrained to fix.
+
+The relevance control uses the **same four probe texts** as
+`researchgpt.rerank.evaluate.OFF_TOPIC_CONTROLS` — wind-turbine fatigue, soil
+nitrogen, opera libretti, beta-lactamase crystallography — so the notebook's
+number and the local gate's number mean the same thing. A test enforces that
+they stay identical.
+
+### Then, locally
+
+```bash
+# unzip to data/models/reranker-mixed/
+python -m researchgpt.rerank.export_onnx --checkpoint data/models/reranker-mixed
+python -m researchgpt.rerank.evaluate    --tuned-onnx data/models/reranker-mixed-onnx
+```
+
+### If section 10 says STOP
+
+The notebook prints which way to move, and it is not the same direction in each
+case:
+
+* **ranks better but still fails the control** → too few random negatives. Set
+  `RANDOM_PER_POSITIVE = 2` (3:2) and re-run.
+* **passes the control but the gain vanished** → too many. Set
+  `HARD_PER_POSITIVE = 5` (5:1) and re-run.
+* **failed both** → TASKLIST's Aug 30 kill switch applies. **Keep the stock
+  reranker and report the negative result.** The pipeline is unaffected — this
+  was always a weight swap — and the verifier satisfies the training requirement
+  on its own. *A fine-tune that did not help, diagnosed and reported, is an
+  honest contribution.*
+
+### Smoke-tested before it was handed over
+
+All 11 code cells were executed locally on CPU against the real 75,395-pair
+file, with a 200-example stand-in for the training cell: data load, the mix and
+its invariants, the survey split, the stock baselines, `fit()`, the comparison
+tables, the gate and the save all ran clean. The stock relevance control printed
+an off-topic score of **−10.74**, matching the local harness's ≈ −11, which
+confirms the notebook reads un-activated logits exactly as the gate does.

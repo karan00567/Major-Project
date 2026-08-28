@@ -626,7 +626,7 @@ This is the graded component *and* the required training component. **Start it t
 
   **The tuned model ranks an IoT paper above the single most relevant paper in the pool.** The relevance control flagged exactly this and was right; my condition-2 evidence was drawn from an unrepresentative pool. *Two reversals on this decision is not a good look, but the final state rests on production output rather than a proxy, and the lesson is specific: a "the pool is clean" argument must be measured on the pool the PLANNER builds, not on a hand-curated one.*
 
-  **Fix before re-adopting:** retrain with **mixed negatives** (~3 hard : 1 random). Training on 100% BM25 hard negatives is what removed the model's ability to recognise irrelevance (T-331). ~40 minutes; not spent, because M1 took priority.
+  **Fix before re-adopting:** retrain with **mixed negatives** (~3 hard : 1 random). Training on 100% BM25 hard negatives is what removed the model's ability to recognise irrelevance (T-331). ✅ **Implemented 2026-08-28 as T-332R** — `notebook-kaggle-traning/03_train_reranker_mixed_negatives.ipynb`. **Awaiting the Kaggle run.**
 
   <details><summary>Superseded adoption reasoning, kept for the report</summary>
 
@@ -656,6 +656,26 @@ This is the graded component *and* the required training component. **Start it t
   **Honest reporting line for T-705b / the deck:** *"the fine-tuned reranker raised Recall@20 by 35% on a curated bibliography and improved every in-domain ranking metric, yet we rejected it: a relevance control showed it had stopped recognising irrelevance, and on the first real pipeline run it ranked an IoT-monitoring paper above the most relevant paper in the pool. We traced the cause to training exclusively on BM25 hard negatives."*
 
   ⚠️ **The gate refuses to be quietly satisfied on the wrong artefact.** Run without `--tuned-onnx` it still reports, but prints that it judged the **unquantized** model and that `TRAINING_SPEC §2.5` requires the decision be made after int8. *That is the exact mistake T-304 made on the verifier — passing a gate on the model that trained rather than the model that ships.*
+- [ ] **T-332R** ⌨️ ★ **Reranker retrain with MIXED negatives (3 hard : 1 random)** — the remediation T-335 specified when it reverted the tuned model. **NOTEBOOK DONE 2026-08-28** — `notebook-kaggle-traning/03_train_reranker_mixed_negatives.ipynb` (23 cells) + README section 03. *Done when: the Kaggle run completes and section 10 prints its verdict.*
+
+  **Changes exactly one variable.** Base model, seed, epochs, lr, batch size, max length, warmup, weight decay, dev fraction **and the survey split** are all held identical to T-332, so the two runs are directly comparable. `tests/test_phase3c_acceptance.py::test_mixed_notebook_changes_only_the_negatives` fails if any of them drift.
+
+  | | T-332 (notebook 02) | **T-332R (notebook 03)** |
+  |---|---|---|
+  | pairs | 75,395 | **75,395** |
+  | positive : negative | 1 : 4 | **1 : 4** |
+  | negative composition | **4 hard** | **3 hard + 1 random** |
+  | training pairs | 68,380 | **68,380** |
+
+  ✅ **Needs no new upload.** All 13,929 cited abstracts already appear in the uploaded `train_triples.jsonl` — every document is a positive for some chapter, because the corpus *is* the set of cited abstracts. The notebook recovers the pool and does the mixing itself. *Verified locally on the real file: 75.0% hard / 25.0% random, ratio 1:4.0 exactly.*
+
+  ★ **The relevance control now runs INSIDE the notebook, before the download.** The diagnostic that caught the previous model only caught it after that model had been quantized, evaluated and adopted. It uses the same four probe texts as `rerank/evaluate.py` (a test enforces they stay identical), so the notebook's violation rate and the local T-335 gate's violation rate mean the same thing.
+
+  **Section 10 is a pre-filter, not the decision** — both thresholds fixed in section 1 *before* the run, per `decisions.txt` D-09's discipline: `nDCG@10` gain ≥ 0.001 **and** control violation rate ≤ 20% (the previous model was at ~73%). **T-335 still decides**, locally, out-of-domain, after int8.
+
+  **Smoke-tested, not just written.** All 11 code cells executed locally on CPU against the real 75,395-pair file with a 200-example stand-in for training. The stock relevance control printed an off-topic score of **−10.74**, matching the local harness's ≈ −11 — confirming the notebook reads un-activated logits exactly as the gate does.
+
+  ⚠️ **Still off the critical path.** The pipeline ships with the stock reranker either way; this remains a weight swap. If the run fails both gate conditions, the Aug 30 kill switch applies — keep stock, report the negative result, move on.
 - [ ] **T-336** 🧠 **UNBLOCKED 2026-08-27** — T-335 adopted the tuned reranker, so this ablation now has two real arms to compare. **Ablation 5 — stock vs fine-tuned reranker**, full system otherwise unchanged, `max_papers=25`. Closes `SESSION_CONTEXT.md §5.6`'s instruction to *"measure reranking's contribution separately."* **Lower priority than ablation 2; must never displace it.**
 
 ---

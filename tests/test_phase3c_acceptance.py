@@ -446,3 +446,159 @@ def test_config_names_the_stock_reranker_after_the_t335_revert():
     assert "reranker: cross-encoder/ms-marco-MiniLM-L-6-v2" in cfg
     assert "T-335 REVERTED" in cfg
     assert "mixed negatives" in cfg.lower() or "MIXED negatives" in cfg
+
+
+# --------------------------------------------------------------------------
+# T-332R — the mixed-negative retrain notebook (03)
+#
+# Written after T-335 was reverted on M1 evidence. The first fine-tune won every
+# ranking metric and was rejected anyway, because 100% BM25 hard negatives left
+# it unable to recognise irrelevance. Notebook 03 changes exactly one variable:
+# the composition of the negatives. These tests hold everything else still, so a
+# later reader can trust that the comparison isolates that one change.
+# --------------------------------------------------------------------------
+
+NOTEBOOK_MIXED = REPO / "notebook-kaggle-traning" / "03_train_reranker_mixed_negatives.ipynb"
+
+
+def _config_of(notebook: pathlib.Path) -> dict:
+    nb = json.loads(notebook.read_text(encoding="utf-8"))
+    sources = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+    config = next(s for s in sources if "BASE_MODEL" in s)
+    namespace: dict = {}
+    exec(compile(config, "<nb-config>", "exec"), namespace)
+    return namespace
+
+
+def _code_of(notebook: pathlib.Path) -> str:
+    nb = json.loads(notebook.read_text(encoding="utf-8"))
+    return "\n".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code")
+
+
+def test_mixed_notebook_exists_and_requests_gpu_and_internet():
+    assert NOTEBOOK_MIXED.exists(), f"{NOTEBOOK_MIXED} is missing"
+    nb = json.loads(NOTEBOOK_MIXED.read_text(encoding="utf-8"))
+    assert nb["metadata"]["accelerator"] == "GPU"
+    assert nb["metadata"]["kaggle"]["isInternetEnabled"] is True
+    assert [c for c in nb["cells"] if c["cell_type"] == "code"]
+
+
+def test_mixed_notebook_changes_only_the_negatives():
+    """Every training hyper-parameter must equal notebook 02's.
+
+    If any of these drift, the run stops being an ablation of the negatives and
+    becomes an uncontrolled second experiment - and the in-domain numbers of the
+    two runs can no longer be compared.
+    """
+    old, new = _config_of(NOTEBOOK), _config_of(NOTEBOOK_MIXED)
+    for key in ("BASE_MODEL", "SEED", "EPOCHS", "LEARNING_RATE", "BATCH_SIZE",
+                "MAX_LENGTH", "WARMUP_RATIO", "WEIGHT_DECAY", "DEV_FRAC"):
+        assert new[key] == old[key], (
+            f"{key} differs from notebook 02 ({new[key]} vs {old[key]}). The "
+            "retrain must isolate the negatives, not confound them."
+        )
+
+
+def test_mixed_notebook_uses_three_hard_to_one_random():
+    """The fix T-335 specified: ~3 hard : 1 random, not a switch to random."""
+    cfg = _config_of(NOTEBOOK_MIXED)
+    assert cfg["HARD_PER_POSITIVE"] == 3
+    assert cfg["RANDOM_PER_POSITIVE"] == 1
+    total = cfg["HARD_PER_POSITIVE"] + cfg["RANDOM_PER_POSITIVE"]
+    assert total == NEGATIVES_PER_POSITIVE, (
+        f"{total} negatives per positive; the uploaded triples carry "
+        f"{NEGATIVES_PER_POSITIVE}, and changing the ratio as well as the "
+        "composition would confound the comparison."
+    )
+    # Hard negatives are the only signal a cross-encoder adds over BM25, so they
+    # must stay in the majority. T-331's warning is right about necessity.
+    assert cfg["HARD_PER_POSITIVE"] > cfg["RANDOM_PER_POSITIVE"]
+
+
+def test_mixed_notebook_seed_matches_the_triples_builder():
+    from researchgpt.rerank.triples import SEED
+
+    cfg = _config_of(NOTEBOOK_MIXED)
+    assert cfg["SEED"] == SEED
+    assert cfg["MIX_SEED"] != SEED, (
+        "the mixing seed must be distinct, so the survey split stays identical "
+        "to notebook 02's and the two runs remain comparable"
+    )
+
+
+def test_mixed_notebook_needs_no_new_upload():
+    """It reads the SAME train_triples.jsonl and does the mixing in-notebook.
+
+    Every document in the corpus appears in that file as a positive for some
+    chapter, so the random negatives can be drawn from it without re-uploading
+    99 MB.
+    """
+    assert _config_of(NOTEBOOK_MIXED)["TRIPLES_GLOB"].endswith("train_triples.jsonl")
+
+
+def test_mixed_notebook_asserts_no_survey_leaks_across_the_split():
+    source = _code_of(NOTEBOOK_MIXED)
+    assert "survey leaked across the split" in source
+    assert "assert" in source
+
+
+def test_mixed_notebook_asserts_a_random_negative_is_never_a_positive():
+    """The one way in-notebook negative mixing can silently corrupt the data."""
+    source = _code_of(NOTEBOOK_MIXED)
+    assert "a random negative is a true positive for its own query" in source
+
+
+def test_mixed_notebook_runs_the_relevance_control():
+    """The diagnostic that caught the previous model - now BEFORE the download.
+
+    Same four probe texts as the local T-335 gate, or the notebook's number and
+    the gate's number would not mean the same thing.
+    """
+    import ast
+
+    from researchgpt.rerank.evaluate import OFF_TOPIC_CONTROLS
+
+    source = _code_of(NOTEBOOK_MIXED)
+    assert "relevance_control" in source
+    assert "OFF_TOPIC_CONTROLS" in source
+
+    # Evaluate the notebook's own literal rather than substring-matching it:
+    # the probes are written as concatenated literals times three, so the source
+    # text and the resulting string are not the same thing.
+    node = next(
+        n for n in ast.parse(source).body
+        if isinstance(n, ast.Assign)
+        and any(getattr(t, "id", None) == "OFF_TOPIC_CONTROLS" for t in n.targets)
+    )
+    namespace: dict = {}
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "<controls>", "exec"), namespace)
+
+    assert namespace["OFF_TOPIC_CONTROLS"] == list(OFF_TOPIC_CONTROLS), (
+        "a probe text differs from researchgpt.rerank.evaluate; the notebook's "
+        "control and the local gate's control must be identical, or the two "
+        "violation rates do not mean the same thing"
+    )
+
+
+def test_mixed_notebook_gate_thresholds_are_fixed_before_the_run():
+    """decisions.txt D-09's discipline: fix the number before seeing it.
+
+    Both live in the config cell, which executes before any measurement.
+    """
+    cfg = _config_of(NOTEBOOK_MIXED)
+    assert 0 < cfg["MAX_CONTROL_VIOLATION_RATE"] <= 0.25, (
+        "the previous model violated on ~73% of live queries; a threshold above "
+        "0.25 would have passed it"
+    )
+    assert cfg["MIN_NDCG_GAIN"] > 0, (
+        "restoring calibration at the cost of the ranking gain is not progress"
+    )
+
+
+def test_mixed_notebook_tells_the_user_the_gate_is_out_of_domain():
+    """Its own gate is a pre-filter. T-335 still decides, locally, after int8."""
+    nb = json.loads(NOTEBOOK_MIXED.read_text(encoding="utf-8"))
+    text = "\n".join("".join(c["source"]) for c in nb["cells"])
+    assert "IN-DOMAIN" in text
+    assert "T-335" in text
+    assert "PRE-FILTER" in text.upper()
