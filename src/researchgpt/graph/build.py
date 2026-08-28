@@ -29,13 +29,16 @@ import pathlib
 import uuid
 from typing import Any
 
+from researchgpt.agents.critic import Critic
 from researchgpt.agents.extractor import Extractor
 from researchgpt.agents.planner import Planner
 from researchgpt.agents.ranker import Ranker
 from researchgpt.agents.retriever import Retriever
+from researchgpt.agents.verifier import Verifier, VerifierModel
 from researchgpt.agents.writer import Writer
 from researchgpt.core.llm import LLMClient
 from researchgpt.core.logging import TraceLogger
+from researchgpt.graph.routing import END_NODE, route_after_critic
 from researchgpt.graph.state import ReviewState
 from researchgpt.output.writers import (
     write_bibtex,
@@ -157,12 +160,28 @@ def run_pipeline(
     return state  # type: ignore[return-value]
 
 
-def build_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None):
-    """The same nodes as a compiled LangGraph ``StateGraph``.
+def make_verifier(cfg: Any, trace: TraceLogger | None = None) -> Verifier | None:
+    """The Verifier, or ``None`` if its ONNX model has not been exported.
 
-    Linear for M1. Phase 5 (T-507) adds the conditional edges from the Critic;
-    the node set does not change, which is why this exists now rather than
-    being retrofitted later.
+    Returning ``None`` rather than raising keeps M1's linear pipeline runnable
+    in a checkout that has never run T-304 - the survey does not depend on
+    verification, and a missing 23 MB artefact should not make the whole
+    project unusable. :func:`build_loop_graph` raises instead, because a
+    "six-agent graph" missing the graded agent is not the thing it claims.
+    """
+    try:
+        model = VerifierModel(cfg.verifier.onnx_path, cfg.verifier.tokenizer)
+    except Exception:
+        return None
+    return Verifier(model, cfg, trace=trace)
+
+
+def build_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None):
+    """The M1 nodes as a compiled LangGraph ``StateGraph``, linear.
+
+    Kept because M1 is the insurance policy: a straight line that produces a
+    cited survey, with no dependency on the Verifier's model artefact.
+    :func:`build_loop_graph` is the Phase 5 topology.
     """
     from langgraph.graph import END, START, StateGraph
 
@@ -177,4 +196,78 @@ def build_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None):
     return graph.compile()
 
 
-__all__ = ["run_pipeline", "build_graph", "make_agents"]
+def build_loop_graph(cfg: Any, llm: LLMClient, trace: TraceLogger | None = None):
+    """T-507 / T-509 — the six-agent graph with the Critic loop.
+
+    Topology, and why it is this shape::
+
+        START -> planner -> retriever -> ranker -> extractor -> critic
+        critic --RETRIEVE--> retriever          (search harder)
+        critic --REPLAN----> planner            (the plan itself is wrong)
+        critic --WRITE-----> writer -> verifier -> critic
+        critic --WRITE-----> END                (once a verified draft exists)
+
+    ★ **The Critic is visited twice per iteration, deliberately.** Its cheap
+    gates - corpus size and per-sub-question coverage - run *before* the Writer
+    spends four sections' worth of tokens on a corpus that cannot support them.
+    Its grounding gate only has a ``grounding_score`` to read after the
+    Verifier, so it is reached again from there. Routing distinguishes the two
+    visits by the presence of ``final_review``; without that the second visit
+    would loop ``writer -> verifier -> critic -> writer`` forever inside one
+    iteration.
+
+    ⚠️ **The Verifier is required here.** ``build_graph`` tolerates a missing
+    model because M1 does not depend on verification; this graph does not,
+    because a six-agent graph missing the graded agent is not the thing it
+    claims to be.
+    """
+    from langgraph.graph import END, START, StateGraph
+
+    planner, retriever, ranker, extractor, writer = make_agents(cfg, llm, trace)
+    critic = Critic(cfg, trace=trace)
+    verifier = make_verifier(cfg, trace=trace)
+    if verifier is None:
+        raise FileNotFoundError(
+            f"The Critic loop needs the verifier model, and "
+            f"{cfg.verifier.onnx_path!r} could not be loaded. Export it with "
+            f"`python -m researchgpt.verify.export_onnx --checkpoint "
+            f"data/models/verifier-scifact` (T-304), or use build_graph() for "
+            f"the linear M1 pipeline."
+        )
+
+    max_iterations = cfg.review.max_iterations
+    graph = StateGraph(ReviewState)
+    for agent in (planner, retriever, ranker, extractor, writer, verifier, critic):
+        graph.add_node(agent.name, agent)
+
+    graph.add_edge(START, planner.name)
+    graph.add_edge(planner.name, retriever.name)
+    graph.add_edge(retriever.name, ranker.name)
+    graph.add_edge(ranker.name, extractor.name)
+    graph.add_edge(extractor.name, critic.name)
+    graph.add_edge(writer.name, verifier.name)
+    graph.add_edge(verifier.name, critic.name)
+
+    def _route(state: ReviewState) -> str:
+        return route_after_critic(state, max_iterations)
+
+    graph.add_conditional_edges(
+        critic.name,
+        _route,
+        {
+            "retriever": retriever.name,
+            "planner": planner.name,
+            "writer": writer.name,
+            END_NODE: END,
+        },
+    )
+    return graph.compile()
+
+
+__all__ = [
+    "run_pipeline",
+    "build_graph",
+    "build_loop_graph",
+    "make_agents",
+    "make_verifier",
+]

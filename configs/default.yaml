@@ -227,7 +227,15 @@ review:
   coverage_threshold: 0.8
 
 verifier:
-  onnx_path: data/models/verifier-int8.onnx
+  # CORRECTED 2026-08-28 (T-502). This named data/models/verifier-int8.onnx,
+  # which has never existed - T-304 exports to a DIRECTORY. The placeholder was
+  # written before the export ran and nothing loaded it until Phase 5, so it
+  # sat wrong for three days.
+  onnx_path: data/models/verifier-onnx
+  # Kept only as a fallback. VerifierModel prefers the tokenizer saved beside
+  # the checkpoint: the export writes its own, and loading a Hub tokenizer that
+  # merely shares a name would score with a different vocabulary and degrade
+  # silently rather than fail.
   tokenizer: microsoft/deberta-v3-small
   support_threshold: 0.7           # biased to precision (T-503)
 
