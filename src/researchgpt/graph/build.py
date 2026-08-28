@@ -83,8 +83,18 @@ def run_pipeline(
     run_id: str | None = None,
     max_papers: int | None = None,
     write_artefacts: bool = True,
+    use_loop: bool = False,
 ) -> ReviewState:
-    """Run PLANNER -> ... -> WRITER and write the run's artefacts."""
+    """Run the pipeline and write the run's artefacts.
+
+    ``use_loop=False`` runs the five-agent line that landed M1 - the insurance
+    policy, no dependency on the Verifier's model artefact.
+
+    ``use_loop=True`` runs the full six-agent graph from
+    :func:`build_loop_graph`: Verifier and Critic included, with the loop able
+    to fire and terminate. That is T-509 / M2. Artefact writing is shared, so
+    the two paths cannot produce differently-shaped output.
+    """
     run_id = run_id or f"run_{uuid.uuid4().hex[:10]}"
     if max_papers is not None:
         cfg = cfg.model_copy(
@@ -105,8 +115,17 @@ def run_pipeline(
                                        "max_papers": cfg.review.max_papers,
                                        "model": cfg.llm.model}, 0)
     try:
-        for agent in make_agents(cfg, llm, trace):
-            _merge(state, agent(state))
+        if use_loop:
+            # LangGraph applies the graph/state.py reducers itself, so no
+            # _merge here - and a recursion_limit well above max_iterations so
+            # the loop's own bound is what stops it, not the framework's.
+            app = build_loop_graph(cfg, llm, trace)
+            state = dict(
+                app.invoke(state, config={"recursion_limit": 50})
+            )
+        else:
+            for agent in make_agents(cfg, llm, trace):
+                _merge(state, agent(state))
 
         if write_artefacts:
             state.setdefault("artefacts", {})
@@ -153,6 +172,12 @@ def run_pipeline(
              "insights": len(state.get("paper_insights") or []),
              "sections": len(state.get("draft_sections") or {}),
              "review_chars": len(state.get("final_review") or ""),
+             "verified_claims": len(state.get("verified_claims") or []),
+             "dropped_claims": len(state.get("unsupported_claims") or []),
+             "grounding_score": state.get("grounding_score"),
+             "iterations": state.get("iteration", 0),
+             "decisions": [d.get("decision")
+                           for d in (state.get("decision_log") or [])],
              "llm_requests": llm.request_count, "llm_cache_hits": llm.cache_hits}, 0)
     finally:
         trace.close()

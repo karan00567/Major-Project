@@ -735,6 +735,8 @@ This is the graded component *and* the required training component. **Start it t
 
 - [x] **T-409** 🧠 Run the **flagship query** — the system surveys *its own topic*, agentic RAG for automated literature review. The 25-paper bibliography is the answer key. Keep the output: after a human edit pass it becomes the report's literature-survey chapter (T-807).
 
+  **RE-RUN 2026-08-28 after the Planner prompt fix, `max_papers=10`, six-agent loop.** Union recall **0.057 (2/35)**, up from **0.000** but still well under the **0.371** stand-in baseline. The prompt fix removed the invented proper nouns completely — 0 acronym/CamelCase names across 12 queries, against 5 in the previous run — and the topic drift into clinical guidelines and policy analysis is gone. So the *mechanism* identified was real and is fixed; the *recall* is not. **Tuning deliberately deferred** on the human's instruction: the objective of this run was an end-to-end output, not a good number. Extraction: field coverage 4.40/8, 0 placeholder echoes, 1 blank of 10.
+
   ✅ **RAN 2026-08-28, 5.8 min, 0 retries, 0 errors, 30 requests.** Artefacts in `outputs/runs/flagship/`. ⚠️ **Produced on a PAID provider (Baseten) after Groq's free tier hit its 200,000-token DAILY cap on both gpt-oss models** — same open-weight `gpt-oss-120b` the T-004 bake-off selected, so output is comparable rather than better. Provider is stamped in `config.json` and in every cache entry; this run may not be reported as a $0 artefact.
 
   **Extraction quality PASSES the T-004 criteria** (applied post hoc, since 120b-on-Baseten was never probed): field coverage **5.32/8** against the 4.6 baseline, **0** placeholder echoes, **0** blank extractions, 25/25 abstract-only (so T-505's cap applies to every claim). `review.md` is 22,025 chars, 5 sections, 50 citation markers, 11 references.
@@ -774,6 +776,14 @@ The centrepiece. Objective 2 lives here.
 
   ⭐ **Worth more now than when it was written.** A T-409 run costs ~25 minutes and a large slice of a 200,000-token daily budget; four attempts on 2026-08-28 exhausted that budget on **both** gpt-oss models. Resuming a run that died at paper 18 is the difference between a lost afternoon and a five-minute top-up.
 - [ ] **T-509** 🔴 **MILESTONE M2 — the full six-agent graph runs with the loop firing and terminating.**
+
+  ⚠️ **PARTIALLY DEMONSTRATED 2026-08-28. Do not tick yet.** The full six-agent graph ran end to end for the first time — `run_pipeline(use_loop=True)`, exit 0, 5.3 min, `max_papers=10`, on the paid host. Every agent fired: Planner → Retriever → Ranker → Extractor → **Critic** → Writer → **Verifier** → **Critic** → END.
+
+  **What is proven:** the Critic is genuinely visited **twice per iteration** as designed — once after the Extractor with `grounding_score: null`, once after the Verifier with `grounding_score: 0.818` — and the second visit routed to **END** rather than back to the Writer. That is the `writer → verifier → critic → writer` spin the `final_review` check exists to prevent, and it did not happen. Verifier output: **33 claims decomposed, 27 verified, 6 dropped UNSUPPORTED, 0 contradicted, grounding 0.8182**.
+
+  🔴 **What is NOT proven: the loop never FIRED.** `iterations: 0`, `decisions: ["WRITE", "WRITE"]`. Coverage came out at 1.00 and the corpus at 271 papers, so every gate passed on the first pass and no RETRIEVE or REPLAN was ever issued. T-509 requires the loop *firing* **and** terminating; only termination is demonstrated on real data. The firing path is covered by `test_loop_fires_on_an_under_covered_query_and_terminates`, which is a simulation, not a run. **To close M2, force a fire** — run a deliberately under-covered query (T-704's hallucination stress test is the natural candidate) and show RETRIEVE → REPLAN → forced WRITE in a real trace.
+
+  🔴 **Every claim came back PARTIAL. Zero SUPPORTED.** `abstract_only_capped: 25` — T-505's cap fired on 25 of the 33 claims because **10 of 10 papers are abstract-only**, which is the standing reality of an OpenAlex corpus. *The system cannot currently emit a SUPPORTED claim at all.* This is the cap working exactly as designed, but it means the grounding figure is entirely made of PARTIALs and the report must say so rather than quoting 0.82 unqualified.
 
 ---
 

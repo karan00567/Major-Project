@@ -253,7 +253,13 @@ review:
   # UNION recall - did retrieval find the paper at all - is unaffected, and
   # decisions.txt D-04 already makes that the primary gate for exactly this
   # reason.
-  max_papers: 25
+  # TEMPORARY 2026-08-28: 25 -> 10 for the end-to-end verification run on the
+  # paid host. NOTE for the ablations: T-702/T-703 specify max_papers=25, so a
+  # 10-paper run is NOT directly comparable to them. With a 35-paper answer key
+  # this also caps CORPUS recall at 10/35 = 0.286 by arithmetic; UNION recall
+  # (did retrieval find the paper at all) is unaffected and remains the gate
+  # under decisions.txt D-04.
+  max_papers: 10
   year_min: 2019
   max_iterations: 3                # hard cap, forced WRITE on the last
   grounding_threshold: 0.7
