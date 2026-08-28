@@ -42,6 +42,7 @@ from researchgpt.graph.routing import END_NODE, route_after_critic
 from researchgpt.graph.state import ReviewState
 from researchgpt.output.writers import (
     write_bibtex,
+    write_claims,
     write_config,
     write_corpus,
     write_insight_table,
@@ -154,6 +155,12 @@ def run_pipeline(
                     run_dir, papers,
                     [i.paper_id for i in state.get("paper_insights") or []],
                     state.get("retrieval_log") or []),
+                "claims_json": write_claims(
+                    run_dir,
+                    state.get("verified_claims") or [],
+                    state.get("unsupported_claims") or [],
+                    state.get("grounding_score"),
+                ),
                 "config_json": write_config(run_dir, cfg),
             }
             state["artefacts"].update(

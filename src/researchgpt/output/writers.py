@@ -155,6 +155,54 @@ def write_corpus(
 
 
 @_safe
+def write_claims(
+    run_dir: pathlib.Path,
+    verified: list[Any],
+    unsupported: list[Any],
+    grounding_score: float | None = None,
+) -> pathlib.Path | None:
+    """T-607/T-608's data source: every claim, its verdict and its evidence.
+
+    ★ **Without this the evidence-inspection panel has nothing to inspect.**
+    The Verifier's output lived only in graph state and vanished at run end -
+    `review.md` keeps the prose and `trace.jsonl` keeps a `claim_dropped` event
+    per drop, but the *verified* claims and the evidence spans that justify
+    them were never written anywhere. Panel 3 is the graded money shot
+    ("click any sentence -> see its supporting evidence span and source
+    paper"), and it cannot be built over data the pipeline throws away.
+
+    Dropped claims are kept in the same file rather than a separate one: Panel
+    4 exists to show what the system *refused* to say, and a reviewer comparing
+    kept against dropped should not have to join two artefacts to do it.
+    """
+    if not verified and not unsupported:
+        return None
+
+    def _dump(claim: Any) -> dict:
+        if hasattr(claim, "model_dump"):
+            return claim.model_dump()
+        return dict(claim)
+
+    payload = {
+        "grounding_score": grounding_score,
+        "counts": {
+            "verified": len(verified),
+            "dropped": len(unsupported),
+            "supported": sum(1 for c in verified
+                             if getattr(c, "verdict", None) == "SUPPORTED"),
+            "partial": sum(1 for c in verified
+                           if getattr(c, "verdict", None) == "PARTIAL"),
+            "contradicted": sum(1 for c in unsupported
+                                if getattr(c, "verdict", None) == "CONTRADICTED"),
+        },
+        "verified": [_dump(c) for c in verified],
+        "dropped": [_dump(c) for c in unsupported],
+    }
+    path = run_dir / "claims.json"
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    return path
+
+
 def write_config(run_dir: pathlib.Path, cfg: Any) -> pathlib.Path:
     """The resolved config, so a run can be reproduced exactly (SPEC 14.10)."""
     path = run_dir / "config.json"
@@ -163,4 +211,4 @@ def write_config(run_dir: pathlib.Path, cfg: Any) -> pathlib.Path:
 
 
 __all__ = ["write_markdown", "write_bibtex", "write_insight_table",
-           "write_corpus", "write_config"]
+           "write_corpus", "write_claims", "write_config"]
