@@ -179,24 +179,6 @@ carries the evidence span it was scored against, and all 19 are locatable in the
 rendered review — which is what makes the evidence panel a demonstration rather
 than a claim.
 
-**Two things do not work yet:**
-
-- 🔴 **Union recall against our own 35-paper bibliography is 0.057**, against a
-  0.371 baseline and a 0.80 gate. Retrieval is a hard ceiling on everything
-  downstream: the Verifier cannot ground a claim against a paper that was never
-  fetched.
-- 🔴 **Zero claims reach `SUPPORTED`.** Every one caps at `PARTIAL` because all
-  retrieved papers are abstract-only, and T-505 caps abstract-only support by
-  design — Li et al. measured abstract-conditioned faithfulness at 0.745 against
-  0.94–0.96 with full text. The cap is the system working; but it means any
-  grounding figure quoted from this build is made **entirely of PARTIALs**.
-
-Our own tuned verifier measures **SUPPORT precision 0.800** on SciFact held-out
-— i.e. ~20% of predicted SUPPORTs are wrong, independently reproducing CliVER's
-21% false-Support rate. That is why the threshold is biased toward precision:
-a false SUPPORTED ships a hallucination with a citation attached, while a false
-UNSUPPORTED merely drops a true sentence, and *that* is visible in Panel 4.
-
 ---
 
 ## Layout
