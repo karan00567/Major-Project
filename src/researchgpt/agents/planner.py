@@ -193,6 +193,36 @@ class Planner(Agent):
             research_question=question,
             constraints=json.dumps(constraints, sort_keys=True),
         )
+
+        # ★ REPLAN: tell the model what was wrong and what it already tried.
+        #
+        # 🔴 Without this a REPLAN is a guaranteed no-op. The prompt was built
+        # from research_question + constraints alone, neither of which changes
+        # between iterations, so the prompt hash was identical - the T-104
+        # cache returned the SAME plan, retrieval re-ran the SAME queries, and
+        # the loop burned an iteration to stand still. SPEC §7.5 requires a
+        # plan DIFF on replan; a Planner that cannot see the critique cannot
+        # produce one. Found 2026-08-28 while setting up the T-509 demo.
+        feedback = (state.get("critic_feedback") or "").strip()
+        previous = [t_.query for t_ in (state.get("search_plan") or [])]
+        if feedback and previous:
+            tried = json.dumps(previous, indent=2)
+            prompt += (
+                "\n\n## THIS IS A REPLAN\n\n"
+                "Your previous plan was rejected. The critique:\n\n"
+                f"{feedback}\n\n"
+                "Queries already tried, which did NOT solve it - do not repeat "
+                f"them:\n{tried}\n\n"
+                "Produce a MATERIALLY DIFFERENT plan: different sub-questions "
+                "or different query vocabulary for the same ones. Returning the "
+                "same plan wastes an iteration and is treated as a defect."
+            )
+            self._emit(
+                "replanning",
+                {"previous_queries": len(previous), "feedback_chars": len(feedback)},
+                state.get("iteration", 0),
+            )
+
         model = self._cfg.llm.planner_model or self._cfg.llm.model
 
         last_error: str | None = None

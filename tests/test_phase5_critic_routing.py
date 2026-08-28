@@ -407,3 +407,64 @@ def test_corpus_gate_keeps_retrieving_while_it_is_still_helping():
     )
     out = Critic(Cfg()).run(growing)
     assert out["decision"] == RETRIEVE, "gave up while retrieval was still working"
+
+
+def test_replan_prompt_differs_from_the_first_plan_prompt():
+    """A REPLAN must not reproduce the first prompt.
+
+    🔴 It did. The Planner built its prompt from research_question +
+    constraints alone, neither of which changes between iterations, so the
+    prompt hash was identical: the T-104 cache returned the SAME plan,
+    retrieval re-ran the SAME queries, and the loop burned an iteration to
+    stand still. SPEC 7.5 requires a plan diff on replan; a Planner that cannot
+    see the critique cannot produce one.
+    """
+    from researchgpt.agents.planner import Planner
+    from researchgpt.core.models import SearchTask
+
+    sent = []
+
+    class CapturingLLM:
+        def complete(self, prompt, **kw):
+            sent.append(prompt)
+            raise RuntimeError("stop after capturing the prompt")
+
+    class Review2(Review):
+        # The Planner reads these two as well; without them run() raises
+        # before it ever builds a prompt, and the test silently captures
+        # nothing.
+        year_min = 2019
+        max_papers = 25
+
+    class Cfg2:
+        review = Review2()
+
+        class llm:
+            planner_model = None
+            model = "openai/gpt-oss-20b"
+
+        class sources:
+            enabled = ["openalex"]
+
+    base = {"research_question": "How do agents reduce hallucination?",
+            "constraints": {}}
+    planner = Planner(CapturingLLM(), Cfg2())
+
+    for state in (
+        base,
+        {**base,
+         "critic_feedback": "DECISION: REPLAN\n- coverage 0.40 < 0.8",
+         "search_plan": [SearchTask(sq_id="SQ1", query="multi agent retrieval",
+                                    sources=["openalex"])]},
+    ):
+        try:
+            planner.run(state)
+        except Exception:
+            pass
+
+    assert len(sent) == 2
+    first, replan = sent
+    assert first != replan, "the replan prompt is identical to the first one"
+    assert "THIS IS A REPLAN" in replan
+    assert "multi agent retrieval" in replan, "must list what was already tried"
+    assert "coverage 0.40" in replan, "must carry the critique"
