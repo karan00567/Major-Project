@@ -160,7 +160,13 @@ class Planner(Agent):
                     query=query,
                     sources=[str(s).strip().lower() for s in sources],
                     year_min=item.get("year_min"),
-                    max_results=int(item.get("max_results") or 25),
+                    # The model's `max_results` is DISCARDED, not honoured.
+                    # Its own few-shot examples all say 25, so it dutifully
+                    # emits 25, and the retriever's min() then pinned every
+                    # run to 25 papers per query no matter what
+                    # `sources.max_per_source` said. How deep to page is an
+                    # operator's budget decision, not a planning decision.
+                    max_results=None,
                 )
             )
 

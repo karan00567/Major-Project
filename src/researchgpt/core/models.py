@@ -161,7 +161,13 @@ class SearchTask(BaseModel):
     query: str
     sources: list[str]
     year_min: Optional[int] = None
-    max_results: int = 25
+    #: ``None`` means "use ``sources.max_per_source``", and that is the normal
+    #: case. It defaulted to 25, which the retriever then took the ``min`` of
+    #: against the configured cap - so raising ``max_per_source`` to 100 did
+    #: nothing at all, because ``min(25, 100)`` is 25. The retrieval budget is
+    #: an operator decision; a per-task override is for callers that build a
+    #: plan by hand, never for the model (see ``Planner._validate``).
+    max_results: Optional[int] = None
 
 
 # --------------------------------------------------------------------------

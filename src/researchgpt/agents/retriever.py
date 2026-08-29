@@ -54,6 +54,12 @@ from researchgpt.tools.search_sources import (
 #: Titles shorter than this are not distinctive enough to dedup on.
 MIN_TITLE_KEY_CHARS = 25
 
+#: Dropped before pairing: they carry no retrieval signal and OpenAlex ignores
+#: them anyway, so pairing on them would spend a metered search on nothing.
+QUERY_STOPWORDS = frozenset(
+    {"a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with", "via"}
+)
+
 #: A "Firstname Lastname" token, allowing initials and hyphenated names.
 _PERSON = re.compile(r"^[A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]+){1,3}$")
 
@@ -83,6 +89,45 @@ _AUTHOR_LIST_RATIO = 0.7
 #: 90s allows one full S2 backoff cycle plus slack, so a single unlucky query
 #: does not disable a source that is merely having a bad minute.
 SOURCE_DEAD_TIME_S = 90.0
+
+
+def expand_query(query: str) -> list[str]:
+    """The planned query, then every 2-term subset of it.
+
+    ``filter=title_and_abstract.search:<q>`` **ANDs every term**, so each term
+    the Planner adds is an exclusion filter, not a refinement. Measured
+    2026-08-29 against the 34 gold papers whose text OpenAlex holds:
+
+        the flagship's 12 Planner queries          reach   3 / 34
+        the same 12 plus every 2-term subset       reach  31 / 34
+
+    and live, at ``max_per_source: 100``, that is union recall 0.057 -> 0.400.
+
+    ⚠️ **The pairs are ADDITIONS, never replacements.** The planned query is
+    issued first and unchanged: it is the precise one, and when it does match
+    it matches best. The pairs exist to raise the ceiling underneath it.
+
+    All pairs rather than a heuristic head-pair, because the best-reaching pair
+    is not predictable from position - for "multi agent retrieval architecture"
+    it is "multi retrieval", for "benchmark dataset literature review" it is
+    "benchmark dataset". A head-pair policy reaches 25/34; all pairs reach
+    31/34, for 5 extra searches on a 4-term query.
+
+    Bounded by ``planner.MAX_QUERY_TERMS`` (6), so a task costs at most
+    1 + C(6,2) = 16 searches; the observed 3-4 term plans cost 4-7.
+    """
+    seen: list[str] = []
+    for token in query.split():
+        if token.lower() in QUERY_STOPWORDS or token in seen:
+            continue
+        seen.append(token)
+    out = [query]
+    for i in range(len(seen)):
+        for j in range(i + 1, len(seen)):
+            pair = f"{seen[i]} {seen[j]}"
+            if pair not in out:
+                out.append(pair)
+    return out
 
 
 def looks_like_author_list(abstract: str) -> bool:
@@ -164,13 +209,25 @@ class Retriever(Agent):
         # Everything already in state, so we return only genuinely new papers.
         seen_doi: set[str] = set()
         seen_title: set[str] = set()
+        # 🔴 The LAST-RESORT key, and the one the contract is enforced on.
+        # A record with no DOI and a title under MIN_TITLE_KEY_CHARS produces
+        # two EMPTY keys, so neither set above can ever recognise it - while
+        # `base.py::_check_partial` compares by paper_id and rejects the whole
+        # update. That mismatch killed a run on W3167518830, titled "JBI
+        # evidence synthesis": 20 characters, no DOI. It bites on any second
+        # retrieval pass, the Critic's RETRIEVE loop included.
+        seen_ids: set[str] = set()
         for paper in state.get("papers", []):
             doi, title = paper_keys(paper)
             if doi:
                 seen_doi.add(doi)
             if title:
                 seen_title.add(title)
-        known_before = len(seen_doi) + len(seen_title)
+            seen_ids.add(paper.paper_id)
+        # Was anything known before this pass? Counted in PAPERS, not in keys:
+        # a state full of DOI-less short-titled records summed to zero here and
+        # would have turned "retrieved nothing new" into a hard failure.
+        known_before = len(seen_ids)
 
         fresh: dict[str, Paper] = {}
         log: list[dict[str, Any]] = []
@@ -183,76 +240,92 @@ class Retriever(Agent):
 
         for task in plan:
             sources = [s for s in (task.sources or enabled) if s in enabled]
-            for source in sources:
-                if budget_exhausted and source == "openalex":
-                    continue
-                if source in disabled:
-                    continue
-                started = time.perf_counter()
-                try:
-                    found = self._search(
-                        source, task.query, task.year_min or year_min,
-                        min(task.max_results or max_per_source, max_per_source),
-                    )
-                    error = None
-                except OpenAlexBudgetExhausted as exc:
-                    # Keep everything gathered so far and stop asking OpenAlex.
-                    budget_exhausted = True
-                    found, error = [], f"budget_exhausted: {exc}"
-                except Exception as exc:  # one bad query must not sink the plan
-                    found, error = [], f"{type(exc).__name__}: {exc}"
-
-                added = 0
-                for paper in found:
-                    if paper.abstract and looks_like_author_list(paper.abstract):
-                        # Keep the paper (citable as existing) but not the junk
-                        # text: no chunks, no wasted extraction call.
-                        paper = paper.model_copy(
-                            update={"abstract": None, "text_availability": "none"}
-                        )
-                        metadata_abstracts += 1
-                    doi, title = paper_keys(paper)
-                    if (doi and doi in seen_doi) or (title and title in seen_title):
-                        # Already known - but a richer copy may still be an upgrade.
-                        existing_id = _find_existing(fresh, doi, title)
-                        if existing_id and _richness(paper) > _richness(fresh[existing_id]):
-                            fresh[existing_id] = paper
+            for query in expand_query(task.query):
+                for source in sources:
+                    if budget_exhausted and source == "openalex":
                         continue
-                    if doi:
-                        seen_doi.add(doi)
-                    if title:
-                        seen_title.add(title)
-                    fresh[paper.paper_id] = paper
-                    added += 1
-
-                elapsed = time.perf_counter() - started
-                if found:
-                    dead_time[source] = 0.0
-                else:
-                    dead_time[source] = dead_time.get(source, 0.0) + elapsed
-                    if dead_time[source] >= SOURCE_DEAD_TIME_S:
-                        disabled.add(source)
-                        self._emit(
-                            "source_disabled",
-                            {"source": source,
-                             "wasted_seconds": round(dead_time[source], 1),
-                             "remaining_tasks": len(plan) - plan.index(task) - 1,
-                             "why": "spent this long returning nothing; an instant "
-                                    "empty response would NOT trip this."},
-                            iteration,
+                    if source in disabled:
+                        continue
+                    started = time.perf_counter()
+                    try:
+                        found = self._search(
+                            source, query, task.year_min or year_min,
+                            min(task.max_results or max_per_source, max_per_source),
                         )
+                        error = None
+                    except OpenAlexBudgetExhausted as exc:
+                        # Keep everything gathered so far and stop asking OpenAlex.
+                        budget_exhausted = True
+                        found, error = [], f"budget_exhausted: {exc}"
+                    except Exception as exc:  # one bad query must not sink the plan
+                        found, error = [], f"{type(exc).__name__}: {exc}"
 
-                log.append({
-                    "sq_id": task.sq_id, "query": task.query, "source": source,
-                    "returned": len(found), "new": added, "error": error,
-                    "iteration": iteration,
-                })
-                self._emit(
-                    "search",
-                    {"sq_id": task.sq_id, "query": task.query, "source": source,
-                     "returned": len(found), "new": added, "error": error},
-                    iteration,
-                )
+                    added = 0
+                    for paper in found:
+                        if paper.abstract and looks_like_author_list(paper.abstract):
+                            # Keep the paper (citable as existing) but not the junk
+                            # text: no chunks, no wasted extraction call.
+                            paper = paper.model_copy(
+                                update={"abstract": None, "text_availability": "none"}
+                            )
+                            metadata_abstracts += 1
+                        doi, title = paper_keys(paper)
+                        if paper.paper_id in seen_ids:
+                            # Already in state. Unlike the key match below there
+                            # is no upgrade path: the reducer ADDS, so returning
+                            # it in any form duplicates it.
+                            continue
+                        if paper.paper_id in fresh:
+                            if _richness(paper) > _richness(fresh[paper.paper_id]):
+                                fresh[paper.paper_id] = paper
+                            continue
+                        if (doi and doi in seen_doi) or (title and title in seen_title):
+                            # Already known - but a richer copy may still be an upgrade.
+                            existing_id = _find_existing(fresh, doi, title)
+                            if existing_id and _richness(paper) > _richness(fresh[existing_id]):
+                                fresh[existing_id] = paper
+                            continue
+                        if doi:
+                            seen_doi.add(doi)
+                        if title:
+                            seen_title.add(title)
+                        fresh[paper.paper_id] = paper
+                        added += 1
+
+                    elapsed = time.perf_counter() - started
+                    if found:
+                        dead_time[source] = 0.0
+                    else:
+                        dead_time[source] = dead_time.get(source, 0.0) + elapsed
+                        if dead_time[source] >= SOURCE_DEAD_TIME_S:
+                            disabled.add(source)
+                            self._emit(
+                                "source_disabled",
+                                {"source": source,
+                                 "wasted_seconds": round(dead_time[source], 1),
+                                 "remaining_tasks": len(plan) - plan.index(task) - 1,
+                                 "why": "spent this long returning nothing; an instant "
+                                        "empty response would NOT trip this."},
+                                iteration,
+                            )
+
+                    # `query` is what was ASKED; `planned_query` is what the
+                    # Planner wrote. They differ for every widened pair, and a
+                    # log carrying only one of them cannot be compared against
+                    # a pre-widening run months later.
+                    log.append({
+                        "sq_id": task.sq_id, "query": query,
+                        "planned_query": task.query, "source": source,
+                        "returned": len(found), "new": added, "error": error,
+                        "iteration": iteration,
+                    })
+                    self._emit(
+                        "search",
+                        {"sq_id": task.sq_id, "query": query,
+                         "planned_query": task.query, "source": source,
+                         "returned": len(found), "new": added, "error": error},
+                        iteration,
+                    )
 
         papers = list(fresh.values())
         chunks = self._chunk(papers)
@@ -267,7 +340,9 @@ class Retriever(Agent):
 
         self._emit(
             "retrieval_summary",
-            {"queries": len(plan), "source_queries": len(log), "failures": len(failures),
+            {"queries": len(plan),
+             "issued_queries": sum(len(expand_query(t.query)) for t in plan),
+             "source_queries": len(log), "failures": len(failures),
              "new_papers": len(papers), "new_chunks": len(chunks),
              "with_abstract": sum(1 for p in papers if (p.abstract or "").strip()),
              "metadata_abstracts_dropped": metadata_abstracts,
@@ -315,4 +390,4 @@ def _find_existing(pool: dict[str, Paper], doi: str, title: str) -> str | None:
 
 
 __all__ = ["Retriever", "paper_keys", "title_key", "looks_like_author_list",
-           "SOURCE_DEAD_TIME_S"]
+           "SOURCE_DEAD_TIME_S", "expand_query", "QUERY_STOPWORDS"]

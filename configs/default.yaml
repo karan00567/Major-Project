@@ -235,6 +235,40 @@ sources:
   # Re-enable by adding semantic_scholar back to this list - ideally once
   # S2_API_KEY exists (T-215), which removes the throttling entirely.
   enabled: [openalex, arxiv]
+  # HELD AT 25. Tried at 100 on 2026-08-29 (T-410) and reverted the same day
+  # on the end-to-end measurement. The two halves of that experiment behaved
+  # very differently, and only one of them survived:
+  #
+  # 1. QUERY WIDENING (`retriever.expand_query`) - KEPT, and load-bearing.
+  #    `title_and_abstract.search` ANDs every term, so each term the Planner
+  #    adds is an exclusion filter. Measured against the 34 gold papers whose
+  #    text OpenAlex holds:
+  #        this plan, as written        reaches   0 / 34   <- zero
+  #        + every 2-term subset        reaches  28 / 34
+  #    Without the widening this run retrieves NO gold paper at all, at any
+  #    cap. That is the change that earned the recall.
+  #
+  # 2. max_per_source 25 -> 100 - REVERTED. It raised the ceiling and moved
+  #    the bottleneck from retrieval to ranking, buying nothing downstream:
+  #        pool             271 -> 8,347
+  #        union recall     0.057 -> 0.286      (5x, real)
+  #        corpus recall    0.000 -> 0.000      (UNCHANGED - what ships)
+  #        best gold rank   93 -> 109;  median gold rank 4,153
+  #        recall@60/@100   0.000 / 0.000
+  #    All 10 gold papers were fetched and NONE reached the top 100. The
+  #    Extractor read ten off-topic papers either way - `multi agent` pulls in
+  #    a whole robotics path-finding literature the reranker cannot sift out.
+  #    Cost of that nothing: +69 minutes a run (ranker 3,264s of 4,448s).
+  #
+  # ⚠️ This CONFIRMS T-212's 2026-08-26 "do NOT adopt max_per_source: 100",
+  # for the reason T-212 gave. An earlier version of this comment claimed the
+  # opposite on the strength of a retrieval-only probe; the pipeline run
+  # falsified it. A ceiling is not a deliverable.
+  #
+  # Before trying 100 again, fix RANKING first - `ranker.py` cross-encodes the
+  # whole corpus once per sub-question at a measured 23.3 pairs/s, and its
+  # output at 8k papers is no better than at 271. A bigger pool is only worth
+  # having once something can sort it.
   max_per_source: 25
 
 review:

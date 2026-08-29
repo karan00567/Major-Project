@@ -1,0 +1,158 @@
+{
+  "metrics": {
+    "run": "flagship",
+    "retrieval": {
+      "gold_papers": 35,
+      "pool_size": 271,
+      "corpus_size": 10,
+      "union_recall": 0.05714285714285714,
+      "corpus_recall": 0.0,
+      "mrr": 0.00047237242836720747,
+      "best_rank": 93,
+      "median_rank": 173,
+      "at_k": {
+        "10": {
+          "hits": 0,
+          "recall": 0.0,
+          "precision": 0.0
+        },
+        "20": {
+          "hits": 0,
+          "recall": 0.0,
+          "precision": 0.0
+        },
+        "40": {
+          "hits": 0,
+          "recall": 0.0,
+          "precision": 0.0
+        },
+        "60": {
+          "hits": 0,
+          "recall": 0.0,
+          "precision": 0.0
+        },
+        "100": {
+          "hits": 1,
+          "recall": 0.02857142857142857,
+          "precision": 0.01
+        },
+        "250": {
+          "hits": 2,
+          "recall": 0.05714285714285714,
+          "precision": 0.008
+        }
+      },
+      "gold_ranks": {
+        "10.1109/jstsp.2025.3579203": 93,
+        "10.1186/s12859-025-06159-4": 173
+      },
+      "missed": [
+        "10.1002/jrsm.1715",
+        "10.1007/s10462-024-10844-w",
+        "10.1007/s10462-024-10902-3",
+        "10.1007/s10462-026-11605-7",
+        "10.1007/s11704-024-40231-1",
+        "10.1007/s44336-024-00009-2",
+        "10.1016/j.ipm.2025.104369",
+        "10.1016/j.nlp.2025.100179",
+        "10.1038/s41467-024-45563-x",
+        "10.1093/bioinformatics/btae238",
+        "10.1093/bioinformatics/btae420",
+        "10.1093/jamiaopen/ooae021",
+        "10.1109/tccn.2025.3528892",
+        "10.1109/tkde.2025.3608716",
+        "10.1145/3543507.3583505",
+        "10.1145/3701228",
+        "10.1145/3703155",
+        "10.1145/3777378",
+        "10.1145/3805774",
+        "10.1162/coli.a.16",
+        "10.1162/tacl_a_00530",
+        "10.18653/v1/2023.emnlp-main.398",
+        "10.18653/v1/2023.emnlp-main.455",
+        "10.18653/v1/2023.emnlp-main.741",
+        "10.18653/v1/2023.findings-acl.418",
+        "10.18653/v1/2024.acl-long.810",
+        "10.18653/v1/2024.eacl-demo.16",
+        "10.18653/v1/2024.emnlp-main.813",
+        "10.18653/v1/2024.naacl-long.389",
+        "10.18653/v1/2024.sdp-1.9",
+        "10.18653/v1/2025.acl-srw.32",
+        "10.18653/v1/2025.emnlp-main.136",
+        "10.18653/v1/2025.findings-acl.264"
+      ]
+    },
+    "sources": {
+      "planned_queries": 12,
+      "issued_queries": 12,
+      "widening_factor": 1.0,
+      "source_queries": 23,
+      "new_papers_by_source": {
+        "openalex": 267,
+        "arxiv": 4
+      },
+      "returned_by_source": {
+        "openalex": 300,
+        "arxiv": 8
+      },
+      "errors_by_source": {},
+      "papers_by_source": {
+        "openalex": 266,
+        "arxiv": 5
+      }
+    },
+    "quality": {
+      "extraction": {
+        "papers": 10,
+        "mean_fields_of_8": 4.89,
+        "repair_passes": 0,
+        "failed_after_repairs": 0,
+        "placeholder_echoes_removed": 0,
+        "skipped_no_text": 0
+      },
+      "writing": {
+        "sections": 3,
+        "references": 8,
+        "chars": 16882,
+        "citations_dropped": 0
+      },
+      "verification": {
+        "claims": 33,
+        "supported": 0,
+        "partial": 27,
+        "unsupported_dropped": 6,
+        "contradicted": 0,
+        "abstract_only_capped": 25,
+        "grounding_score": 0.8182,
+        "grounding_precision": 0.8181818181818182,
+        "strict_precision": 0.0
+      },
+      "loop": {
+        "critic_decisions": [
+          "WRITE",
+          "WRITE"
+        ],
+        "iterations": 0,
+        "replans": 0
+      }
+    },
+    "cost": {
+      "llm_requests": 14,
+      "prompt_tokens_est": 50927,
+      "response_tokens_est": 9246,
+      "total_tokens_est": 60173,
+      "reserved_tokens_est": 79599,
+      "wall_seconds": 317.9,
+      "seconds_by_agent": {
+        "planner": 3.6,
+        "retriever": 35.8,
+        "ranker": 212.6,
+        "extractor": 31.0,
+        "critic": 0.0,
+        "writer": 15.5,
+        "verifier": 17.9
+      }
+    },
+    "ranking_order_verified": true
+  }
+}

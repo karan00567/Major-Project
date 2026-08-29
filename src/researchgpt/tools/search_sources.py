@@ -108,6 +108,25 @@ def infer_venue_tier(work: dict) -> str:
         return "unknown"
 
 
+def sanitise_openalex_query(query: str) -> str:
+    """Strip characters that OpenAlex parses as filter syntax, not as text.
+
+    Measured 2026-08-29: ``,`` and ``?`` both return **HTTP 400**. The comma
+    separates one filter from the next in ``filter=a:x,b:y``, and the question
+    mark ends the query string, so either one inside a search value corrupts
+    the request rather than narrowing it. ``:``, ``|``, apostrophes and unicode
+    hyphens are all accepted and are left alone - stripping them would change
+    the query the caller asked for.
+
+    Found while probing gold papers by title: 3 of 21 titles contained a comma
+    or a question mark and every one of them 400'd. The pipeline has not hit
+    this only because the Planner happens to emit bare keyword phrases; nothing
+    in its schema prevents a comma.
+    """
+    cleaned = query.replace(",", " ").replace("?", " ")
+    return " ".join(cleaned.split())
+
+
 def search_openalex(
     query: str,
     *,
@@ -129,7 +148,7 @@ def search_openalex(
     Without it, evaluation work exhausts the day's quota in minutes.
     """
     key = api_key if api_key is not None else os.getenv("OPENALEX_API_KEY")
-    filters = [f"title_and_abstract.search:{query}"]
+    filters = [f"title_and_abstract.search:{sanitise_openalex_query(query)}"]
     if year_min is not None:
         filters.append(f"from_publication_date:{year_min}-01-01")
         filters.append("to_publication_date:2026-12-31")
@@ -585,6 +604,7 @@ __all__ = [
     "normalise_doi",
     "arxiv_id_to_doi",
     "infer_venue_tier",
+    "sanitise_openalex_query",
     "search_openalex",
     "search_arxiv",
     "search_semantic_scholar",

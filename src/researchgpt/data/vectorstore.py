@@ -11,8 +11,14 @@ from researchgpt.core.models import Chunk
 
 
 class VectorStore:
+    #: Used only if the client will not say. Chroma's local limit is derived
+    #: from SQLite's 32,766-variable cap divided by the bindings per row, so it
+    #: is a property of the build, not a number to invent.
+    FALLBACK_MAX_BATCH = 5000
+
     def __init__(
-        self, path: str = "data/vectorstore", collection: str = "chunks"
+        self, path: str = "data/vectorstore", collection: str = "chunks",
+        max_batch: int | None = None,
     ) -> None:
         self._path = Path(path)
         self._path.mkdir(parents=True, exist_ok=True)
@@ -24,6 +30,13 @@ class VectorStore:
             name=collection,
             metadata={"hnsw:space": "cosine"},
         )
+        self.max_batch = max_batch or self._client_max_batch()
+
+    def _client_max_batch(self) -> int:
+        try:
+            return int(self._client.get_max_batch_size())
+        except Exception:
+            return self.FALLBACK_MAX_BATCH
 
     def add(
         self, chunks: list[Chunk], embeddings: list[list[float]]
@@ -44,13 +57,22 @@ class VectorStore:
             }
             for c in chunks
         ]
-        # upsert so re-ingestion does not duplicate
-        self._collection.upsert(
-            ids=ids,
-            embeddings=embeddings,
-            documents=documents,
-            metadatas=metadatas,
-        )
+        # 🔴 Batched because Chroma REJECTS an oversized write rather than
+        # splitting it, and the ceiling is a function of corpus size: 640
+        # chunks (max_per_source 25) fit in one call, 15,166 (max_per_source
+        # 100) do not, and the run died at the ranker 31 minutes in - after
+        # retrieval and most of the embedding had been paid for. Any future
+        # widening of the pool walks straight back into it.
+        #
+        # upsert so re-ingestion does not duplicate.
+        for start in range(0, len(ids), self.max_batch):
+            stop = start + self.max_batch
+            self._collection.upsert(
+                ids=ids[start:stop],
+                embeddings=embeddings[start:stop],
+                documents=documents[start:stop],
+                metadatas=metadatas[start:stop],
+            )
 
     def query(
         self, embedding: list[float], k: int = 30

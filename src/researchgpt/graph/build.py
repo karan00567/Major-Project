@@ -133,7 +133,7 @@ def run_pipeline(
             # never passed one, so no checkpoint was ever written on the real
             # path. A feature reachable only from its own tests is not shipped.
             from researchgpt.graph.checkpoint import checkpointer as _checkpointer
-            from researchgpt.graph.checkpoint import thread_config
+            from researchgpt.graph.checkpoint import resume_input, thread_config
 
             saver = _checkpointer()
             app = build_loop_graph(cfg, llm, trace, checkpointer=saver)
@@ -141,7 +141,10 @@ def run_pipeline(
             # The loop's own bound (review.max_iterations, enforced twice) is
             # what should stop this, not LangGraph's recursion guard.
             config["recursion_limit"] = 50
-            state = dict(app.invoke(state, config=config))
+            # 🔴 The other half of T-508. Passing `state` here on a thread that
+            # already has checkpoints re-runs the graph from START; only None
+            # resumes. See checkpoint.resume_input.
+            state = dict(app.invoke(resume_input(saver, config, state), config=config))
         else:
             for agent in make_agents(cfg, llm, trace):
                 _merge(state, agent(state))

@@ -78,6 +78,37 @@ def thread_config(run_id: str, **extra: Any) -> dict[str, Any]:
     return {"configurable": configurable}
 
 
+def resume_input(saver: Any, config: dict[str, Any], state: dict[str, Any]):
+    """What to pass as ``invoke``'s input: ``None`` to resume, else the state.
+
+    🔴 This is the half of T-508 that was missing, and its absence made the
+    whole feature inert on the real path. LangGraph resumes a thread only when
+    invoked with ``None``; given an input it records a fresh ``input``
+    checkpoint and re-runs the graph from START.
+
+    Measured 2026-08-29 - the checkpoint table after a "resume":
+
+        step -1  source: input      first attempt
+        step  0  loop               planner
+        step  1  loop               retriever
+        step  2  loop               ranker (died)
+        step  3  source: input      <- the resume, starting over
+        step  4  loop               planner AGAIN
+        step  5  loop               retriever AGAIN
+
+    So the docstring's promise - "picks up after the last completed node
+    instead of starting from the Planner" - was false while the checkpointer
+    itself worked perfectly and wrote every checkpoint. It cost a re-paid
+    retrieval, and the replay then crashed the retriever against a state that
+    already held its own results.
+    """
+    try:
+        existing = saver.get_tuple(config)
+    except Exception:
+        return state
+    return None if existing is not None else state
+
+
 def latest_state(saver: Any, run_id: str) -> dict[str, Any] | None:
     """The most recent checkpointed state for ``run_id``, or ``None``."""
     tuple_ = saver.get_tuple(thread_config(run_id))
@@ -161,6 +192,7 @@ def resumable_runs(path: str | pathlib.Path = DEFAULT_CHECKPOINT_DB) -> list[str
 
 __all__ = [
     "DEFAULT_CHECKPOINT_DB",
+    "resume_input",
     "checkpointer",
     "thread_config",
     "latest_state",
