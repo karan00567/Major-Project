@@ -27,6 +27,70 @@ reuses that same upload** — it rebuilds the negatives in-notebook.
 
 ---
 
+## Notebooks 04–07 — the local `qwen2.5:3b-instruct` arm
+
+Added 2026-08-29. A **separate track** from 01–03, serving the local-inference
+side-car in `agents/`: models small enough to run on a 5 GB card through Ollama.
+
+| Notebook | Task | Trains | Data it needs |
+|---|---|---|---|
+| `04_train_extractor_qwen3b.ipynb` | **T-337** | Extractor, **distilled from `gpt-oss`** | `data/llm_cache/` — 162 cached calls, 134 usable |
+| `05_train_writer_qwen3b.ipynb` | **T-338** | Writer, on SciReviewGen `reference → target` | none — streams from the Hub |
+| `06_train_verifier_qwen3b.ipynb` | **T-339** | Verifier, **generative arm** vs the DeBERTa incumbent | `data/scifact/pairs_*.jsonl` |
+| `07_train_critic_qwen3b_ablation.ipynb` | **T-340** | Critic router — **an ablation expected to fail** | `outputs/runs/*/trace.jsonl` |
+
+All four are QLoRA (4-bit NF4, LoRA r=16) on `Qwen/Qwen2.5-3B-Instruct`, sized
+for a **free Kaggle T4**, and all four end by exporting GGUF `q4_K_M` plus an
+Ollama `Modelfile`. **Train on Kaggle, run on the 5 GB card** — a 3B QLoRA does
+not fit in 5 GB of VRAM.
+
+### Two agents are missing from that list, deliberately
+
+| agent | why there is no notebook |
+|---|---|
+| **Planner** | excluded by request |
+| **Retriever** | **there is no model to train.** It is HTTP calls to OpenAlex / arXiv / Semantic Scholar plus DOI-and-title dedup. Nothing in it is learned |
+| **Ranker** | it *has* a trained model, but it is a **22M cross-encoder**, not a 3B generative model — and it is already covered by notebooks 02 and 03. Replacing a 22M reranker with a 3B one would make ranking, already the pipeline's slowest stage at 1,130 s/run, dramatically worse |
+
+### Read the header of each before running
+
+Three of the four contradict something already recorded in the project, and each
+notebook says so at the top rather than burying it:
+
+* **04** — `TRAINING_SPEC.md §4` says the Extractor *"cannot be fine-tuned at
+  all: it needs 4-field labels that do not exist."* True for **human** labels.
+  The cache now holds 134 **teacher** labels, which is distillation, not
+  annotation. A distilled student's ceiling is the teacher, including its
+  errors — amend §4 before citing this.
+* **05** — the Writer fine-tune was **evaluated and rejected on 2026-08-25**, on
+  deployment cost. One of the three objections has weakened (a GPU exists now);
+  the context objection stands and is binding: `num_ctx 8192` holds ~25 papers'
+  insights, not 60.
+* **06** — **does not replace the Verifier.** The DeBERTa model is one of the
+  seven things `TASKLIST §0` never cuts. This is a comparison arm for T-705b,
+  and the most useful outcome is a *negative* one: a 3B failing to beat a 44M
+  model is direct evidence for "architecture beats model scale".
+* **07** — **expected to be rejected, and written that way.** There are only
+  **17 recorded routing decisions** across all 78 runs, so it trains on
+  synthetic data generated from the gates themselves, which proves only that a
+  network can fit three thresholds. Its real finding is that two of the three
+  gates escalate on *prior decisions*, so a stateless router cannot express the
+  policy at all.
+
+### Kaggle gotchas specific to these four
+
+* **The T4 is sm_75 and has no bf16.** Every cell uses `fp16`. Setting `bf16=True`
+  does not error — it silently falls back and doubles step time.
+* **Merge the adapter in fp16, never in 4-bit.** `merge_and_unload()` on a 4-bit
+  model produces garbage weights; the dequantise–merge–requantise round trip
+  destroys deltas as small as LoRA's. Notebook cells reload the base in fp16 for
+  this reason, which is why that step is slow.
+* **`num_ctx` on the Ollama side defaults to 2048** and the extractor prompt is
+  ~3,530 tokens before any paper text. Every `Modelfile` emitted here sets 8192.
+  See `agents/README.md`; `python -m agents.probe` verifies it with a canary.
+
+---
+
 ## 01 — Verifier fine-tune (T-302 / T-303)
 
 Trains the three-way claim verifier that decides `SUPPORT` / `CONTRADICT` /
