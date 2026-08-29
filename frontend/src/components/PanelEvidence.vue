@@ -90,21 +90,23 @@ function select(sentence) {
 
 <template>
   <section class="panel">
-    <header>
-      <h2>3 · Evidence</h2>
-      <p class="hint">
-        <strong>{{ matched }}</strong> of {{ verifiedClaims.length }} verified claims
-        located in the text. Click a marked sentence to see the evidence the
-        Verifier scored it against.
+    <header class="mb-3">
+      <h2 class="panel-title">3 · Evidence</h2>
+      <p class="mt-1 text-[0.84rem] leading-relaxed text-ink-dim dark:text-night-dim">
+        <strong class="font-semibold text-ink dark:text-night-fg">{{ matched }}</strong>
+        of {{ verifiedClaims.length }} verified claims located in the text.
+        Click a marked sentence to see the evidence the Verifier scored it against.
       </p>
     </header>
 
-    <div class="split">
-      <article class="review" v-if="reviewMarkdown">
+    <div class="grid items-start gap-4 lg:grid-cols-[1.6fr_1fr]">
+      <article v-if="reviewMarkdown"
+               class="review scroll-soft max-h-[60vh] max-w-[78ch] overflow-y-auto
+                      pr-3 text-[0.94rem] leading-[1.65]">
         <template v-for="(b, i) in blocks" :key="i">
           <div v-if="b.kind === 'md'" v-html="b.html" class="md" />
-          <div v-else-if="b.kind === 'blank'" class="spacer" />
-          <p v-else class="para">
+          <div v-else-if="b.kind === 'blank'" class="h-2" />
+          <p v-else class="mb-3">
             <span
               v-for="(s, j) in b.sentences"
               :key="j"
@@ -116,48 +118,51 @@ function select(sentence) {
           </p>
         </template>
       </article>
-      <p v-else class="empty">No review yet.</p>
+      <p v-else class="text-[0.86rem] text-ink-dim dark:text-night-dim">No review yet.</p>
 
-      <aside class="evidence">
-        <div v-if="!selected" class="empty">
+      <aside class="rounded-xl border border-paper-line bg-paper p-3
+                    dark:border-night-line dark:bg-night">
+        <div v-if="!selected" class="text-[0.84rem] text-ink-dim dark:text-night-dim">
           <p>Select a highlighted sentence.</p>
-          <p class="legend">
-            <span class="swatch v-supported" /> supported
-            <span class="swatch v-partial" /> partial
+          <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span class="flex items-center gap-1.5">
+              <span class="h-2.5 w-4 rounded-sm bg-supported/25
+                           border-b-2 border-supported" /> supported
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="h-2.5 w-4 rounded-sm bg-partial/25
+                           border-b-2 border-partial" /> partial
+            </span>
           </p>
         </div>
-        <div v-else>
-          <div class="verdict" :class="verdictClass(selected)">
-            {{ selected.verdict }}
-            <span class="score">score {{ selected.support_score.toFixed(3) }}</span>
-          </div>
-          <blockquote class="claim">{{ selected.text }}</blockquote>
 
-          <h4>Evidence the Verifier scored</h4>
-          <div v-if="selected.evidence.length" class="spans">
-            <blockquote v-for="(e, i) in selected.evidence" :key="i" class="span">
-              <p>{{ e.quote }}</p>
-              <code>{{ e.chunk_id }}</code>
+        <div v-else>
+          <div class="mb-2 flex items-baseline gap-2">
+            <span class="rounded px-1.5 py-0.5 text-[0.68rem] font-bold tracking-wide"
+                  :class="selected.verdict === 'SUPPORTED'
+                    ? 'bg-supported/15 text-supported' : 'bg-partial/15 text-partial'">
+              {{ selected.verdict }}
+            </span>
+            <span class="font-mono text-[0.72rem] text-ink-dim dark:text-night-dim">
+              score {{ selected.support_score.toFixed(3) }}
+            </span>
+          </div>
+          <blockquote class="mb-3 border-l-2 border-accent pl-3 text-[0.88rem]
+                             leading-relaxed">{{ selected.text }}</blockquote>
+
+          <h4 class="panel-title mb-1.5">Evidence the Verifier scored</h4>
+          <div v-if="selected.evidence.length" class="space-y-2">
+            <blockquote v-for="(e, i) in selected.evidence" :key="i"
+                        class="rounded-lg border border-paper-line bg-paper-card p-2.5
+                               dark:border-night-line dark:bg-night-card">
+              <p class="text-[0.84rem] leading-relaxed">{{ e.quote }}</p>
+              <code class="mt-1 block font-mono text-[0.68rem] text-ink-dim
+                           dark:text-night-dim">{{ e.chunk_id }}</code>
             </blockquote>
           </div>
-          <p v-else class="empty">
-            No evidence span recorded — this claim cited a paper whose text we
-            do not hold.
+          <p v-else class="text-[0.82rem] text-ink-dim dark:text-night-dim">
+            No evidence span recorded for this claim.
           </p>
-
-          <h4>Source papers</h4>
-          <ul class="papers">
-            <li v-for="pid in selected.paper_ids" :key="pid">
-              <span v-if="paperById[pid]">
-                {{ paperById[pid].title }}
-                <em v-if="paperById[pid].year">({{ paperById[pid].year }})</em>
-                <span v-if="paperById[pid].text_availability !== 'full'" class="flag">
-                  abstract only
-                </span>
-              </span>
-              <code v-else>{{ pid }}</code>
-            </li>
-          </ul>
         </div>
       </aside>
     </div>
@@ -165,51 +170,23 @@ function select(sentence) {
 </template>
 
 <style scoped>
-.split { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1rem; align-items: start; }
-@media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
-
-.review {
-  max-height: 60vh; overflow-y: auto; padding-right: .75rem;
-  line-height: 1.65; font-size: .94rem;
-}
-.para { margin: 0 0 .7rem; }
-.spacer { height: .4rem; }
-.md :deep(h2), .md :deep(h3), .md :deep(h4) { margin: 1rem 0 .4rem; }
-
-.sentence { cursor: default; border-radius: 2px; }
+/* Kept as scoped CSS rather than utilities: these style sentences rendered
+   from v-html and marked at runtime, which utility classes in the template
+   cannot reach. Underline rather than highlight, so the prose still reads as
+   prose (T-607). */
+.sentence { cursor: default; border-radius: 2px; transition: background .15s; }
 .sentence.v-supported, .sentence.v-partial { cursor: pointer; }
-/* Underline, not highlight: the prose must still read as prose. */
 .sentence.v-supported { border-bottom: 2px solid #2f9e5f; background: #2f9e5f14; }
 .sentence.v-partial   { border-bottom: 2px solid #c98a2e; background: #c98a2e14; }
-.sentence.active      { background: #2f6fed26; }
+.sentence.v-supported:hover, .sentence.v-partial:hover { background: #2f6fed1f; }
+.sentence.active      { background: #2f6fed30; }
 
-.evidence {
-  position: sticky; top: 0; border: 1px solid var(--line);
-  border-radius: 8px; padding: .85rem; background: var(--card);
-  max-height: 60vh; overflow-y: auto;
+.md :deep(h1), .md :deep(h2), .md :deep(h3), .md :deep(h4) {
+  margin: 1.1rem 0 .4rem; font-weight: 600; line-height: 1.3;
 }
-.verdict { font-weight: 700; letter-spacing: .02em; margin-bottom: .5rem; }
-.verdict.v-supported { color: #2f9e5f; }
-.verdict.v-partial   { color: #c98a2e; }
-.score { font-weight: 400; color: var(--muted); margin-left: .5rem; font-size: .85rem; }
-
-.claim { margin: 0 0 .8rem; padding-left: .7rem; border-left: 3px solid var(--line); }
-h4 { margin: .9rem 0 .35rem; font-size: .8rem; text-transform: uppercase;
-     letter-spacing: .06em; color: var(--muted); }
-.span { margin: 0 0 .6rem; padding: .5rem .6rem; background: var(--bg);
-        border-radius: 6px; font-size: .87rem; }
-.span p { margin: 0 0 .3rem; }
-code { font-size: .76rem; color: var(--muted); }
-
-.papers { margin: 0; padding-left: 1.1rem; font-size: .87rem; }
-.flag { font-size: .72rem; color: #c98a2e; border: 1px solid #c98a2e55;
-        border-radius: 999px; padding: 0 .4rem; margin-left: .35rem; }
-
-.empty { color: var(--muted); font-size: .88rem; }
-.legend { margin-top: .6rem; }
-.swatch { display: inline-block; width: .8rem; height: .55rem; border-radius: 2px;
-          margin: 0 .25rem 0 .6rem; vertical-align: middle; }
-.swatch.v-supported { background: #2f9e5f; }
-.swatch.v-partial { background: #c98a2e; }
-.hint { color: var(--muted); font-size: .85rem; margin: .2rem 0 .8rem; }
+.md :deep(h2) { font-size: 1.02rem; }
+.md :deep(h3) { font-size: .95rem; }
+.md :deep(p)  { margin: 0 0 .7rem; }
+.md :deep(ul), .md :deep(ol) { margin: 0 0 .7rem 1.1rem; }
+.md :deep(code) { font-size: .88em; }
 </style>

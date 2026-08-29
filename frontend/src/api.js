@@ -37,6 +37,18 @@ export const postOverride = (runId, claimId, decision, note) =>
     body: JSON.stringify({ claim_id: claimId, decision, note }),
   })
 
+// T-612. The sheet is rebuilt from the run's trace on every request, so it
+// survives an API restart and shows what a previous session already scored.
+export const getScoreSheet = (runId) =>
+  json(`/api/runs/${encodeURIComponent(runId)}/scores`)
+
+export const postScores = (runId, body) =>
+  json(`/api/runs/${encodeURIComponent(runId)}/scores`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
 export const artifactUrl = (runId, name) =>
   `/api/runs/${encodeURIComponent(runId)}/artifact/${encodeURIComponent(name)}`
 

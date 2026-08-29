@@ -23,10 +23,19 @@ class ReviewRequest(BaseModel):
     """``POST /api/review``."""
 
     question: str = Field(min_length=10)
-    #: Defaults to the configured value when omitted. Capped low on purpose:
-    #: the demo path (T-610) runs live only at small sizes, because a 25-paper
-    #: run is minutes long and a 60-paper run is tens of minutes.
-    max_papers: int | None = Field(default=None, ge=1, le=60)
+    #: Defaults to the configured value when omitted. The ceiling matches the
+    #: largest size Panel 1 offers (T-611) - a picker whose top entry the API
+    #: rejects is worse than no picker, and at le=60 that is exactly what
+    #: choosing 100 did.
+    #:
+    #: ⚠️ The ceiling is a REQUEST bound, not a promise about runtime. Cost is
+    #: roughly linear in max_papers and is paced by the provider's tokens per
+    #: minute, not by CPU: measured 2026-08-29, extraction admits about one
+    #: paper a minute on Groq's free tier, so 100 papers is ~100 minutes of
+    #: extraction alone and ~650,000 reserved tokens against a 200,000/day
+    #: budget - i.e. it cannot finish in one day. Panel 1 says so next to the
+    #: sizes it offers; this bound only stops the request being absurd.
+    max_papers: int | None = Field(default=None, ge=1, le=100)
     #: Run the six-agent graph (Verifier + Critic) rather than the M1 line.
     use_loop: bool = True
 
@@ -121,6 +130,78 @@ class RunResult(BaseModel):
     human_overrides: list[OverrideOut] = []
 
 
+# --------------------------------------------------------------------------
+# T-612 — human scoring
+# --------------------------------------------------------------------------
+
+#: 1 is worst, 5 is best. Mirrors the CHECK constraint in ``db/models.py`` -
+#: validated in both places on purpose, so a score written by psql or by a
+#: later script is still in range.
+SCORE_MIN, SCORE_MAX = 1, 5
+
+
+class PaperScoreIn(BaseModel):
+    """One reviewer judgement of one paper the Extractor read."""
+
+    #: The pipeline's identity for the paper, not its DOI: about one OpenAlex
+    #: record in five has no DOI, and those papers must still be scoreable.
+    paper_id: str = Field(min_length=1)
+    score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ArtefactScoreIn(BaseModel):
+    """The reviewer's verdict on the generated review itself."""
+
+    score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    note: str | None = Field(default=None, max_length=2000)
+    artefact: str = "review.md"
+
+
+class ScoreSubmission(BaseModel):
+    """``POST /api/runs/{id}/scores`` — T-612.
+
+    Scoring the papers and scoring the write-up are deliberately separate
+    fields rather than one number: they answer "was retrieval any good?" and
+    "was the writing any good?", and the automated metrics cannot currently
+    tell those apart.
+    """
+
+    papers: list[PaperScoreIn] = Field(default_factory=list)
+    artefact: ArtefactScoreIn | None = None
+
+
+class ScoredPaper(BaseModel):
+    """A row of the review sheet: what to judge, plus any judgement so far."""
+
+    paper_id: str
+    doi: str | None = None
+    title: str
+    venue: str | None = None
+    year: int | None = None
+    url: str | None = None
+    score: int | None = None
+    note: str | None = None
+
+
+class ArtefactInfo(BaseModel):
+    name: str
+    chars: int
+
+
+class ScoreSheet(BaseModel):
+    """``GET /api/runs/{id}/scores`` and the reply to a submission."""
+
+    run_id: str
+    papers: list[ScoredPaper]
+    artefact: ArtefactInfo | None = None
+    artefact_score: ArtefactScoreIn | None = None
+    #: ``"trace"`` or ``"trace+db"``. The UI shows the difference rather than
+    #: claiming a database write that did not happen - the registry is
+    #: best-effort (`DB_SCHEMA.md §9`) and may simply be absent.
+    persisted: str = "trace"
+
+
 __all__ = [
     "ReviewRequest",
     "OverrideRequest",
@@ -130,4 +211,12 @@ __all__ = [
     "ClaimOut",
     "EvidenceOut",
     "RunResult",
+    "PaperScoreIn",
+    "ArtefactScoreIn",
+    "ScoreSubmission",
+    "ScoredPaper",
+    "ArtefactInfo",
+    "ScoreSheet",
+    "SCORE_MIN",
+    "SCORE_MAX",
 ]

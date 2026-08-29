@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import pathlib
 import threading
@@ -41,6 +42,8 @@ from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 
 from researchgpt.api.schemas import (
+    ArtefactInfo,
+    ArtefactScoreIn,
     ClaimOut,
     OverrideOut,
     OverrideRequest,
@@ -48,7 +51,13 @@ from researchgpt.api.schemas import (
     ReviewRequest,
     RunResult,
     RunSummary,
+    ScoredPaper,
+    ScoreSheet,
+    ScoreSubmission,
 )
+from researchgpt.db import scores as scores_db
+
+log = logging.getLogger(__name__)
 
 RUNS_DIR = pathlib.Path("outputs/runs")
 
@@ -132,6 +141,47 @@ def _read_json(path: pathlib.Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+
+
+def _append_trace_events(
+    run_dir: pathlib.Path, run_id: str,
+    events: list[tuple[str, dict]], *, what: str = "event",
+) -> None:
+    """Append human-authored events to a run's trace.
+
+    🔴 A trace that does not end in a newline would otherwise have the
+    first record concatenated onto its last line, destroying BOTH - in the file
+    every figure in the report is derived from. Appending blind is the obvious
+    implementation and it is wrong; a real trace sometimes has no trailing
+    newline (an interrupted run, an editor that strips it). Caught by
+    ``test_override_survives_a_reload`` and by T-612's equivalent, both of
+    which use a fixture with no trailing newline on purpose.
+
+    Shared by T-609's overrides and T-612's scores: two human-input surfaces
+    appending to the same file should not carry two copies of this.
+    """
+    if not events:
+        return
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    lines = [
+        json.dumps({"ts": now, "run_id": run_id, "agent": "human",
+                    "event": name, "iteration": 0, "payload": payload},
+                   ensure_ascii=False)
+        for name, payload in events
+    ]
+    trace = run_dir / "trace.jsonl"
+    try:
+        needs_newline = False
+        if trace.exists() and trace.stat().st_size:
+            with trace.open("rb") as fh:
+                fh.seek(-1, 2)
+                needs_newline = fh.read(1) != b"\n"
+        with trace.open("a", encoding="utf-8") as fh:
+            payload = "\n".join(lines) + "\n"
+            fh.write(("\n" if needs_newline else "") + payload)
+    except OSError as exc:
+        raise HTTPException(status_code=500,
+                            detail=f"could not write {what}: {exc}") from exc
 
 
 def _trace_events(run_dir: pathlib.Path) -> list[dict]:
@@ -399,34 +449,10 @@ def record_override(run_id: str, req: OverrideRequest) -> list[OverrideOut]:
             detail=f"no claim {req.claim_id!r} in run {run_id}",
         )
 
-    line = json.dumps({
-        "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "run_id": run_id,
-        "agent": "human",
-        "event": "human_override",
-        "iteration": 0,
-        "payload": {"claim_id": req.claim_id, "decision": req.decision,
-                    "note": req.note},
-    }, ensure_ascii=False)
-    trace = run_dir / "trace.jsonl"
-    try:
-        # 🔴 A trace that does not end in a newline would otherwise have this
-        # record concatenated onto its last line, destroying BOTH - in the file
-        # the report derives its figures from. Appending blind is the obvious
-        # implementation and it is wrong; caught by
-        # test_override_survives_a_reload, which uses a fixture with no
-        # trailing newline precisely because real files sometimes do not have
-        # one (an interrupted run, an editor that strips it).
-        needs_newline = False
-        if trace.exists() and trace.stat().st_size:
-            with trace.open("rb") as fh:
-                fh.seek(-1, 2)
-                needs_newline = fh.read(1) != b"\n"
-        with trace.open("a", encoding="utf-8") as fh:
-            fh.write(("\n" if needs_newline else "") + line + "\n")
-    except OSError as exc:
-        raise HTTPException(status_code=500,
-                            detail=f"could not write override: {exc}") from exc
+    _append_trace_events(run_dir, run_id, [
+        ("human_override", {"claim_id": req.claim_id,
+                            "decision": req.decision, "note": req.note}),
+    ], what="override")
 
     return _overrides_of(run_dir)
 
@@ -516,6 +542,166 @@ def health() -> dict[str, Any]:
         "fixture_run_id": FIXTURE_RUN_ID if FIXTURE_MODE else None,
         "fixture_available": (RUNS_DIR / FIXTURE_RUN_ID).is_dir(),
     }
+
+
+# --------------------------------------------------------------------------
+# T-612 — human scoring
+# --------------------------------------------------------------------------
+
+
+def _scores_of(run_dir: pathlib.Path) -> tuple[dict[str, dict], dict | None]:
+    """Replay the trace's ``human_score`` events, last write per target wins.
+
+    Same shape as ``_overrides_of``: the trace is the record, the Postgres
+    tables are a queryable mirror. Replaying means a re-score is just a newer
+    line, so a changed mind is preserved in the history while the sheet shows
+    the current answer.
+    """
+    papers: dict[str, dict] = {}
+    artefact: dict | None = None
+    for event in _trace_events(run_dir):
+        if event.get("event") != "human_score":
+            continue
+        payload = event.get("payload") or {}
+        kind, target = payload.get("kind"), payload.get("target")
+        row = {"score": payload.get("score"), "note": payload.get("note")}
+        if kind == "paper" and target:
+            papers[target] = row
+        elif kind == "artefact":
+            artefact = dict(row, artefact=target or "review.md")
+    return papers, artefact
+
+
+def _extracted_papers(run_dir: pathlib.Path) -> list[dict]:
+    """The papers the Extractor actually read, in ranked order.
+
+    Not the whole pool: a run retrieves thousands and extracts ten, and asking
+    a human to score thousands is not a review.
+    """
+    corpus = _read_json(run_dir / "corpus.json") or {}
+    by_id = {p.get("paper_id"): p for p in (corpus.get("papers") or [])}
+    return [by_id[i] for i in (corpus.get("extracted_paper_ids") or []) if i in by_id]
+
+
+def _score_sheet(run_dir: pathlib.Path, run_id: str, persisted: str) -> ScoreSheet:
+    scored, artefact_score = _scores_of(run_dir)
+    rows = []
+    for paper in _extracted_papers(run_dir):
+        saved = scored.get(paper.get("paper_id")) or {}
+        rows.append(ScoredPaper(
+            paper_id=paper.get("paper_id") or "",
+            doi=paper.get("doi"),
+            title=paper.get("title") or "(untitled)",
+            venue=paper.get("venue"),
+            year=paper.get("year"),
+            url=paper.get("url"),
+            score=saved.get("score"),
+            note=saved.get("note"),
+        ))
+
+    review = run_dir / "review.md"
+    artefact = None
+    if review.exists():
+        try:
+            artefact = ArtefactInfo(name="review.md",
+                                    chars=len(review.read_text(encoding="utf-8")))
+        except OSError:
+            artefact = None
+
+    current = None
+    if artefact_score and artefact_score.get("score") is not None:
+        current = ArtefactScoreIn(score=artefact_score["score"],
+                                  note=artefact_score.get("note"),
+                                  artefact=artefact_score.get("artefact") or "review.md")
+    return ScoreSheet(run_id=run_id, papers=rows, artefact=artefact,
+                      artefact_score=current, persisted=persisted)
+
+
+def _mirror_state(run_id: str) -> str:
+    """Whether the Postgres mirror currently holds a score for this run.
+
+    🔴 Tests the CONTENTS, not the dict. ``get_scores`` returns
+    ``{"papers": [], "artefact": None}`` for a run nobody has scored - which is
+    truthy - so a truthiness check reported ``trace+db`` on an untouched sheet,
+    telling the reviewer the database held a judgement that did not exist.
+    """
+    try:
+        stored = scores_db.get_scores(run_id)
+    except Exception:                       # the mirror is never load-bearing
+        return "trace"
+    if stored and (stored.get("papers") or stored.get("artefact")):
+        return "trace+db"
+    return "trace"
+
+
+@app.get("/api/runs/{run_id}/scores", response_model=ScoreSheet)
+def get_score_sheet(run_id: str) -> ScoreSheet:
+    """T-612 — what a reviewer is asked to judge, plus anything judged so far."""
+    run_dir = _run_dir(run_id)
+    return _score_sheet(run_dir, run_id, _mirror_state(run_id))
+
+
+@app.post("/api/runs/{run_id}/scores", response_model=ScoreSheet)
+def submit_scores(run_id: str, req: ScoreSubmission) -> ScoreSheet:
+    """T-612 — record a human 1-5 judgement of the papers and the review.
+
+    ★ **The trace is written first, then Postgres.** `DB_SCHEMA.md §9` makes
+    every registry call best-effort, which is right for a catalogue row the
+    machine wrote and wrong for a judgement a human just formed. Writing the
+    append-only trace first satisfies both: the score cannot be lost, the
+    mirror stays best-effort, and the response says which happened instead of
+    claiming a database write that did not occur.
+    """
+    run_dir = _run_dir(run_id)
+
+    if not req.papers and req.artefact is None:
+        raise HTTPException(status_code=422,
+                            detail="submission scores nothing")
+
+    # Refuse a judgement about a paper this run never read - the same guard the
+    # override endpoint applies to claim_id, and for the same reason: a typo
+    # would otherwise land in the audit record referring to nothing.
+    known = {p.get("paper_id") for p in _extracted_papers(run_dir)}
+    unknown = [p.paper_id for p in req.papers if p.paper_id not in known]
+    if unknown:
+        raise HTTPException(
+            status_code=404,
+            detail=f"run {run_id} did not extract these papers: {sorted(unknown)}",
+        )
+
+    by_id = {p.get("paper_id"): p for p in _extracted_papers(run_dir)}
+    events: list[tuple[str, dict]] = []
+    rows: list[dict] = []
+    for entry in req.papers:
+        paper = by_id.get(entry.paper_id) or {}
+        events.append(("human_score", {
+            "kind": "paper", "target": entry.paper_id, "score": entry.score,
+            "note": entry.note, "doi": paper.get("doi"),
+            "title": paper.get("title"),
+        }))
+        rows.append({"paper_id": entry.paper_id, "doi": paper.get("doi"),
+                     "title": paper.get("title"), "score": entry.score,
+                     "note": entry.note})
+
+    artefact_row = None
+    if req.artefact is not None:
+        events.append(("human_score", {
+            "kind": "artefact", "target": req.artefact.artefact,
+            "score": req.artefact.score, "note": req.artefact.note,
+        }))
+        artefact_row = {"artefact": req.artefact.artefact,
+                        "score": req.artefact.score, "note": req.artefact.note}
+
+    _append_trace_events(run_dir, run_id, events, what="scores")
+
+    persisted = "trace"
+    try:
+        if scores_db.save_scores(run_id, papers=rows, artefact=artefact_row):
+            persisted = "trace+db"
+    except Exception as exc:                # deliberately broad - DB_SCHEMA §9
+        log.warning("scores not mirrored to Postgres for %s: %s", run_id, exc)
+
+    return _score_sheet(run_dir, run_id, persisted)
 
 
 __all__ = ["app", "DOWNLOADABLE", "RUNS_DIR", "FIXTURE_MODE", "FIXTURE_RUN_ID"]

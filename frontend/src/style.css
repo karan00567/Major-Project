@@ -1,44 +1,57 @@
-:root {
-  --bg: #fbfbfc;
-  --card: #ffffff;
-  --fg: #1a1c1f;
-  --muted: #6b7280;
-  --line: #e3e5e9;
-  color-scheme: light dark;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14161a;
-    --card: #1b1e23;
-    --fg: #e8eaed;
-    --muted: #9aa1ab;
-    --line: #2a2e35;
+/* T-614. Two shared component classes, because "a bordered card" and "a panel
+   heading" appear on every screen and repeating fifteen utilities each time is
+   how a design drifts out of alignment. Everything else is utilities in place. */
+@layer components {
+  .panel {
+    @apply rounded-xl border border-paper-line bg-paper-card p-4 shadow-card
+           dark:border-night-line dark:bg-night-card dark:shadow-none;
+  }
+  .panel-title {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.09em]
+           text-ink-dim dark:text-night-dim;
+  }
+  .field-label {
+    @apply mb-1 block text-[0.72rem] font-medium uppercase tracking-[0.08em]
+           text-ink-dim dark:text-night-dim;
+  }
+  .control {
+    @apply w-full rounded-lg border border-paper-line bg-paper px-3 py-2 text-sm
+           text-ink outline-none transition
+           focus:border-accent focus:ring-2 focus:ring-accent/25
+           disabled:opacity-50
+           dark:border-night-line dark:bg-night dark:text-night-fg;
+  }
+  .btn-primary {
+    @apply rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white
+           transition hover:bg-accent-hover
+           disabled:cursor-not-allowed disabled:opacity-45;
+  }
+  .btn-ghost {
+    @apply rounded-md border border-paper-line px-2.5 py-1 text-xs font-medium
+           text-ink-dim transition hover:border-accent hover:text-accent
+           dark:border-night-line dark:text-night-dim;
   }
 }
 
-* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  @apply bg-paper text-ink antialiased dark:bg-night dark:text-night-fg;
+  font-family: theme('fontFamily.sans');
 }
 
-.panel {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: .9rem 1rem 1rem;
+/* Scrollbars inside panels, so a long list does not draw a heavy grey bar
+   across a light card. */
+.scroll-soft { scrollbar-width: thin; scrollbar-color: theme('colors.paper.line') transparent; }
+.scroll-soft::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-soft::-webkit-scrollbar-thumb {
+  background: theme('colors.paper.line'); border-radius: 999px;
 }
-
-.panel > header h2 {
-  margin: 0;
-  font-size: .8rem;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  color: var(--muted);
+@media (prefers-color-scheme: dark) {
+  .scroll-soft { scrollbar-color: theme('colors.night.line') transparent; }
+  .scroll-soft::-webkit-scrollbar-thumb { background: theme('colors.night.line'); }
 }
-
-blockquote { margin: 0; }

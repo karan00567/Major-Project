@@ -6,6 +6,8 @@ import PanelRun from './components/PanelRun.vue'
 import PanelProgress from './components/PanelProgress.vue'
 import PanelEvidence from './components/PanelEvidence.vue'
 import PanelDropped from './components/PanelDropped.vue'
+import PanelScores from './components/PanelScores.vue'
+import DashboardView from './components/DashboardView.vue'
 import { getResult, health, listRuns, postOverride, startReview, streamEvents } from './api.js'
 
 const runs = ref([])
@@ -16,6 +18,19 @@ const busy = ref(false)
 const error = ref('')
 const fixtureMode = ref(false)
 const overrides = ref({})
+
+// Three views, chosen by path. A path check rather than vue-router: T-604
+// chose "one page, one run - a store is ceremony", and a router for three
+// static routes is the same kind of ceremony. Vite serves index.html for
+// unknown paths (appType 'spa'), so these all load this app; navigation
+// between them is a full page load, so none of this needs to be reactive.
+//
+//   /dashboard  what the project is, for someone who has never seen it (T-613)
+//   /optimizer  the run page plus the human scoring sheet (T-612)
+//   /           the run page
+const route = window.location.pathname.replace(/\/+$/, '')
+const onDashboard = ref(route === '/dashboard')
+const onOptimizer = ref(route === '/optimizer')
 
 let closeStream = null
 
@@ -114,26 +129,59 @@ const grounding = computed(() =>
 </script>
 
 <template>
-  <div class="app">
-    <header class="top">
-      <h1>ResearchGPT</h1>
-      <div class="stats" v-if="result">
-        <span><b>{{ result.counts.verified ?? 0 }}</b> claims kept</span>
-        <span><b>{{ result.counts.dropped ?? 0 }}</b> dropped</span>
-        <span><b>{{ grounding }}</b> grounded</span>
-        <span v-if="result.decisions.length" class="chain">{{ result.decisions.join(' → ') }}</span>
+  <DashboardView v-if="onDashboard" />
+
+  <div v-else class="min-h-screen">
+    <header
+      class="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2
+             border-b border-paper-line bg-paper/85 px-5 py-3 backdrop-blur
+             dark:border-night-line dark:bg-night/85"
+    >
+      <a href="/dashboard"
+         class="group flex items-baseline gap-2 no-underline"
+         title="What this project is">
+        <span class="text-[0.95rem] font-semibold tracking-tight
+                     text-ink dark:text-night-fg">ResearchGPT</span>
+        <span class="text-[0.68rem] uppercase tracking-[0.1em] text-ink-dim
+                     transition group-hover:text-accent dark:text-night-dim">
+          about
+        </span>
+      </a>
+
+      <div v-if="result" class="flex flex-wrap items-center gap-x-5 gap-y-1
+                                text-[0.8rem] text-ink-dim dark:text-night-dim">
+        <span><b class="font-semibold text-supported">{{ result.counts.verified ?? 0 }}</b> kept</span>
+        <span><b class="font-semibold text-unsupported">{{ result.counts.dropped ?? 0 }}</b> dropped</span>
+        <span><b class="font-semibold text-ink dark:text-night-fg">{{ grounding }}</b> grounded</span>
+        <span v-if="result.decisions.length" class="flex items-center gap-1">
+          <span
+            v-for="(d, i) in result.decisions" :key="i"
+            class="rounded px-1.5 py-0.5 font-mono text-[0.68rem] font-semibold"
+            :class="{
+              'bg-write/15 text-write': d === 'WRITE',
+              'bg-retrieve/15 text-retrieve': d === 'RETRIEVE',
+              'bg-replan/15 text-replan': d === 'REPLAN',
+            }"
+          >{{ d }}</span>
+        </span>
       </div>
+
+      <span v-if="busy"
+            class="ml-auto flex items-center gap-2 text-[0.8rem] text-accent">
+        <span class="h-2 w-2 animate-pulse-ring rounded-full bg-accent"></span>
+        running
+      </span>
     </header>
 
-    <div class="grid">
-      <div class="col">
+    <div class="mx-auto grid max-w-[96rem] grid-cols-1 gap-4 p-4 lg:grid-cols-[21rem_1fr]">
+      <div class="flex min-w-0 flex-col gap-4">
         <PanelRun
           :runs="runs" :busy="busy" :fixture-mode="fixtureMode" :error="error"
           @start="start" @open="open"
         />
         <PanelProgress :events="events" :running="busy" />
       </div>
-      <div class="col wide">
+      <div class="flex min-w-0 flex-col gap-4">
         <PanelEvidence
           :review-markdown="result?.review_markdown || ''"
           :verified-claims="result?.verified_claims || []"
@@ -147,19 +195,8 @@ const grounding = computed(() =>
           :overrides="overrides"
           @override="override"
         />
+        <PanelScores v-if="onOptimizer" :run-id="runId" />
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.top { display: flex; align-items: baseline; gap: 1.2rem; flex-wrap: wrap;
-       padding: .9rem 1.2rem; border-bottom: 1px solid var(--line); }
-h1 { font-size: 1.05rem; margin: 0; letter-spacing: .01em; }
-.stats { display: flex; gap: 1rem; font-size: .82rem; color: var(--muted); flex-wrap: wrap; }
-.stats b { color: var(--fg); }
-.chain { font-family: ui-monospace, monospace; font-size: .76rem; }
-.grid { display: grid; grid-template-columns: 22rem 1fr; gap: 1rem; padding: 1rem 1.2rem; }
-@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
-.col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
-</style>

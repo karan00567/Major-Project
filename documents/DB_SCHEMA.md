@@ -295,4 +295,73 @@ That last query is the payoff: `PROJECT_PLAN.md §9.4`'s ablation table becomes 
 
 ---
 
+## 12. Tables: `paper_scores` and `artefact_scores` — human judgement (T-612)
+
+A reviewer opens a finished run, sees the papers the Extractor actually read and the review it produced, and scores each **1 (worst) to 5 (best)**. Two tables, because they answer different questions — *was the retrieval any good?* and *was the writing any good?* — and the automated metrics cannot currently tell those apart. Averaging them into one number would destroy the distinction the tables exist to record.
+
+### The rule this feature had to reconcile
+
+§9 says a database call must never raise into its caller, and §1 rule 3 says this is a catalogue, not a log. Both still hold, because **the score is appended to the run's `trace.jsonl` first and mirrored here second** — exactly how T-609's overrides already work.
+
+* The trace is the record and keeps the **history** of a changed mind.
+* These tables are the queryable **mirror** and hold one current row per `(run_id, target, reviewer)`.
+* A Postgres outage costs the mirror and never the score. The API reports `persisted: "trace"` rather than `"trace+db"`, so the UI can say so honestly instead of claiming a write that did not happen.
+
+That is §1 rule 3 applied, not bent: the log stays in the log, and the index stays an index.
+
+### DDL
+
+```sql
+CREATE TABLE paper_scores (
+    id         UUID PRIMARY KEY,
+    run_id     VARCHAR(64) NOT NULL,
+    paper_id   VARCHAR(64) NOT NULL,
+    doi        TEXT,                       -- nullable, deliberately
+    title      TEXT        NOT NULL,       -- snapshot of what was judged
+    score      SMALLINT    NOT NULL,
+    note       TEXT,
+    reviewer   VARCHAR(64) NOT NULL DEFAULT 'human',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_paper_scores_range CHECK (score BETWEEN 1 AND 5),
+    CONSTRAINT uq_paper_scores_run_paper_reviewer UNIQUE (run_id, paper_id, reviewer)
+);
+CREATE INDEX ix_paper_scores_run_id ON paper_scores (run_id);
+CREATE INDEX ix_paper_scores_doi    ON paper_scores (doi);
+
+CREATE TABLE artefact_scores (
+    id         UUID PRIMARY KEY,
+    run_id     VARCHAR(64) NOT NULL,
+    artefact   VARCHAR(64) NOT NULL DEFAULT 'review.md',
+    score      SMALLINT    NOT NULL,
+    note       TEXT,
+    reviewer   VARCHAR(64) NOT NULL DEFAULT 'human',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_artefact_scores_range CHECK (score BETWEEN 1 AND 5),
+    CONSTRAINT uq_artefact_scores_run_artefact_reviewer UNIQUE (run_id, artefact, reviewer)
+);
+CREATE INDEX ix_artefact_scores_run_id ON artefact_scores (run_id);
+```
+
+### Three decisions worth knowing
+
+**`run_id` carries no foreign key to `runs`.** The registry is best-effort (§9), so a run whose artefacts are on disk may never have been registered — it only takes Postgres being down while the pipeline ran. An FK would then reject a human's score for a run that demonstrably exists, inverting the rule: the index would refuse data *because the index is incomplete*.
+
+**`paper_id` is the key and `doi` is nullable.** Roughly one OpenAlex record in five has no DOI. Measured on a real run: `W3167518830`, titled *"JBI evidence synthesis"*, has none at all — and a sheet keyed on DOI would silently drop exactly those papers. `doi` is carried for citation and for the reviewer's `doi.org` link, not as identity.
+
+**`title` is denormalised into the row, and §11 still stands.** Paper metadata belongs to SQLite `metadata_db`; this is not a metadata store. It is a **snapshot of the title the reviewer actually saw when they scored**, which must not change when the corpus is re-fetched. Evidence of what was judged, not a copy of the catalogue.
+
+### Range validation lives in two places
+
+`CHECK (score BETWEEN 1 AND 5)` duplicates the Pydantic bound in `api/schemas.py`. That is intentional: validation at one layer only is validation that can be walked around, and a score written by `psql` or by a later analysis script must still be in range.
+
+### What this deliberately does not do
+
+| Not included | Why |
+|---|---|
+| Feed scores back into retrieval or ranking | Collection only. The optimizer is a later task and gets that name when it exists. |
+| Identity / multi-rater support beyond `reviewer` | Single-user project. The column exists so a second rater needs no schema change — but §8 has no Alembic, so adding one means drop-and-recreate. |
+| Scoring papers outside the extracted corpus | A run retrieves thousands and extracts ten. Nobody hand-scores thousands, and there is no human judgement to record about a paper nobody read. |
+
+---
+
 *Companion to `TASKLIST.md` Phase 6B and `RESEARCHGPT_SPEC.md` §4 (module connectivity — the registry adds a persistence subsystem to the MCD).*

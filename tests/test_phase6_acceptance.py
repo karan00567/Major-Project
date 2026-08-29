@@ -376,3 +376,138 @@ def test_override_does_not_touch_the_review(client, runs):
     client.post("/api/runs/demo/overrides",
                 json={"claim_id": "c3", "decision": "reinstate"})
     assert review.read_text(encoding="utf-8") == before
+
+
+# --------------------------------------------------------------------------
+# T-611 — the max_papers picker
+# --------------------------------------------------------------------------
+
+#: What Panel 1 offers. A fixed list rather than a free number box: these are
+#: the sizes whose cost is actually known (see the runtime note in the panel),
+#: and a typed 8,347 is a two-hour run nobody meant to start.
+MAX_PAPER_OPTIONS = (5, 10, 15, 25, 50, 100)
+
+
+def test_t611_every_offered_size_is_accepted_by_the_api():
+    """🔴 The bound was ``le=60`` while the panel now offers 100, so choosing
+    the largest size would have 422'd - a picker that cannot pick its own top
+    entry. This test exists to keep the two ends from drifting again."""
+    import pydantic
+    import pytest as _pytest
+
+    from researchgpt.api.schemas import ReviewRequest
+
+    question = "How do multi-agent systems reduce hallucination in reviews?"
+    for size in MAX_PAPER_OPTIONS:
+        assert ReviewRequest(question=question, max_papers=size).max_papers == size
+
+    # The ceiling is still a ceiling: above the largest offered size it fails.
+    with _pytest.raises(pydantic.ValidationError):
+        ReviewRequest(question=question, max_papers=max(MAX_PAPER_OPTIONS) + 1)
+    with _pytest.raises(pydantic.ValidationError):
+        ReviewRequest(question=question, max_papers=0)
+
+
+def test_t611_the_panel_offers_exactly_those_sizes():
+    """The picker is the contract the test above checks. Read it from the
+    component so the two cannot say different things."""
+    import pathlib
+    import re
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    panel = (repo / "frontend" / "src" / "components" / "PanelRun.vue").read_text(
+        encoding="utf-8")
+    match = re.search(r"const PAPER_OPTIONS = \[([0-9,\s]+)\]", panel)
+    assert match, "PanelRun.vue must declare PAPER_OPTIONS for this to be checkable"
+    offered = tuple(int(n) for n in match.group(1).replace(" ", "").strip(",").split(","))
+    assert offered == MAX_PAPER_OPTIONS
+
+
+def test_t612_the_score_panel_is_gated_to_the_optimizer_path():
+    """The scoring sheet is reachable at /optimizer and nowhere else.
+
+    Asserted on the source because there is no JS test runner here: the panel
+    must be rendered behind a condition, not unconditionally. A gate that
+    quietly disappears would put a scoring form on the main demo page, which is
+    exactly what it was asked not to do.
+    """
+    import pathlib
+    import re
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    src = (repo / "frontend" / "src" / "App.vue").read_text(encoding="utf-8")
+
+    assert "'/optimizer'" in src, "the gate must name the path it opens on"
+    assert re.search(r"<PanelScores\s+v-if=", src), (
+        "PanelScores must be behind a v-if; rendering it unconditionally puts "
+        "the score sheet on every page"
+    )
+
+
+def test_t612_panel_two_no_longer_dumps_raw_trace_events():
+    """Panel 2 shows the agents and the Critic chain. The tail of raw events
+    ('graph run_end / critic agent_end / ...') described the shape of the log
+    rather than the run, and was removed 2026-08-29. The reasons survive as
+    each chip's title, and trace.jsonl remains the full record."""
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    panel = (repo / "frontend" / "src" / "components" / "PanelProgress.vue").read_text(
+        encoding="utf-8")
+    assert 'class="log"' not in panel
+    assert 'class="why"' not in panel
+    # The chain itself, and the reasons on hover, must stay. Matched on the
+    # class PREFIX: utility classes are appended alongside the hook since
+    # T-614, so pinning the exact attribute would break on restyling.
+    assert 'class="chain' in panel
+    assert 'd.decision' in panel
+    assert 'd.reasons.join' in panel
+
+
+def test_t613_the_dashboard_is_its_own_route_and_replaces_the_run_page():
+    """/dashboard explains the project to someone who has never seen it, so it
+    renders INSTEAD of the panels rather than above them."""
+    import pathlib
+    import re
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    src = (repo / "frontend" / "src" / "App.vue").read_text(encoding="utf-8")
+
+    assert "'/dashboard'" in src
+    assert re.search(r"<DashboardView\s+v-if=\"onDashboard\"", src)
+    # v-else on the app shell: the two views are exclusive, not stacked.
+    # Asserted on the directive, not on a class name - the class is styling and
+    # changed when the UI moved to Tailwind (T-614); the exclusivity is the
+    # contract.
+    assert re.search(r"<div\s+v-else", src)
+
+
+def test_t613_the_dashboard_cta_navigates_without_starting_a_run():
+    """🔴 The button must take the reader to the run page, NOT run anything.
+    A dashboard that kicks off a 40-minute job and a slice of a daily token
+    budget because someone clicked 'Run literature review' to see what it does
+    is a trap."""
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    view = (repo / "frontend" / "src" / "components" / "DashboardView.vue").read_text(
+        encoding="utf-8")
+
+    assert "window.location.href = '/'" in view
+    for forbidden in ("startReview", "postScores", "/api/review"):
+        assert forbidden not in view, (
+            f"{forbidden} on the dashboard - the CTA must navigate, not run"
+        )
+
+
+def test_t613_the_dashboard_states_the_problem_with_its_evidence():
+    """The argument for claim-level verification rests on these measurements;
+    without them the page is marketing copy."""
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    view = (repo / "frontend" / "src" / "components" / "DashboardView.vue").read_text(
+        encoding="utf-8")
+    for cited in ("FActScore", "ALCE", "Sarol", "SurveyGen"):
+        assert cited in view
+    assert "39.18%" in view and "35.84%" in view
