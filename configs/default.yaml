@@ -66,35 +66,34 @@ llm:
   # silently injects fabricated content (SPEC 14.2 forbids exactly this).
   #
   # Restore 120b once its daily window refills, if the two runs are comparable.
-  # ============================================================== TEMPORARY
-  # 🔴 PAID PROVIDER, FOR 2026-08-28 ONLY. REVERT TOMORROW.
+  # ======================================== PAID-HOST EXCURSION, NOW CLOSED
+  # 🟢 REVERTED 2026-08-29. Back on the free tier; TASKLIST 0.1 holds again.
   #
-  # This BREAKS TASKLIST 0.1 ("no paid models, no paid tiers, no trial
-  # credits, at any point in this project"), knowingly and on the human's
-  # explicit instruction, to unblock one T-409 test run after Groq's free tier
-  # ran out of DAILY tokens on both gpt-oss models.
+  # HISTORY, kept because the $0 rule has one documented breach inside it:
+  # on 2026-08-28, on the human's explicit instruction ("this api_key is just
+  # to test the run for 2 day"), this file named the PAID host `baseten` for
+  # one T-409 run, after Groq's free tier exhausted its 200,000-token DAILY
+  # budget on both gpt-oss models. That knowingly broke TASKLIST 0.1 ("no
+  # paid models, no paid tiers, no trial credits, at any point").
   #
-  # What is preserved: the MODEL. Baseten serves the same open-weight
-  # `openai/gpt-oss-120b` that the T-004 bake-off selected as PRIMARY, so this
-  # run's output is comparable to a free-tier run rather than better than one.
-  # Only the host is paid. Measured cost: ~4,730 tokens per extraction,
+  # What was preserved even then: the MODEL. Baseten served the same
+  # open-weight `openai/gpt-oss-120b` the T-004 bake-off selected as PRIMARY,
+  # so that run's output is comparable to a free-tier run rather than better
+  # than one. Only the host was paid - measured ~4,730 tokens per extraction,
   # ~118,000 for 25 papers, roughly $0.02.
   #
-  # The provider is stamped into outputs/runs/<id>/config.json and into every
-  # cache entry, so no artefact produced this way can be reported as $0 by
-  # accident.
+  # ⚠️ The artefacts from that window are still on disk and are NOT $0 runs.
+  # `provider` is stamped into outputs/runs/<id>/config.json and into every
+  # cache entry, so a run made that way is identifiable - check that field
+  # before reporting any run as zero-cost.
   #
-  # TOMORROW, REVERT TO:
-  #     model: openai/gpt-oss-20b
-  #     planner_model: openai/gpt-oss-20b
-  #     provider: null
-  #     requests_per_minute: 30
-  #     tokens_per_minute: 8000
-  #     review.max_papers: 10        <-- the human's instruction, see below
+  # Back on Groq the free-tier ceilings bind again, so the whole set reverts
+  # together: 20b, provider null, RPM 30, TPM 8000 (see below). Reverting the
+  # model without the pacing is what walks straight back into a 429 storm.
   # ==========================================================================
-  model: openai/gpt-oss-120b       # T-004 PRIMARY. Same weights, paid host.
-  planner_model: openai/gpt-oss-120b
-  provider: baseten                # TEMPORARY - see the block above
+  model: openai/gpt-oss-20b        # free tier; it was 120b's TPD that ran out
+  planner_model: openai/gpt-oss-20b
+  provider: null                   # Groq, inferred from MODEL_PROVIDER
   temperature: 0.1
   # 4096 -> 2048. Measured over 55 cached extractions: median response 571
   # tokens, p90 948, max 1,682. 4096 reserved 2.4x the largest response ever
@@ -123,14 +122,14 @@ llm:
   # Now: llm.py estimates prompt+max_tokens, refuses an impossible request
   # immediately with TokenBudgetExceeded, and paces on a rolling 60 s token
   # ledger. requests_per_minute returns to Groq's real 30; tokens govern.
-  # TEMPORARY (2026-08-28): Baseten is a paid endpoint with no 8,000 TPM free
-  # cap, so the token pacing that Groq needs is switched off. Setting
-  # tokens_per_minute to 0 also disables the TokenBudgetExceeded pre-flight,
-  # which is correct here - that guard exists for a small free-tier bucket.
-  # RESTORE 30 / 8000 when reverting to Groq, or the first free-tier run will
-  # walk straight back into the 429 storm of 2026-08-28.
-  requests_per_minute: 60
-  tokens_per_minute: 0
+  # RESTORED 2026-08-29 to 30 / 8000, with the revert to Groq above.
+  # The 2026-08-28 excursion ran 60 / 0 because Baseten is a paid endpoint
+  # with no 8,000 TPM free cap; tokens_per_minute: 0 also switches off the
+  # TokenBudgetExceeded pre-flight, which is only ever correct against a host
+  # that has no small bucket to protect. Do not carry those two values back
+  # to a free-tier run - that pairing is the 429 storm of 2026-08-28.
+  requests_per_minute: 30
+  tokens_per_minute: 8000
   # ★ gpt-oss are REASONING models. max_tokens budgets the reasoning trace AND
   # the visible answer together, so at the provider's default effort the trace
   # can eat the whole budget and return EMPTY content.
@@ -253,12 +252,18 @@ review:
   # UNION recall - did retrieval find the paper at all - is unaffected, and
   # decisions.txt D-04 already makes that the primary gate for exactly this
   # reason.
-  # TEMPORARY 2026-08-28: 25 -> 10 for the end-to-end verification run on the
-  # paid host. NOTE for the ablations: T-702/T-703 specify max_papers=25, so a
-  # 10-paper run is NOT directly comparable to them. With a 35-paper answer key
-  # this also caps CORPUS recall at 10/35 = 0.286 by arithmetic; UNION recall
-  # (did retrieval find the paper at all) is unaffected and remains the gate
-  # under decisions.txt D-04.
+  # 25 -> 10 on 2026-08-28 for the end-to-end verification run on the paid
+  # host, and DELIBERATELY KEPT at 10 through the 2026-08-29 revert, on the
+  # human's instruction: "from tomorrow, change the max_papers=10 for groq".
+  # Ten is what one full run can afford inside Groq's 200,000-token DAILY
+  # budget - the ceiling that forced the excursion in the first place.
+  #
+  # NOTE for the ablations: T-702/T-703 specify max_papers=25, so a 10-paper
+  # run is NOT directly comparable to them; raise this to 25 for those runs
+  # and budget the daily tokens accordingly. With a 35-paper answer key, 10
+  # also caps CORPUS recall at 10/35 = 0.286 by arithmetic; UNION recall (did
+  # retrieval find the paper at all) is unaffected and remains the gate under
+  # decisions.txt D-04.
   max_papers: 10
   year_min: 2019
   max_iterations: 3                # hard cap, forced WRITE on the last
