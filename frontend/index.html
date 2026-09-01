@@ -3,7 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ResearchGPT</title>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description"
+          content="ResearchGPT — a multi-agent agentic RAG platform that drafts a
+                   cited literature review and then verifies every claim it wrote
+                   against the evidence it retrieved, dropping whatever it cannot
+                   ground." />
+    <title>ResearchGPT — verified literature review</title>
+
+    <!--
+      Theme, before first paint.
+
+      ⚠️ Inline and synchronous on purpose. The Vue bundle is a module, so it is
+      deferred; if the class were applied from src/lib/theme.js the page would
+      paint white and then flip, which is worse on a projector than simply
+      being in the wrong theme. Reads the same localStorage key that module
+      owns — the two must stay in sync.
+    -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('researchgpt-theme')
+          var dark = pref === 'dark' || (pref !== 'light'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {
+          /* storage blocked: fall through to the light default */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -309,6 +309,56 @@ def test_every_verified_claim_carries_its_evidence():
     assert not without, f"verified claims with no evidence span: {without[:5]}"
 
 
+def test_every_cited_paper_reaches_the_evidence_panel():
+    """Panel 3 names a claim's SOURCE by resolving its ``paper_ids`` against
+    the ``papers`` list in the same payload. So the payload's size cap must
+    never drop a paper a claim cites.
+
+    🔴 It did. The cap was a plain ``papers[:200]`` over a corpus in RETRIEVAL
+    order, while the cited papers are whatever the Ranker floated to the top —
+    unrelated orders. On the fixture, five of the nine cited papers sit at
+    positions 251-466 and fell outside the slice, so more than half of the
+    panel's source lookups missed and it could only say "not in this payload"
+    about a paper the run had read. A slice is the obvious implementation and
+    the wrong one; this test is what makes that visible.
+    """
+    import json
+    import pathlib
+
+    from researchgpt.api.app import RESULT_PAPER_LIMIT, _papers_for_panel
+
+    run = pathlib.Path("outputs/runs/fixture")
+    if not (run / "claims.json").exists():
+        pytest.skip("fixture not built in this checkout")
+
+    claims = json.loads((run / "claims.json").read_text(encoding="utf-8"))
+    corpus = json.loads((run / "corpus.json").read_text(encoding="utf-8"))
+
+    served = _papers_for_panel(corpus, claims)
+    served_ids = {p["paper_id"] for p in served}
+
+    cited = {
+        pid
+        for bucket in ("verified", "dropped")
+        for claim in claims[bucket]
+        for pid in claim.get("paper_ids") or []
+    }
+    known = {p["paper_id"] for p in corpus["papers"]}
+
+    missing = (cited & known) - served_ids
+    assert not missing, (
+        f"{len(missing)} cited papers are absent from /result: {sorted(missing)[:5]}. "
+        "Panel 3 cannot name their source."
+    )
+
+    # The papers a human is asked to score must survive the cap for the same
+    # reason - and the cap itself has to still be a cap.
+    extracted = set(corpus.get("extracted_paper_ids") or []) & known
+    assert extracted <= served_ids, "extracted papers were truncated away"
+    assert len(served) <= RESULT_PAPER_LIMIT
+    assert len(served_ids) == len(served), "the payload repeats a paper"
+
+
 # --------------------------------------------------------------------------
 # T-609 — human-in-the-loop, persisted
 # --------------------------------------------------------------------------

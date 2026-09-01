@@ -1,19 +1,32 @@
 <script setup>
 // T-605 — Panel 1. Query, max_papers, run. Also the run picker, because the
 // demo path (T-610) replays a pre-baked run rather than running live.
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { ago, num, pct, stamp, truncate } from '../lib/format.js'
 
-defineProps({
+const props = defineProps({
   runs: { type: Array, default: () => [] },
   busy: Boolean,
   fixtureMode: Boolean,
   error: { type: String, default: '' },
+  openRunId: { type: String, default: '' },
 })
 const emit = defineEmits(['start', 'open'])
 
 const question = ref(
   'How do multi-agent retrieval-augmented systems reduce hallucination in automated literature review?',
 )
+
+// Three questions the corpus can actually answer, so a reader with no question
+// of their own has somewhere to start. Picking one only fills the box — it
+// never starts a run, for the same reason the dashboard's CTA does not: a
+// 40-minute job against a metered daily budget must be deliberate.
+const EXAMPLES = [
+  'How do multi-agent retrieval-augmented systems reduce hallucination in automated literature review?',
+  'What evaluation metrics are used for citation faithfulness in generated scientific text?',
+  'How do cross-encoder rerankers compare with dense retrieval for scientific literature search?',
+]
+
 // T-611. A fixed list, not a free number box. These are the sizes whose cost
 // is actually known, and the runtime is paced by the provider's tokens per
 // minute rather than by CPU - measured 2026-08-29, extraction admits roughly
@@ -36,24 +49,43 @@ const RUNTIME_HINT = {
 // Defaults low on purpose: a 25-paper run is minutes long against a metered
 // free tier, so the live demo is meant to be small (T-610).
 const maxPapers = ref(10)
+
+const filter = ref('')
+
+const tooShort = computed(() => question.value.trim().length < 10)
+
+const visibleRuns = computed(() => {
+  const q = filter.value.trim().toLowerCase()
+  if (!q) return props.runs
+  return props.runs.filter((r) =>
+    `${r.run_id} ${r.question || ''}`.toLowerCase().includes(q))
+})
+
+const DOT = {
+  complete: 'bg-supported',
+  running: 'bg-replan animate-pulse-ring',
+  failed: 'bg-unsupported',
+}
 </script>
 
 <template>
-  <section class="panel">
-    <header class="mb-3 flex items-baseline justify-between">
-      <h2 class="panel-title">1 · Run</h2>
-      <a href="/optimizer"
-         class="text-[0.68rem] uppercase tracking-[0.08em] text-ink-dim
-                no-underline transition hover:text-accent dark:text-night-dim">
-        score a run
-      </a>
-    </header>
+  <section class="panel panel-pad">
+    <h2 class="panel-title mb-3"><span class="panel-index">1</span> Run</h2>
 
     <label class="block">
       <span class="field-label">Research question</span>
       <textarea v-model="question" rows="3" :disabled="busy"
                 class="control resize-y leading-relaxed" />
     </label>
+
+    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <span class="text-[0.7rem] text-ink-faint dark:text-night-faint">try:</span>
+      <button v-for="(ex, i) in EXAMPLES" :key="i" type="button"
+              class="btn-quiet max-w-full truncate !text-[0.72rem]"
+              :disabled="busy" :title="ex" @click="question = ex">
+        {{ truncate(ex, 38) }}
+      </button>
+    </div>
 
     <div class="mt-3 flex items-end gap-3">
       <label class="block min-w-0 flex-1">
@@ -66,12 +98,19 @@ const maxPapers = ref(10)
       </label>
       <button
         class="btn-primary shrink-0"
-        :disabled="busy || fixtureMode || question.trim().length < 10"
+        :disabled="busy || fixtureMode || tooShort"
+        :title="fixtureMode
+          ? 'Fixture mode refuses live runs'
+          : tooShort ? 'The question needs at least 10 characters' : ''"
         @click="emit('start', { question, maxPapers })"
       >
         {{ busy ? 'Running…' : 'Run review' }}
       </button>
     </div>
+    <p v-if="tooShort && !busy"
+       class="mt-1.5 text-[0.74rem] text-ink-dim dark:text-night-dim">
+      The API requires at least 10 characters.
+    </p>
 
     <p v-if="maxPapers >= 50"
        class="mt-3 rounded-lg border-l-[3px] border-replan bg-replan/10 px-3 py-2
@@ -88,38 +127,70 @@ const maxPapers = ref(10)
               text-ink-dim dark:text-night-dim">
       <strong class="text-ink dark:text-night-fg">Fixture mode.</strong>
       Live runs are disabled; open a recorded run below. Unset
-      <code class="font-mono text-[0.9em]">RESEARCHGPT_FIXTURE</code> to run for real.
+      <code class="tag-mono">RESEARCHGPT_FIXTURE</code> to run for real.
     </p>
-    <p v-if="error" class="mt-3 text-[0.82rem] text-unsupported">{{ error }}</p>
+    <p v-if="error"
+       class="mt-3 rounded-lg border-l-[3px] border-unsupported bg-unsupported/10
+              px-3 py-2 text-[0.82rem] text-unsupported dark:text-unsupported-lite">
+      {{ error }}
+    </p>
 
-    <h3 class="panel-title mb-2 mt-5">Previous runs</h3>
-    <ul class="scroll-soft -mr-1 max-h-64 space-y-1 overflow-y-auto pr-1">
-      <li v-for="r in runs" :key="r.run_id">
+    <div class="panel-head mb-2 mt-5">
+      <h3 class="panel-title">Previous runs</h3>
+      <span class="text-[0.7rem] text-ink-dim dark:text-night-dim">
+        {{ visibleRuns.length }} of {{ runs.length }}
+      </span>
+    </div>
+    <input v-if="runs.length > 6" v-model="filter" type="search"
+           placeholder="filter runs"
+           class="control mb-2 !py-1.5 text-[0.8rem]" aria-label="Filter runs" />
+
+    <p v-if="!runs.length" class="panel-note">
+      No runs on disk yet. Artefacts land in
+      <code class="tag-mono">outputs/runs/</code>, and every directory there
+      shows up here — the filesystem is the record, not a database.
+    </p>
+
+    <ul class="scroll-soft -mr-1 max-h-72 space-y-1 overflow-y-auto pr-1">
+      <li v-for="r in visibleRuns" :key="r.run_id">
         <button
-          class="w-full rounded-lg border border-transparent px-2 py-1.5 text-left
-                 transition hover:border-paper-line hover:bg-paper
-                 dark:hover:border-night-line dark:hover:bg-night"
+          class="w-full rounded-lg border px-2.5 py-2 text-left transition"
+          :class="r.run_id === openRunId
+            ? 'border-accent bg-accent-soft'
+            : 'border-transparent hover:border-paper-line hover:bg-paper dark:hover:border-night-line dark:hover:bg-night'"
+          :aria-current="r.run_id === openRunId ? 'true' : undefined"
           @click="emit('open', r.run_id)"
         >
-          <span class="block truncate font-mono text-[0.78rem] text-accent">
-            {{ r.run_id }}
+          <!-- The question first. A column of run ids is unreadable: they are
+               all the same shape, and the only thing that distinguishes one
+               run from another is what it was asked. A run whose trace never
+               recorded one falls back to its id as the heading rather than to
+               a row of identical "(not recorded)" placeholders. -->
+          <span class="block truncate text-[0.8rem] font-medium
+                       text-ink dark:text-night-fg"
+                :class="r.question ? '' : 'font-mono !text-[0.76rem]'">
+            {{ r.question || r.run_id }}
           </span>
-          <span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.72rem]
-                       text-ink-dim dark:text-night-dim">
+          <span class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5
+                       text-[0.7rem] text-ink-dim dark:text-night-dim">
             <span class="flex items-center gap-1">
-              <span class="h-1.5 w-1.5 rounded-full"
-                    :class="{
-                      'bg-supported': r.status === 'complete',
-                      'bg-replan animate-pulse-ring': r.status === 'running',
-                      'bg-unsupported': r.status === 'failed',
-                    }" />
+              <span class="h-1.5 w-1.5 rounded-full" :class="DOT[r.status]" />
               {{ r.status }}
             </span>
-            <template v-if="r.papers">· {{ r.papers }} papers</template>
+            <template v-if="r.started">
+              · <span :title="stamp(r.started)">{{ ago(r.started) }}</span>
+            </template>
+            <template v-if="r.papers">· {{ num(r.papers) }} papers</template>
             <template v-if="r.verified_claims != null">
               · {{ r.verified_claims }} kept / {{ r.dropped_claims }} dropped
             </template>
+            <template v-if="r.grounding_score != null">
+              · {{ pct(r.grounding_score, 0) }} grounded
+            </template>
           </span>
+          <span v-if="r.question"
+                class="mt-0.5 block truncate font-mono text-[0.68rem]
+                       text-ink-faint dark:text-night-faint">{{ r.run_id }}</span>
         </button>
       </li>
     </ul>

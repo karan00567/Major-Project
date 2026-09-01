@@ -122,6 +122,10 @@ class RunResult(BaseModel):
     #: persuasive next to what it did say.
     dropped_claims: list[ClaimOut] = []
     papers: list[dict[str, Any]] = []
+    #: Which of those the Extractor actually read. A run retrieves hundreds and
+    #: extracts ten, and the difference is the point: the panel can say "read"
+    #: rather than "retrieved" about a paper only if it is told which is which.
+    extracted_paper_ids: list[str] = []
     artefacts: list[str] = []
     decisions: list[str] = []
     iterations: int = 0

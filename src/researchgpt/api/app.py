@@ -213,10 +213,38 @@ def _status(run_id: str, run_dir: pathlib.Path) -> str:
     return "running" if events else "unknown"
 
 
+#: The two keys a ``run_start`` payload can carry the question under. There are
+#: genuinely two emitters and they never agreed: ``graph/build.py`` writes
+#: ``research_question``, ``cli.py`` writes ``question``.
+_QUESTION_KEYS = ("research_question", "question")
+
+
 def _question_of(events: list[dict]) -> str | None:
+    """The question a run was asked, from whichever emitter recorded it.
+
+    🔴 This read ``research_question`` only, and returned on the FIRST
+    ``run_start`` it saw. A CLI-launched run emits its own ``run_start`` first,
+    under ``question`` — so the function hit that record, found no
+    ``research_question``, and returned None. Measured 2026-08-30 across
+    ``outputs/runs/``: **68 of 80 runs carry the CLI shape**, so the endpoint
+    was blind to the question of 85% of runs on disk.
+
+    That was invisible while the run picker led with the run id. It stopped
+    being invisible the moment the picker led with the question, which is the
+    only thing that distinguishes one run from another in a list of eighty.
+
+    So: scan every ``run_start``, accept either key, and take the first one that
+    actually has a question rather than the first record that merely looks like
+    the right event.
+    """
     for e in events:
-        if e.get("event") == "run_start":
-            return (e.get("payload") or {}).get("research_question")
+        if e.get("event") != "run_start":
+            continue
+        payload = e.get("payload") or {}
+        for key in _QUESTION_KEYS:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
     return None
 
 
@@ -358,6 +386,54 @@ def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
     return out
 
 
+#: How many papers ``/result`` carries. A run's corpus runs to hundreds and the
+#: page renders a handful, so the payload is capped — see ``_papers_for_panel``
+#: for what the cap must never truncate.
+RESULT_PAPER_LIMIT = 200
+
+
+def _papers_for_panel(corpus: Any, claims: dict) -> list[dict]:
+    """The corpus, capped — but never at the cost of a cited paper.
+
+    🔴 A plain ``papers[:200]`` looks harmless and is not. The corpus is in
+    RETRIEVAL order while the papers the review actually cites are whatever the
+    Ranker floated to the top, so the two orders are unrelated: on the fixture,
+    **five of the nine cited papers sit at positions 251-466** and fell outside
+    the slice. Panel 3 resolves a claim's ``paper_ids`` against this list to
+    name its source, so more than half of those lookups missed and the panel
+    could only say "not in this payload" about a paper the run had read.
+
+    Cited first, then the extracted set, then the rest of the corpus up to the
+    cap: the papers the UI is guaranteed to ask about are the ones it is
+    guaranteed to get.
+    """
+    papers = corpus.get("papers") if isinstance(corpus, dict) else corpus
+    papers = list(papers or [])
+    by_id = {p.get("paper_id"): p for p in papers if p.get("paper_id")}
+
+    wanted: list[str] = []
+    for bucket in ("verified", "dropped"):
+        for claim in claims.get(bucket) or []:
+            wanted.extend(claim.get("paper_ids") or [])
+    if isinstance(corpus, dict):
+        wanted.extend(corpus.get("extracted_paper_ids") or [])
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    for pid in wanted:
+        if pid in by_id and pid not in seen:
+            seen.add(pid)
+            out.append(by_id[pid])
+    for paper in papers:
+        if len(out) >= RESULT_PAPER_LIMIT:
+            break
+        pid = paper.get("paper_id")
+        if pid not in seen:
+            seen.add(pid)
+            out.append(paper)
+    return out
+
+
 @app.get("/api/runs/{run_id}/result", response_model=RunResult)
 def run_result(run_id: str) -> RunResult:
     """Everything the Vue app renders, in one request."""
@@ -367,7 +443,6 @@ def run_result(run_id: str) -> RunResult:
     payload = (end or {}).get("payload") or {}
     claims = _read_json(run_dir / "claims.json") or {}
     corpus = _read_json(run_dir / "corpus.json") or {}
-    papers = corpus.get("papers") if isinstance(corpus, dict) else corpus
 
     review = ""
     md = run_dir / "review.md"
@@ -383,7 +458,10 @@ def run_result(run_id: str) -> RunResult:
         counts=claims.get("counts") or {},
         verified_claims=_claims_out(claims.get("verified") or []),
         dropped_claims=_claims_out(claims.get("dropped") or []),
-        papers=list(papers or [])[:200],
+        papers=_papers_for_panel(corpus, claims),
+        extracted_paper_ids=list(
+            (corpus.get("extracted_paper_ids") or []) if isinstance(corpus, dict) else []
+        ),
         artefacts=sorted(f.name for f in run_dir.iterdir() if f.name in DOWNLOADABLE),
         decisions=list(payload.get("decisions") or []),
         iterations=int(payload.get("iterations") or 0),

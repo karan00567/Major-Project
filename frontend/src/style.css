@@ -2,38 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-/* T-614. Two shared component classes, because "a bordered card" and "a panel
-   heading" appear on every screen and repeating fifteen utilities each time is
-   how a design drifts out of alignment. Everything else is utilities in place. */
+/* T-614. Shared component classes, because "a bordered card", "a panel
+   heading", "a stat" and "a pill" appear on every screen and repeating fifteen
+   utilities each time is how a design drifts out of alignment. Everything else
+   is utilities in place. */
 @layer components {
   .panel {
-    @apply rounded-xl border border-paper-line bg-paper-card p-4 shadow-card
+    @apply rounded-2xl border border-paper-line bg-paper-card shadow-card
            dark:border-night-line dark:bg-night-card dark:shadow-none;
   }
+  .panel-pad { @apply p-4 sm:p-5; }
+
+  /* The numbered eyebrow every panel wears. `.panel-index` is the small
+     numeral; keeping it separate from the label lets the number stay quiet
+     while the label carries the meaning. */
   .panel-title {
-    @apply text-[0.72rem] font-semibold uppercase tracking-[0.09em]
-           text-ink-dim dark:text-night-dim;
+    @apply flex items-center gap-2 text-[0.72rem] font-semibold uppercase
+           tracking-[0.09em] text-ink-dim dark:text-night-dim;
   }
+  .panel-index {
+    @apply grid h-[1.15rem] w-[1.15rem] place-items-center rounded-md
+           bg-paper-sunk text-[0.66rem] font-bold text-ink-dim
+           dark:bg-night-sunk dark:text-night-dim;
+  }
+  .panel-head {
+    @apply flex flex-wrap items-center justify-between gap-x-4 gap-y-2;
+  }
+  .panel-note {
+    @apply text-[0.82rem] leading-relaxed text-ink-dim dark:text-night-dim;
+  }
+
   .field-label {
-    @apply mb-1 block text-[0.72rem] font-medium uppercase tracking-[0.08em]
+    @apply mb-1.5 block text-[0.72rem] font-medium uppercase tracking-[0.08em]
            text-ink-dim dark:text-night-dim;
   }
   .control {
     @apply w-full rounded-lg border border-paper-line bg-paper px-3 py-2 text-sm
            text-ink outline-none transition
-           focus:border-accent focus:ring-2 focus:ring-accent/25
-           disabled:opacity-50
-           dark:border-night-line dark:bg-night dark:text-night-fg;
+           placeholder:text-ink-faint
+           focus:border-accent focus:bg-paper-card focus:ring-4 focus:ring-accent/15
+           disabled:cursor-not-allowed disabled:opacity-50
+           dark:border-night-line dark:bg-night dark:text-night-fg
+           dark:placeholder:text-night-faint dark:focus:bg-night-sunk;
   }
   .btn-primary {
-    @apply rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white
-           transition hover:bg-accent-hover
-           disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent
+           px-4 py-2 text-sm font-semibold text-white shadow-card transition
+           hover:bg-accent-hover hover:shadow-lift active:translate-y-px
+           disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none
+           disabled:hover:bg-accent;
   }
   .btn-ghost {
-    @apply rounded-md border border-paper-line px-2.5 py-1 text-xs font-medium
-           text-ink-dim transition hover:border-accent hover:text-accent
-           dark:border-night-line dark:text-night-dim;
+    @apply inline-flex items-center gap-1.5 rounded-md border border-paper-line
+           bg-paper-card px-2.5 py-1 text-xs font-medium text-ink-dim transition
+           hover:border-accent hover:text-accent hover:shadow-card
+           disabled:cursor-not-allowed disabled:opacity-45
+           dark:border-night-line dark:bg-night-card dark:text-night-dim
+           dark:hover:border-accent-lite dark:hover:text-accent-lite;
+  }
+  .btn-quiet {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs
+           font-medium text-ink-dim transition hover:bg-paper-sunk
+           hover:text-ink dark:text-night-dim dark:hover:bg-night-sunk
+           dark:hover:text-night-fg;
+  }
+
+  /* One pill shape for every small labelled fact: a verdict, a source, a
+     count. Colour is applied by the caller; the geometry is shared. */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5
+           text-[0.68rem] font-semibold leading-5;
+  }
+  .pill-soft {
+    @apply pill bg-paper-sunk text-ink-dim dark:bg-night-sunk dark:text-night-dim;
+  }
+  .tag-mono {
+    @apply rounded bg-paper-sunk px-1.5 py-0.5 font-mono text-[0.7rem]
+           text-ink-dim dark:bg-night-sunk dark:text-night-dim;
+  }
+
+  /* A metric. `tabular-nums` so a column of numbers does not jitter as it
+     updates during a live run. */
+  .stat {
+    @apply rounded-xl border border-paper-line bg-paper-card px-3 py-2.5
+           transition hover:border-accent/40 hover:shadow-card
+           dark:border-night-line dark:bg-night-card;
+  }
+  .stat-value {
+    @apply block font-mono text-[1.15rem] font-semibold leading-tight
+           tabular-nums text-ink dark:text-night-fg;
+  }
+  .stat-label {
+    @apply mt-0.5 block text-[0.68rem] uppercase tracking-[0.07em]
+           text-ink-dim dark:text-night-dim;
+  }
+
+  .divider { @apply border-t border-paper-hair dark:border-night-hair; }
+
+  .skeleton {
+    @apply rounded-md bg-paper-sunk dark:bg-night-sunk;
+    background-image: linear-gradient(
+      90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+    background-size: 400px 100%;
+    background-repeat: no-repeat;
+    @apply animate-shimmer;
+  }
+  .dark .skeleton {
+    background-image: linear-gradient(
+      90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+  }
+
+  /* Links inside prose. Underline on hover only, so a paragraph of citations
+     does not read as a fence. */
+  .link {
+    @apply text-accent no-underline transition hover:underline
+           dark:text-accent-lite;
   }
 }
 
@@ -42,16 +125,48 @@ html { scroll-behavior: smooth; }
 body {
   @apply bg-paper text-ink antialiased dark:bg-night dark:text-night-fg;
   font-family: theme('fontFamily.sans');
+  /* A very soft accent wash behind the header. Enough to stop the page reading
+     as a white rectangle; not enough to compete with anything on it.
+     ⚠️ NOT `background-attachment: fixed`. A fixed gradient has to be recomposited
+     on every scroll frame, and on the run page — a long document plus a
+     backdrop-blurred sticky header — that was enough to stall the renderer for
+     seconds at a time. It scrolls with the page, which is also what a wash
+     behind the header should do. */
+  background-image:
+    radial-gradient(60rem 22rem at 50% -8rem, theme('colors.accent.soft'), transparent);
+  background-repeat: no-repeat;
+}
+
+/* Keyboard users get a visible ring everywhere; mouse users never see it.
+   The panels are full of clickable spans and pips, and without this the whole
+   evidence panel is unusable from the keyboard. */
+:focus-visible {
+  outline: 2px solid theme('colors.accent.DEFAULT');
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.dark :focus-visible { outline-color: theme('colors.accent.lite'); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Scrollbars inside panels, so a long list does not draw a heavy grey bar
    across a light card. */
 .scroll-soft { scrollbar-width: thin; scrollbar-color: theme('colors.paper.line') transparent; }
 .scroll-soft::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-soft::-webkit-scrollbar-track { background: transparent; }
 .scroll-soft::-webkit-scrollbar-thumb {
   background: theme('colors.paper.line'); border-radius: 999px;
 }
-@media (prefers-color-scheme: dark) {
-  .scroll-soft { scrollbar-color: theme('colors.night.line') transparent; }
-  .scroll-soft::-webkit-scrollbar-thumb { background: theme('colors.night.line'); }
-}
+.scroll-soft:hover::-webkit-scrollbar-thumb { background: #cfd3da; }
+/* Class-based, not a media query: the theme is now overridable (T-614 note in
+   tailwind.config.js), and a media query would keep painting OS-dark
+   scrollbars onto a page the reader has forced light. */
+.dark .scroll-soft { scrollbar-color: theme('colors.night.line') transparent; }
+.dark .scroll-soft::-webkit-scrollbar-thumb { background: theme('colors.night.line'); }

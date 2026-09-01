@@ -29,6 +29,10 @@ const dirty = computed(() =>
   Object.keys(paperScores.value).length > 0 || artefactScore.value != null,
 )
 
+/** How much of the sheet is done. A reviewer working through twenty papers
+ *  needs to see the end of the list from the middle of it. */
+const scored = computed(() => Object.keys(paperScores.value).length)
+
 async function load(id) {
   sheet.value = null
   error.value = ''
@@ -92,10 +96,12 @@ async function submit() {
 
 <template>
   <section class="panel">
-    <header class="mb-3 flex items-baseline justify-between gap-2">
-      <h2 class="panel-title">5 · Score</h2>
+    <header class="panel-head mb-3">
+      <h2 class="panel-title"><span class="panel-index">6</span> Score</h2>
       <span v-if="sheet && sheet.papers.length"
-            class="text-[0.7rem] text-ink-dim dark:text-night-dim">
+            class="flex items-center gap-2 text-[0.7rem] text-ink-dim
+                   dark:text-night-dim">
+        <span class="pill-soft">{{ scored }}/{{ sheet.papers.length }} scored</span>
         1 worst · 5 best
       </span>
     </header>
@@ -111,10 +117,18 @@ async function submit() {
     </p>
 
     <template v-if="sheet && sheet.papers.length">
-      <p class="mb-3 text-[0.84rem] leading-relaxed text-ink-dim dark:text-night-dim">
+      <p class="panel-note mb-2">
         Score the papers the Extractor actually read — follow the DOI to check
-        one — then the review itself.
+        one — then the review itself. Two verdicts, not one: "was the retrieval
+        any good?" and "was the writing any good?" are different questions, and
+        corpus recall has read 0.000 in runs whose grounding score read 1.000,
+        so a single blended number would destroy exactly that distinction.
       </p>
+      <div class="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-paper-sunk
+                  dark:bg-night-sunk">
+        <div class="h-full rounded-full bg-accent transition-all duration-500"
+             :style="{ width: `${(scored / sheet.papers.length) * 100}%` }" />
+      </div>
 
       <ul class="papers scroll-soft -mr-1 max-h-[46vh] space-y-2 overflow-y-auto pr-1">
         <li v-for="p in sheet.papers" :key="p.paper_id"
@@ -174,12 +188,20 @@ async function submit() {
         <button class="btn-primary" :disabled="busy || !dirty" @click="submit">
           {{ busy ? 'Saving…' : 'Save scores' }}
         </button>
-        <p v-if="saved" class="text-[0.78rem] text-ink-dim dark:text-night-dim">
+        <p v-if="saved"
+           class="text-[0.78rem]"
+           :class="saved.includes('Not mirrored')
+             ? 'text-replan dark:text-replan-lite'
+             : 'text-supported dark:text-supported-lite'">
           {{ saved }}
         </p>
       </div>
     </template>
 
-    <p v-if="error" class="mt-2 text-[0.82rem] text-unsupported">{{ error }}</p>
+    <p v-if="error"
+       class="mt-2 rounded-lg border-l-[3px] border-unsupported bg-unsupported/10
+              px-3 py-2 text-[0.82rem] text-unsupported dark:text-unsupported-lite">
+      {{ error }}
+    </p>
   </section>
 </template>

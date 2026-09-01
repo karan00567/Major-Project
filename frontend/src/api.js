@@ -67,12 +67,39 @@ export function streamEvents(runId, onEvent, onDone) {
 
   // Named events, because the server sets `event:` to the trace's own event
   // name rather than using a single generic channel.
+  //
+  // ⚠️ EventSource ONLY delivers a named event to a listener registered for
+  // that exact name - `onmessage` sees the unnamed default channel and nothing
+  // else. So this list is not documentation, it is the filter: an event missing
+  // from it is silently discarded, with no error anywhere.
+  //
+  // It was thirteen names, and the run page was consequently blind to the nine
+  // richest payloads on the wire - `plan_ready` (the sub-questions), `search`
+  // (every query and what it returned), `rank_summary`, `extract_summary`,
+  // `review_written`, `embed_cache`, `request` / `cache_hit` (the LLM bill).
+  // Enumerated from every event name emitted across src/researchgpt/ and
+  // present in outputs/runs/*/trace.jsonl, 2026-08-30. Adding a new trace event
+  // means adding it here too, or the UI will not see it.
   es.onmessage = (m) => safeParse(m.data, onEvent)
   for (const name of [
-    'run_start', 'agent_start', 'agent_end', 'critic_decision',
-    'claims_decomposed', 'verification_summary', 'claim_dropped',
-    'extract_progress', 'retrieval_summary', 'rank_summary', 'replanning',
-    'run_end', 'run_failed',
+    // lifecycle
+    'run_start', 'run_end', 'run_failed', 'agent_start', 'agent_end',
+    'agent_error', 'error', 'artefacts_written',
+    // planner
+    'plan_ready', 'replanning',
+    // retriever
+    'search', 'retrieval_summary', 'source_disabled', 'retry',
+    // ranker
+    'embed_cache', 'rank_summary', 'rank_skipped',
+    // extractor
+    'extract_progress', 'extract_summary',
+    // writer
+    'section_written', 'section_failed', 'section_rejected_uncited',
+    'section_uncited_retry', 'review_written',
+    // verifier
+    'claims_decomposed', 'claim_dropped', 'verification_summary',
+    // critic + llm adapter
+    'critic_decision', 'request', 'cache_hit',
   ]) {
     es.addEventListener(name, (m) => safeParse(m.data, onEvent))
   }
