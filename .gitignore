@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+# A stray copy named `env` (no dot) slips past the patterns above and carries
+# the same live keys. Ignore it too rather than rely on nobody running `git add .`.
+/env
 
 # Runtime artefacts (T-008)
 # ⚠️ ANCHORED with a leading slash — these must match ONLY the runtime

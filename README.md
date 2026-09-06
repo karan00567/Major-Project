@@ -110,20 +110,69 @@ DATABASE_URL=           # optional; empty disables the registry
 ### The web app
 
 ```bash
-# Terminal 1 — API. RESEARCHGPT_FIXTURE=1 replays a recorded run and
-# REFUSES to start live ones, which is what you want for a demo.
-RESEARCHGPT_FIXTURE=1 python -m uvicorn researchgpt.api.app:app --port 8000
+# Terminal 1 — API
+python -m uvicorn researchgpt.api.app:app --port 8000
 
 # Terminal 2 — UI
 cd frontend && npm install && npm run dev
 ```
 
+Setting `RESEARCHGPT_FIXTURE=1` (in the environment or in `.env`) makes the API
+**refuse to start new reviews** — `POST /api/review` answers 409 — and open the
+pre-recorded run instead. Use it when the machine must not start a job by
+accident. Leave it unset to ask live questions.
+
+> The UI never describes itself as being in a demo. With the flag on it says
+> only *"New reviews are not being accepted on this server right now"*, which is
+> the one fact a user needs; how the deployment is configured is not their
+> problem, and announcing that the output is pre-recorded frames working
+> software as a rehearsal.
+
 Open **http://localhost:5173/**. (Vite binds IPv6 `[::1]`, so `127.0.0.1:5173`
 is refused — use `localhost`.)
 
-Four panels: run control, live agent progress over SSE, **evidence inspection**
-(click any verified sentence to see the span the Verifier scored it against),
-and dropped claims with human-in-the-loop confirm/override.
+**`/` is the landing page** — the overview of what the project is and why, which
+is public, because asking someone to sign in before they can read what the thing
+*does* gets the order backwards. Its button reads **"Log in"** when you are
+signed out and **"Run a review"** when you are not, and either way it only
+navigates: the dashboard cannot start a run.
+
+| route | |
+|---|---|
+| `/` | the landing page / overview (public) |
+| `/dashboard` | the same page, kept so older links still work |
+| `/run` | the question box and the results (needs a session) |
+
+Reviews belong to the account that started them, so the run list and every
+artefact are scoped to whoever is signed in. The demo account is seeded by:
+
+```bash
+python scripts/seed_accounts.py     # idempotent; safe to re-run
+```
+
+which creates **`demo_account@gmail.com` / `Karan*123`**, marks it an
+administrator, and adopts every run already in the registry. The sign-in screen
+has a *"Use the demo account"* button so nobody has to type that under pressure.
+
+> ⚠️ Accounts are the one part of the system that **requires** Postgres. `T-625`
+> still holds for the pipeline — it runs with no database at all — but a password
+> has no filesystem fallback, so with the registry down the API's authenticated
+> routes fail **closed** (503) rather than serving everyone's runs to everybody.
+
+The layout is a chat shell: a sidebar with your five most recent reviews and
+profile settings, the results in the middle, and a question box pinned to the
+bottom. The results are the same four panels as before — run overview, live
+agent progress over SSE, **evidence inspection** (click any verified sentence to
+see the span the Verifier scored it against), and dropped claims with
+human-in-the-loop confirm/override.
+
+The T-612 manual scoring sheet is **administrator-only** and is not shown to an
+ordinary account. `is_admin` is deliberately not settable through any API — only
+`scripts/seed_accounts.py` or psql grants it — so there is no self-service
+privilege escalation.
+
+Set `JWT_SECRET` in `.env`. Without it a random one is generated per process,
+which works but signs everyone out whenever the API restarts.
 
 See **`documents/SHOWCASE.md`** for the demo runbook.
 

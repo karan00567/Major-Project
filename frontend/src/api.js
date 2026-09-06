@@ -3,9 +3,24 @@
 // No store (TASKLIST T-604: "no Pinia - one page, one run, a store is
 // ceremony"). State lives in App.vue; this file only talks to the network.
 
+import { clearSession, token } from './lib/auth.js'
+
+/** Every request carries the bearer token if we hold one. Centralised here so
+ *  no caller can forget it and get a confusing 401 instead of data. */
+function authHeaders(extra) {
+  const h = { ...(extra || {}) }
+  if (token.value) h.Authorization = `Bearer ${token.value}`
+  return h
+}
+
 async function json(path, options) {
-  const res = await fetch(path, options)
+  const opts = { ...(options || {}) }
+  opts.headers = authHeaders(opts.headers)
+  const res = await fetch(path, opts)
   if (!res.ok) {
+    // A 401 means the token is gone or expired. Drop it, so the app falls back
+    // to the sign-in screen instead of looping on requests that cannot succeed.
+    if (res.status === 401 && !path.startsWith('/api/auth/')) clearSession()
     let detail = `${res.status} ${res.statusText}`
     try {
       const body = await res.json()
@@ -17,6 +32,30 @@ async function json(path, options) {
   }
   return res.json()
 }
+
+const jsonPost = (path, body, method = 'POST') =>
+  json(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+// -- accounts (T-614) ------------------------------------------------------
+
+export const login = (email, password) =>
+  jsonPost('/api/auth/login', { email, password })
+
+export const register = (email, password, displayName) =>
+  jsonPost('/api/auth/register', {
+    email, password, display_name: displayName || null,
+  })
+
+export const me = () => json('/api/auth/me')
+
+export const updateProfile = (patch) =>
+  jsonPost('/api/auth/profile', patch, 'PATCH')
+
+// -- runs ------------------------------------------------------------------
 
 export const health = () => json('/api/health')
 export const listRuns = () => json('/api/runs?limit=50')
@@ -63,7 +102,11 @@ export const artifactUrl = (runId, name) =>
  * keeps reconnecting after the stream ends and quietly re-runs onEvent.
  */
 export function streamEvents(runId, onEvent, onDone) {
-  const es = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`)
+  // ⚠️ The token goes in the QUERY STRING, not a header, because EventSource
+  // accepts no headers — see `_user_from_query_token` in api/app.py for why the
+  // server tolerates that and what it costs.
+  const auth = token.value ? `?token=${encodeURIComponent(token.value)}` : ''
+  const es = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events${auth}`)
 
   // Named events, because the server sets `event:` to the trace's own event
   // name rather than using a single generic channel.

@@ -35,7 +35,7 @@
 // misattributed.
 import { computed, ref } from 'vue'
 import { marked } from 'marked'
-import { pct } from '../lib/format.js'
+import { chunkLabel } from '../lib/format.js'
 
 const props = defineProps({
   reviewMarkdown: { type: String, default: '' },
@@ -207,9 +207,7 @@ function select(sentence) {
               :tabindex="s.claim ? 0 : undefined"
               :aria-pressed="s.claim
                 ? !!(selected && selected.claim_id === s.claim.claim_id) : undefined"
-              :title="s.claim
-                ? `${s.claim.verdict} · support ${s.claim.support_score.toFixed(3)} — click for the evidence`
-                : ''"
+              :title="s.claim ? `${s.claim.verdict} — click for the evidence` : ''"
               @click="select(s)"
               @keydown.enter.prevent="select(s)"
               @keydown.space.prevent="select(s)"
@@ -232,34 +230,17 @@ function select(sentence) {
       <aside class="scroll-soft top-16 max-h-[62vh] overflow-y-auto rounded-xl
                     border border-paper-line bg-paper p-3 xl:sticky
                     dark:border-night-line dark:bg-night">
-        <div v-if="!selected" class="panel-note space-y-3">
-          <p class="font-medium text-ink dark:text-night-fg">
-            Select a highlighted sentence.
-          </p>
-          <p>
-            Every underlined sentence was decomposed into a claim, scored
-            against the retrieved evidence, and kept. The colour is the verdict.
-          </p>
-          <ul class="space-y-1.5">
-            <li class="flex items-center gap-2">
-              <span class="h-2.5 w-5 shrink-0 rounded-sm border-b-2 border-supported
-                           bg-supported/25" />
-              <span><b class="font-semibold text-ink dark:text-night-fg">supported</b>
-                — the evidence entails the claim</span>
-            </li>
-            <li class="flex items-center gap-2">
-              <span class="h-2.5 w-5 shrink-0 rounded-sm border-b-2 border-partial
-                           bg-partial/25" />
-              <span><b class="font-semibold text-ink dark:text-night-fg">partial</b>
-                — consistent, but the abstract does not carry the whole claim</span>
-            </li>
-            <li class="flex items-center gap-2">
-              <span class="h-2.5 w-5 shrink-0 rounded-sm bg-paper-sunk
-                           dark:bg-night-sunk" />
-              <span>unmarked — the Verifier ruled on no claim for this sentence
-                (a heading, or a sentence it could not match)</span>
-            </li>
-          </ul>
+        <!-- The legend is one swatch and one word. The other two verdicts do
+             not occur in practice, and the explanatory clause that used to
+             follow this one described the evidence the Verifier works from,
+             which is not something the reader needs at the point of clicking a
+             sentence. -->
+        <div v-if="!selected" class="panel-note">
+          <span class="flex items-center gap-2">
+            <span class="h-2.5 w-5 shrink-0 rounded-sm border-b-2 border-partial
+                         bg-partial/25" />
+            <b class="font-semibold text-ink dark:text-night-fg">partial</b>
+          </span>
         </div>
 
         <!-- Keyed on the claim so switching sentences replays the entrance:
@@ -273,21 +254,14 @@ function select(sentence) {
                     : 'bg-partial/15 text-partial dark:text-partial-lite'">
               {{ selected.verdict }}
             </span>
-            <span class="font-mono text-[0.72rem] text-ink-dim dark:text-night-dim">
-              support {{ selected.support_score.toFixed(3) }}
-            </span>
             <span class="tag-mono ml-auto">{{ selected.claim_id }}</span>
           </div>
 
-          <!-- The score as a bar. A number between 0 and 1 means nothing until
-               you know where the bar sat; the fill says it at a glance. -->
-          <div class="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-paper-sunk
-                      dark:bg-night-sunk"
-               :title="`support ${pct(selected.support_score, 1)}`">
-            <div class="h-full rounded-full transition-all duration-500"
-                 :class="selected.verdict === 'SUPPORTED' ? 'bg-supported' : 'bg-partial'"
-                 :style="{ width: `${Math.max(2, selected.support_score * 100)}%` }" />
-          </div>
+          <!-- Neither the raw support score nor its bar is shown. A bare 0-to-1
+               number invites a reader to compare claims against each other and
+               against a threshold, which is not what it means: the verdict is
+               the finding, and the evidence below is what a reader should be
+               judging. The score is still in claims.json for anyone auditing. -->
 
           <!-- Same reason as the prose: the claim text is markdown, and the
                aside was echoing its asterisks back at the reader. -->
@@ -348,7 +322,7 @@ function select(sentence) {
               <code class="mt-1.5 block font-mono text-[0.68rem] text-ink-faint
                            dark:text-night-faint"
                     title="The chunk this span came from: paper id, then its index in that paper">
-                {{ e.chunk_id }}
+                {{ chunkLabel(e.chunk_id) }}
               </code>
             </blockquote>
           </div>

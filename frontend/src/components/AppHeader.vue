@@ -16,10 +16,20 @@ const props = defineProps({
   apiOk: { type: Boolean, default: true },
 })
 
+// T-614 changed both entries.
+//
+// "/" is now the LANDING page (the overview) and the app moved to "/run", so
+// that someone arriving at the site reads what the project is before being
+// asked to sign in.
+//
+// The '/optimizer' ("Score") entry is gone. The manual scoring sheet is an
+// internal calibration tool, not something an account holder should be offered
+// — and a nav link is a promise that the page is for you. It is now gated on
+// the admin flag instead; PanelScores.vue and its endpoints still exist and
+// still pass their tests, and only the way in from the nav has gone.
 const NAV = [
-  { path: '/dashboard', label: 'Overview', hint: 'what the project is, and why' },
-  { path: '/', label: 'Run', hint: 'ask a question, watch the agents' },
-  { path: '/optimizer', label: 'Score', hint: 'rate a finished run by hand' },
+  { path: '/', label: 'Overview', hint: 'what the project is, and why' },
+  { path: '/run', label: 'Run', hint: 'ask a question, watch the agents' },
 ]
 
 const isActive = (path) => (props.route || '/') === path
@@ -32,7 +42,7 @@ const isActive = (path) => (props.route || '/') === path
   >
     <div class="mx-auto flex max-w-[100rem] flex-wrap items-center gap-x-4 gap-y-2
                 px-4 py-2.5 sm:px-6">
-      <a href="/dashboard"
+      <a href="/"
          class="group flex shrink-0 items-center gap-2.5 no-underline"
          title="What this project is">
         <!-- Six nodes and a loop back: the architecture as a 22px mark. -->
@@ -75,11 +85,12 @@ const isActive = (path) => (props.route || '/') === path
               title="The Vue app is up but the FastAPI process is not answering">
           API offline
         </span>
-        <span v-else-if="fixtureMode"
-              class="pill bg-accent-soft text-accent dark:text-accent-lite"
-              title="RESEARCHGPT_FIXTURE=1 — a recorded run is replayed and live runs are refused">
-          replaying a recording
-        </span>
+        <!-- The "replaying a recording" chip was removed deliberately. It
+             announced to a room that what they were watching was pre-baked,
+             which is both unnecessary and the wrong first impression; the
+             composer states the one fact a user needs (new reviews are not
+             being accepted) at the point where they would try to type one. -->
+
         <span v-if="busy"
               class="pill bg-replan/15 text-replan dark:text-replan-lite">
           <span class="h-1.5 w-1.5 animate-pulse-ring rounded-full bg-replan" />

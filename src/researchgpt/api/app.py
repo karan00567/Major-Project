@@ -32,6 +32,7 @@ import logging
 import os
 import pathlib
 import threading
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -41,12 +42,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 
+from researchgpt.api.auth import AdminUser, CurrentUser, OptionalUser
 from researchgpt.api.schemas import (
     ArtefactInfo,
     ArtefactScoreIn,
+    AuthOut,
     ClaimOut,
+    LoginRequest,
     OverrideOut,
     OverrideRequest,
+    ProfileUpdate,
+    RegisterRequest,
     ReviewAccepted,
     ReviewRequest,
     RunResult,
@@ -54,6 +60,7 @@ from researchgpt.api.schemas import (
     ScoredPaper,
     ScoreSheet,
     ScoreSubmission,
+    UserOut,
 )
 from researchgpt.db import scores as scores_db
 
@@ -100,6 +107,20 @@ DOWNLOADABLE = {
 #: falls back to inferring status from the artefacts on disk, which is why
 #: _status() consults the filesystem rather than trusting this alone.
 _RUNS: dict[str, str] = {}
+
+#: 🔴 run_id -> user_id, for runs THIS process started. Load-bearing, not a cache.
+#:
+#: The registry row is created by ``run_pipeline`` itself, so it does not exist
+#: at the moment ``POST /api/review`` returns — and the browser calls /result and
+#: /events for the new run immediately. Stamping the owner only after the
+#: pipeline finished (the first version of T-614) left a run unowned for its
+#: entire life, so ``_require_owner`` answered its own creator with 404 and the
+#: page sat empty for 35 minutes while the run went fine on disk.
+#:
+#: This map closes that window the instant the request is accepted. The database
+#: is still written to as soon as the row appears, because this map dies with
+#: the process and another session must be able to see the run too.
+_RUN_OWNERS: dict[str, str] = {}
 _RUNS_LOCK = threading.Lock()
 
 app = FastAPI(title="ResearchGPT", version="0.1.0")
@@ -266,12 +287,162 @@ def _claims_out(rows: list[dict]) -> list[ClaimOut]:
 
 
 # --------------------------------------------------------------------------
+# ownership (T-614)
+# --------------------------------------------------------------------------
+
+
+def _require_owner(run_id: str, user: dict) -> None:
+    """Refuse a run the caller does not own.
+
+    **404, not 403.** A 403 would confirm that ``run_id`` exists, which turns
+    this guard into an oracle for enumerating other people's run ids. From
+    outside, a run you do not own is indistinguishable from a run that is not
+    there.
+
+    Fails closed when the registry is down, for the reason given on
+    :func:`list_runs`: without it there is no way to establish ownership, and
+    the safe answer to "may this person read this" is never "probably".
+    """
+    # The in-process map first: a run started moments ago is owned by its
+    # starter even though the registry row may not exist yet.
+    with _RUNS_LOCK:
+        if _RUN_OWNERS.get(run_id) == user["id"]:
+            return
+
+    from researchgpt.db import users as users_db
+
+    owned = users_db.run_ids_for(user["id"])
+    if owned is None:
+        raise HTTPException(
+            status_code=503,
+            detail="The account database is unavailable, so this run's owner "
+                   "cannot be confirmed.",
+        )
+    if run_id not in owned:
+        raise HTTPException(status_code=404, detail=f"No run named {run_id!r}.")
+
+
+def _owned_run_dir(run_id: str, user: dict) -> pathlib.Path:
+    """The run's directory, once the caller has been shown to own it.
+
+    Ownership is checked BEFORE the directory is resolved so that the two
+    failure modes return the same 404: otherwise "exists but not yours" and
+    "does not exist" would be distinguishable by which error arrived first.
+    """
+    _require_owner(run_id, user)
+    return _run_dir(run_id)
+
+
+def _user_from_query_token(token: str | None) -> dict:
+    """Identity for EventSource, which cannot send an Authorization header.
+
+    ⚠️ **This is the one place a token travels in a URL**, and that is a real
+    (if small) cost: query strings land in server logs and browser history in a
+    way headers do not. It is accepted here because the browser EventSource API
+    supports no headers at all, and the alternatives are worse — an
+    unauthenticated stream would serve any run's trace to anyone who guessed
+    its id. Same signing key, same expiry, same checks as the header path.
+    """
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    from researchgpt.db import users as users_db
+
+    claims = users_db.decode_token(token)
+    if not claims:
+        raise HTTPException(status_code=401, detail="Your session has expired.")
+    user = users_db.get_user(claims.get("sub"))
+    if user is None:
+        raise HTTPException(status_code=401, detail="That account is unavailable.")
+    return user
+
+
+# --------------------------------------------------------------------------
+# accounts (T-614)
+# --------------------------------------------------------------------------
+
+
+@app.post("/api/auth/register", response_model=AuthOut, status_code=201)
+def register(req: RegisterRequest) -> AuthOut:
+    """Create an account and sign straight in.
+
+    Returning a token here rather than making the client immediately POST to
+    /login is not a shortcut: it removes a window in which a just-created
+    account exists but the user is not holding a session for it.
+    """
+    from researchgpt.db import users as users_db
+
+    try:
+        user = users_db.create_user(req.email, req.password, req.display_name)
+    except users_db.EmailTaken as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except users_db.PasswordRejected as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        # The registry is down. Say so plainly: identity has no filesystem
+        # fallback, unlike the run list.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    token = users_db.make_token_for(user["id"], user["email"])
+    return AuthOut(token=token, user=UserOut(**user))
+
+
+@app.post("/api/auth/login", response_model=AuthOut)
+def login(req: LoginRequest) -> AuthOut:
+    """Exchange an email and password for a bearer token."""
+    from researchgpt.db import users as users_db
+
+    try:
+        user = users_db.authenticate(req.email, req.password)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    if user is None:
+        # One message for both "no such account" and "wrong password". Telling
+        # them apart is a free account-enumeration oracle.
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
+    token = user.pop("_token")
+    return AuthOut(token=token, user=UserOut(**user))
+
+
+@app.get("/api/auth/me", response_model=UserOut)
+def whoami(user: dict = CurrentUser) -> UserOut:
+    return UserOut(**user)
+
+
+@app.patch("/api/auth/profile", response_model=UserOut)
+def update_profile(req: ProfileUpdate, user: dict = CurrentUser) -> UserOut:
+    """Update the display name, email or password of the signed-in account."""
+    from researchgpt.db import users as users_db
+
+    try:
+        updated = users_db.update_profile(
+            user["id"],
+            display_name=req.display_name,
+            email=req.email,
+            new_password=req.new_password,
+            current_password=req.current_password,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except users_db.EmailTaken as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except users_db.PasswordRejected as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return UserOut(**updated)
+
+
+# --------------------------------------------------------------------------
 # endpoints
 # --------------------------------------------------------------------------
 
 
 @app.post("/api/review", response_model=ReviewAccepted, status_code=202)
-def start_review(req: ReviewRequest) -> ReviewAccepted:
+def start_review(req: ReviewRequest, user: dict = CurrentUser) -> ReviewAccepted:
     """Start a run and return immediately.
 
     202, not 200: the run has been accepted and is minutes from finishing.
@@ -296,16 +467,45 @@ def start_review(req: ReviewRequest) -> ReviewAccepted:
     run_id = f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:8]}"
     cfg = load_config("configs/default.yaml")
 
+    # Owned from the instant the request is accepted, so the browser's very
+    # first /result and /events calls for this run succeed. See _RUN_OWNERS.
     with _RUNS_LOCK:
         _RUNS[run_id] = "running"
+        _RUN_OWNERS[run_id] = user["id"]
+
+    def _claim_when_registered() -> None:
+        """Write the owner to the registry as soon as the row exists.
+
+        ``run_pipeline`` inserts the row early, but not before this thread
+        starts, so a single attempt would usually lose the race. Polling
+        briefly is enough and costs nothing: the registry is best-effort, so
+        giving up simply leaves the run owned in-process for this session.
+        """
+        from researchgpt.db import users as users_db
+
+        for _ in range(60):  # ~60s, far longer than registration takes
+            if users_db.claim_run(run_id, user["id"]):
+                return
+            time.sleep(1)
+        log.warning("could not record the owner of run %s in the registry", run_id)
+
+    threading.Thread(target=_claim_when_registered,
+                     name=f"claim-{run_id}", daemon=True).start()
 
     def _work() -> None:
+        from researchgpt.db import users as users_db
+
         try:
             run_pipeline(req.question, cfg, run_id=run_id,
                          max_papers=req.max_papers, use_loop=req.use_loop)
             status = "complete"
         except Exception:
             status = "failed"
+        # Claim again at the end, idempotently. A run that failed before the
+        # registry row was written still gets its owner here, and a run that
+        # vanishes from your history because it failed is worse than one listed
+        # as failed.
+        users_db.claim_run(run_id, user["id"])
         with _RUNS_LOCK:
             _RUNS[run_id] = status
 
@@ -319,7 +519,10 @@ def start_review(req: ReviewRequest) -> ReviewAccepted:
 
 
 @app.get("/api/runs", response_model=list[RunSummary])
-def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
+def list_runs(
+    limit: int = Query(default=50, ge=1, le=500),
+    user: dict = CurrentUser,
+) -> list[RunSummary]:
     """Newest first. Registry if present, filesystem scan otherwise.
 
     ★ **T-625: this must work with no database at all.** The Vue run list and
@@ -339,8 +542,36 @@ def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
     So: enumerate the disk, then overlay registry metrics where a row exists.
     A registry row whose directory is gone is skipped — the artefacts are what
     this endpoint serves, and they are what has disappeared.
+
+    🔴 **T-614 narrows the rule above, and only here.** Once runs have owners,
+    "show everything on disk" would show one account another account's work, so
+    this endpoint now serves the INTERSECTION of the disk and the runs this
+    user owns. The filesystem is still the source of the artefacts; the
+    registry is now also the source of *who may see them*.
+
+    The consequence is deliberate and worth stating: with Postgres down,
+    ownership cannot be established and this returns **nothing** rather than
+    everything. ``run_ids_for`` returns ``None`` (not an empty set) in that
+    case precisely so the two are distinguishable — failing closed is the only
+    safe direction for an authorisation check.
     """
     from researchgpt.db import registry
+    from researchgpt.db import users as users_db
+
+    owned = users_db.run_ids_for(user["id"])
+    if owned is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The account database is unavailable, so your runs cannot be "
+                "identified. The pipeline itself is unaffected."
+            ),
+        )
+    # A run started in this process is yours even if the registry has not caught
+    # up. Without this the run you just started is missing from your own sidebar
+    # until it finishes.
+    with _RUNS_LOCK:
+        owned = owned | {rid for rid, uid in _RUN_OWNERS.items() if uid == user["id"]}
 
     enriched: dict[str, dict] = {}
     rows = registry.list_runs(500)
@@ -350,7 +581,7 @@ def list_runs(limit: int = Query(default=50, ge=1, le=500)) -> list[RunSummary]:
     if not RUNS_DIR.is_dir():
         return []
     dirs = sorted(
-        (d for d in RUNS_DIR.iterdir() if d.is_dir()),
+        (d for d in RUNS_DIR.iterdir() if d.is_dir() and d.name in owned),
         key=lambda d: d.stat().st_mtime,
         reverse=True,
     )[:limit]
@@ -435,9 +666,9 @@ def _papers_for_panel(corpus: Any, claims: dict) -> list[dict]:
 
 
 @app.get("/api/runs/{run_id}/result", response_model=RunResult)
-def run_result(run_id: str) -> RunResult:
+def run_result(run_id: str, user: dict = CurrentUser) -> RunResult:
     """Everything the Vue app renders, in one request."""
-    run_dir = _run_dir(run_id)
+    run_dir = _owned_run_dir(run_id, user)
     events = _trace_events(run_dir)
     end = next((e for e in reversed(events) if e.get("event") == "run_end"), None)
     payload = (end or {}).get("payload") or {}
@@ -497,7 +728,8 @@ def _overrides_of(run_dir: pathlib.Path) -> list[OverrideOut]:
 
 
 @app.post("/api/runs/{run_id}/overrides", response_model=list[OverrideOut])
-def record_override(run_id: str, req: OverrideRequest) -> list[OverrideOut]:
+def record_override(run_id: str, req: OverrideRequest,
+                    user: dict = CurrentUser) -> list[OverrideOut]:
     """T-609 — write a human judgement back to the trace.
 
     `decisions.txt` T-007 (2026-08-25) made HITL mandatory: it is the concrete
@@ -508,7 +740,7 @@ def record_override(run_id: str, req: OverrideRequest) -> list[OverrideOut]:
     (T-107), so an override is one more line and the history of a changed mind
     is preserved instead of being overwritten.
     """
-    run_dir = _run_dir(run_id)
+    run_dir = _owned_run_dir(run_id, user)
 
     if req.decision is not None and req.decision not in VALID_DECISIONS:
         raise HTTPException(
@@ -536,13 +768,13 @@ def record_override(run_id: str, req: OverrideRequest) -> list[OverrideOut]:
 
 
 @app.get("/api/runs/{run_id}/overrides", response_model=list[OverrideOut])
-def list_overrides(run_id: str) -> list[OverrideOut]:
-    return _overrides_of(_run_dir(run_id))
+def list_overrides(run_id: str, user: dict = CurrentUser) -> list[OverrideOut]:
+    return _overrides_of(_owned_run_dir(run_id, user))
 
 
 @app.get("/api/runs/{run_id}/artifact/{name}")
-def run_artifact(run_id: str, name: str) -> FileResponse:
-    run_dir = _run_dir(run_id)
+def run_artifact(run_id: str, name: str, user: dict = CurrentUser) -> FileResponse:
+    run_dir = _owned_run_dir(run_id, user)
     if name not in DOWNLOADABLE:
         raise HTTPException(
             status_code=404,
@@ -555,14 +787,19 @@ def run_artifact(run_id: str, name: str) -> FileResponse:
 
 
 @app.get("/api/runs/{run_id}/events")
-async def run_events(run_id: str) -> EventSourceResponse:
+async def run_events(run_id: str, token: str | None = Query(default=None)
+                     ) -> EventSourceResponse:
     """T-602 — one SSE event per trace line, tailing the file.
 
     Replays what already happened before following the tail, so a client that
     connects late (or replays a finished run for the T-610 demo) sees the whole
     story rather than only what arrives after it subscribed.
+
+    T-614: identity comes from ``?token=`` rather than a header, because the
+    browser EventSource API cannot set one. See :func:`_user_from_query_token`.
     """
-    run_dir = _run_dir(run_id)
+    user = _user_from_query_token(token)
+    run_dir = _owned_run_dir(run_id, user)
     trace = run_dir / "trace.jsonl"
 
     async def stream():
@@ -713,14 +950,15 @@ def _mirror_state(run_id: str) -> str:
 
 
 @app.get("/api/runs/{run_id}/scores", response_model=ScoreSheet)
-def get_score_sheet(run_id: str) -> ScoreSheet:
+def get_score_sheet(run_id: str, user: dict = AdminUser) -> ScoreSheet:
     """T-612 — what a reviewer is asked to judge, plus anything judged so far."""
-    run_dir = _run_dir(run_id)
+    run_dir = _owned_run_dir(run_id, user)
     return _score_sheet(run_dir, run_id, _mirror_state(run_id))
 
 
 @app.post("/api/runs/{run_id}/scores", response_model=ScoreSheet)
-def submit_scores(run_id: str, req: ScoreSubmission) -> ScoreSheet:
+def submit_scores(run_id: str, req: ScoreSubmission,
+                  user: dict = AdminUser) -> ScoreSheet:
     """T-612 — record a human 1-5 judgement of the papers and the review.
 
     ★ **The trace is written first, then Postgres.** `DB_SCHEMA.md §9` makes
@@ -730,7 +968,7 @@ def submit_scores(run_id: str, req: ScoreSubmission) -> ScoreSheet:
     mirror stays best-effort, and the response says which happened instead of
     claiming a database write that did not occur.
     """
-    run_dir = _run_dir(run_id)
+    run_dir = _owned_run_dir(run_id, user)
 
     if not req.papers and req.artefact is None:
         raise HTTPException(status_code=422,

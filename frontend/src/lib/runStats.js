@@ -246,56 +246,31 @@ export function stages(d) {
       key: 'planner',
       label: 'Plan',
       value: d.plan ? `${d.plan.subQuestions ?? '—'} sub-questions` : null,
-      detail: d.plan
-        ? `${d.plan.searchTasks ?? '—'} search tasks · facets: ${
-            (d.plan.facets || []).join(', ') || 'none'}`
-        : 'not started',
     },
     {
       key: 'retriever',
       label: 'Retrieve',
       value: d.retrieval ? `${n(d.retrieval.newPapers)} papers` : null,
-      detail: d.retrieval
-        ? `${d.retrieval.sourceQueries} source queries · ${
-            n(d.retrieval.newChunks)} chunks · ${d.retrieval.failures} failed`
-        : 'not started',
     },
     {
       key: 'ranker',
       label: 'Rank',
       value: d.rank ? `${n(d.rank.ranked)} reranked` : null,
-      detail: d.rank
-        ? `${n(d.rank.chunks)} chunks scored · ${
-            n(d.rank.unrankedTail)} left in the tail`
-        : 'not started',
     },
     {
       key: 'extractor',
       label: 'Extract',
       value: d.extract ? `${d.extract.papers ?? d.extract.done ?? 0} papers read` : null,
-      detail: d.extract
-        ? `${d.extract.meanFields != null
-              ? `${d.extract.meanFields} of 8 fields filled`
-              : 'in progress'}${
-            d.extract.skippedNoText ? ` · ${d.extract.skippedNoText} had no text` : ''}`
-        : 'not started',
     },
     {
       key: 'writer',
       label: 'Write',
       value: d.write ? `${d.write.sections ?? 0} sections` : null,
-      detail: d.write
-        ? `${n(d.write.chars)} characters · ${d.write.references ?? 0} references`
-        : 'not started',
     },
     {
       key: 'verifier',
       label: 'Verify',
       value: d.verify ? `${d.verify.claims ?? 0} claims checked` : null,
-      detail: d.verify
-        ? `${d.verify.dropped ?? 0} dropped below a ${
-            d.verify.threshold ?? '—'} support bar`
-        : 'not started',
     },
   ]
 }

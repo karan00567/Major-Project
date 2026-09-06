@@ -192,7 +192,20 @@ def test_pipeline_imports_registry_lazily(monkeypatch):
 
 
 def test_api_lists_runs_from_the_filesystem_without_a_database(monkeypatch, tmp_path):
-    """The Vue run list and the T-610 pre-baked demo both depend on this."""
+    """Run SUMMARIES are read from disk, not from the registry.
+
+    ⚠️ **Read the name carefully after T-614.** What is still true, and what
+    this test pins, is that the *content* of the listing comes from the
+    filesystem: the registry only enriches rows that are already there.
+
+    What is no longer true is that the endpoint answers with no database at
+    all. Accounts have no filesystem fallback, so ``GET /api/runs`` now needs
+    the registry to establish who owns what and **fails closed with 503**
+    without it — see ``test_the_run_list_fails_closed_when_ownership_cannot_be_
+    established`` in ``test_t614_auth.py``, which asserts exactly that. Here,
+    conftest's bypass supplies the ownership answer so this test can go on
+    checking the thing it was written to check.
+    """
     from fastapi.testclient import TestClient
 
     import researchgpt.api.app as app_module

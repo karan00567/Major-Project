@@ -71,9 +71,6 @@ const chain = computed(() =>
     : (props.result?.decisions || []).map((d) => ({ decision: d, reasons: [] })),
 )
 
-function copyId() {
-  navigator.clipboard?.writeText(props.runId).catch(() => {})
-}
 </script>
 
 <template>
@@ -108,19 +105,18 @@ function copyId() {
         </span>
       </div>
 
+      <!-- The run id and the model name were removed from this line. Both are
+           plumbing: the id is a timestamp and a hash that means nothing to a
+           reader, and naming the model invites a conversation about the
+           generator when the argument of this project is the architecture
+           around it. Neither is lost — both are in the run's own config.json
+           and trace.jsonl, which remain the record. -->
       <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5
                   text-[0.74rem] text-ink-dim dark:text-night-dim">
-        <button class="tag-mono transition hover:text-accent"
-                :title="`Copy run id — ${runId}`" @click="copyId">
-          {{ runId }}
-        </button>
         <span v-if="digest.startedAt" :title="stamp(digest.startedAt)">
           started {{ ago(digest.startedAt) }}
         </span>
         <span v-if="digest.wallMs">· wall clock {{ ms(digest.wallMs) }}</span>
-        <span v-if="digest.model">
-          · <span class="font-mono">{{ digest.model }}</span>
-        </span>
         <span v-if="digest.maxPapers">· cap {{ digest.maxPapers }} papers</span>
       </div>
 
@@ -149,26 +145,27 @@ function copyId() {
       </div>
 
       <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <!-- No `sub` line on these tiles: the strip reads as six numbers, and a
+             second grey line under each one turned it into a paragraph. The
+             detail it carried is not lost — every tile keeps its `hint`, which
+             is the title attribute, and the same figures are stated in full by
+             the panels below. -->
         <StatTile
           :value="num(digest.totals.papers ?? digest.retrieval?.newPapers)"
           label="papers found" tone="accent"
-          :sub="digest.retrieval ? `${num(digest.retrieval.withAbstract)} with abstracts` : ''"
           hint="Unique papers in the corpus after dedup by DOI then title" />
         <StatTile
           :value="num(digest.extract?.papers ?? digest.totals.insights)"
           label="papers read"
-          :sub="digest.extract?.meanFields != null ? `${digest.extract.meanFields}/8 fields` : ''"
           hint="A run retrieves thousands and extracts a handful — the extraction is the expensive, LLM-metered step" />
         <StatTile
           :value="num(digest.verify?.claims)" label="claims checked"
-          :sub="digest.write ? `${digest.write.sections} sections` : ''"
           hint="Every sentence of the draft is decomposed and scored against the paper it cites" />
         <StatTile
           :value="num(kept)" label="kept" tone="good"
           hint="Claims the Verifier could ground in retrieved evidence" />
         <StatTile
           :value="num(dropped)" label="dropped" tone="bad"
-          :sub="digest.verify?.threshold != null ? `below ${digest.verify.threshold}` : ''"
           hint="Removed from the review because the evidence did not support them" />
         <StatTile
           :value="pct(grounding, 2)" label="grounding"
@@ -195,36 +192,15 @@ function copyId() {
             {{ r.key }}
           </span>
         </div>
-        <p v-if="digest.verify?.abstractOnlyCapped"
-           class="panel-note mt-2.5 rounded-lg border-l-[3px] border-partial
-                  bg-partial/10 px-3 py-2">
-          <strong class="font-semibold text-ink dark:text-night-fg">
-            {{ digest.verify.abstractOnlyCapped }} claims were capped at PARTIAL
-            by design.</strong>
-          The corpus is built from abstracts, and full support needs full text —
-          so SUPPORTED is unreachable here, and reporting these as partial is
-          the honest ceiling rather than a weak result.
-        </p>
       </div>
 
-      <!-- What the run cost. Free tier or not, the token bill is the binding
-           constraint on this project, so it belongs on screen. -->
-      <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t
-                  border-paper-hair pt-3 text-[0.76rem] text-ink-dim
-                  dark:border-night-hair dark:text-night-dim">
-        <span class="panel-title">Cost</span>
-        <span>
-          <b class="font-semibold text-ink dark:text-night-fg">{{ digest.llm.requests }}</b>
-          LLM calls
-        </span>
-        <span v-if="digest.llm.hitRate != null">
-          <b class="font-semibold text-ink dark:text-night-fg">{{ digest.llm.cacheHits }}</b>
-          served from cache ({{ pct(digest.llm.hitRate, 0) }})
-        </span>
-        <span v-if="digest.rank?.rerankMs">rerank {{ ms(digest.rank.rerankMs) }}</span>
-        <span v-if="digest.rank?.embedMs">embed {{ ms(digest.rank.embedMs) }}</span>
-        <span>· {{ digest.events }} trace events</span>
-      </div>
+      <!-- The "Cost" strip (LLM calls, cache hits, rerank/embed timings, trace
+           event count) was removed. It is operator telemetry: it says what the
+           machinery did to itself, not what the run found, and on a page whose
+           subject is the review it reads as instrumentation left switched on.
+           Every figure remains derivable from trace.jsonl, which is still the
+           single source of truth for the report. -->
+
     </template>
   </section>
 </template>

@@ -206,6 +206,61 @@ class ScoreSheet(BaseModel):
     persisted: str = "trace"
 
 
+#: T-614 — accounts. Kept at the bottom so the run-facing schemas above stay
+#: the first thing a reader meets.
+
+
+class RegisterRequest(BaseModel):
+    """``POST /api/auth/register``."""
+
+    email: str = Field(min_length=3, max_length=255)
+    #: The floor is enforced again in ``db.users.hash_password``. Two layers on
+    #: purpose: this one gives a good error message, that one is the guarantee,
+    #: and a password set by a seeding script never passes through here.
+    password: str = Field(min_length=8, max_length=72)
+    display_name: str | None = Field(default=None, max_length=120)
+
+
+class LoginRequest(BaseModel):
+    """``POST /api/auth/login``."""
+
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=72)
+
+
+class ProfileUpdate(BaseModel):
+    """``PATCH /api/auth/profile``. Every field optional; absent means unchanged."""
+
+    display_name: str | None = Field(default=None, max_length=120)
+    email: str | None = Field(default=None, max_length=255)
+    new_password: str | None = Field(default=None, min_length=8, max_length=72)
+    #: Required by the server whenever email or password changes.
+    current_password: str | None = Field(default=None, max_length=72)
+
+
+class UserOut(BaseModel):
+    """An account as the API is willing to describe it. No password field
+    exists here, so no handler can leak one by forgetting to strip it."""
+
+    id: str
+    email: str
+    display_name: str | None = None
+    #: Gates the T-612 scoring sheet in the UI. The client uses this only to
+    #: decide what to render — every scoring route re-checks it server side, so
+    #: editing this to true in a browser console reveals a panel whose every
+    #: request then returns 403.
+    is_admin: bool = False
+    created_at: str | None = None
+
+
+class AuthOut(BaseModel):
+    """A successful register or login."""
+
+    token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
 __all__ = [
     "ReviewRequest",
     "OverrideRequest",
@@ -223,4 +278,9 @@ __all__ = [
     "ScoreSheet",
     "SCORE_MIN",
     "SCORE_MAX",
+    "RegisterRequest",
+    "LoginRequest",
+    "ProfileUpdate",
+    "UserOut",
+    "AuthOut",
 ]

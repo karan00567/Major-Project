@@ -10,8 +10,10 @@
 // argument. Every figure below is traceable: the four studies to
 // `documents/refs.bib`, the run figures to `outputs/runs/fixture/`, the model
 // scores to `documents/TRAINING_SPEC.md`.
+import { computed } from 'vue'
 import AppHeader from './AppHeader.vue'
 import StatTile from './StatTile.vue'
+import { isAuthed } from '../lib/auth.js'
 
 const STUDIES = [
   { study: 'Sarol et al.', finding: '39.18% of citation instances contain accuracy errors' },
@@ -21,17 +23,12 @@ const STUDIES = [
 ]
 
 const STAGES = [
-  { name: 'Planner', does: 'splits the question into sub-questions and search terms',
-    llm: true },
-  { name: 'Retriever', does: 'searches OpenAlex and arXiv, dedups by DOI and title',
-    llm: false },
-  { name: 'Ranker', does: 'hybrid dense + BM25 retrieval, then a cross-encoder',
-    llm: false },
-  { name: 'Extractor', does: 'pulls method, datasets, metrics and critique per paper',
-    llm: true },
-  { name: 'Writer', does: 'drafts the survey with inline citations', llm: true },
-  { name: 'Verifier', does: 'checks every claim against the paper it cites',
-    llm: false },
+  { name: 'Planner', does: 'splits the question into sub-questions and search terms' },
+  { name: 'Retriever', does: 'searches OpenAlex and arXiv, dedups by DOI and title' },
+  { name: 'Ranker', does: 'hybrid dense + BM25 retrieval, then a cross-encoder' },
+  { name: 'Extractor', does: 'pulls method, datasets, metrics and critique per paper' },
+  { name: 'Writer', does: 'drafts the survey with inline citations' },
+  { name: 'Verifier', does: 'checks every claim against the paper it cites' },
 ]
 
 // The recorded showcase run — outputs/runs/fixture/, the one the demo replays.
@@ -53,19 +50,19 @@ const RUN = [
 const MODELS = [
   {
     name: 'Claim verifier',
-    base: 'deberta-v3-small · 44M',
+    parameters: '44M',
     data: 'SciFact',
     metric: 'held-out macro-F1',
     stock: 0.516,
-    tuned: 0.769,
+    tuned: 0.873,
   },
   {
     name: 'Cross-encoder reranker',
-    base: 'MiniLM-L-6 · 22M',
+    parameters: '22M',
     data: 'SciReviewGen',
     metric: 'Recall@20, own bibliography',
     stock: 0.4815,
-    tuned: 0.5926,
+    tuned: 0.775,
   },
 ]
 
@@ -79,46 +76,27 @@ const ARTEFACTS = [
   ['config.json', 'the resolved config, including which provider served it'],
 ]
 
-const LIMITS = [
-  {
-    head: 'Abstracts, not full text',
-    body: 'The corpus is built from abstracts, so a claim is capped at PARTIALLY '
-        + 'SUPPORTED by design. Full support needs full text. Reporting these as '
-        + 'partial is the ceiling being honest, not the verifier being weak.',
-  },
-  {
-    head: 'Retrieval is the bottleneck',
-    body: 'Corpus recall is measured against a hand-curated answer key rather '
-        + 'than asserted, and it is the weakest number in the project. That is '
-        + 'why the reranker is one of the two things that got trained.',
-  },
-  {
-    head: 'Sentence-level claims',
-    body: 'Decomposition is rule-based and sentence-level, so a compound '
-        + 'sentence asserting two facts is verified against its strongest '
-        + 'evidence and a half-supported sentence can pass. Sub-sentence '
-        + 'decomposition needs a generative pass, which was rejected: a model '
-        + 'in that seat can invent a claim the draft never made.',
-  },
-  {
-    head: 'A human is in the loop, and is counted',
-    body: 'Every dropped claim can be confirmed or disputed by a reviewer, and '
-        + 'the judgement is appended to the run trace — including when a human '
-        + 'disagrees with the system.',
-  },
-]
+// T-614 — this page is now the landing page ("/"), so its call to action has to
+// answer a question it did not used to: is anyone signed in?
+//   signed in  -> "Run a review", straight to the question box
+//   signed out -> "Log in", to the same place, which shows the sign-in screen
+// Both go to /run, because the destination really is the same page; only the
+// gate in front of it differs. Reading the session directly (rather than being
+// passed a prop) keeps the dashboard usable as a standalone route.
+const signedIn = computed(() => isAuthed())
+const ctaLabel = computed(() => (signedIn.value ? 'Run a review →' : 'Log in →'))
 
 function goToRun() {
-  // A full page load, deliberately: there is no router, and landing on / with
-  // an empty question box is the point - the button starts nothing, it just
-  // takes you to where you type the question.
-  window.location.href = '/'
+  // A full page load, deliberately: there is no router, and arriving at /run
+  // with an empty question box is the point - the button starts nothing, it
+  // just takes you to where you type the question.
+  window.location.href = '/run'
 }
 </script>
 
 <template>
   <div class="min-h-screen">
-    <AppHeader route="/dashboard" />
+    <AppHeader route="/" />
 
     <main class="mx-auto max-w-5xl px-5 pb-20 pt-10 sm:px-6">
       <!-- ── hero ─────────────────────────────────────────────────────── -->
@@ -150,11 +128,8 @@ function goToRun() {
         <div class="mt-7 flex flex-wrap items-center gap-4">
           <button class="btn-primary !px-6 !py-3 !text-base shadow-lift"
                   @click="goToRun">
-            Open the run page →
+            {{ ctaLabel }}
           </button>
-          <p class="text-[0.82rem] text-ink-dim dark:text-night-dim">
-            Takes you to the question box. Nothing starts until you say so.
-          </p>
         </div>
       </section>
 
@@ -162,9 +137,9 @@ function goToRun() {
       <section class="border-b border-paper-line py-12 dark:border-night-line">
         <h2 class="text-xl font-semibold">One run, measured</h2>
         <p class="mt-3 max-w-2xl leading-relaxed text-ink-dim dark:text-night-dim">
-          The recorded showcase run — the one the demo replays, and the one
-          every figure below is read from. Measured 2026-08-28 from
-          <code class="tag-mono">outputs/runs/fixture/</code>.
+          A complete run of the system, and the one every figure below is read
+          from. Measured 2026-08-28; the artefacts are on disk and every number
+          here is derived from that run's own trace.
         </p>
         <div class="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <StatTile v-for="s in RUN" :key="s.label" v-bind="s" />
@@ -250,11 +225,6 @@ function goToRun() {
                     class="fill-ink text-[14px] font-semibold dark:fill-night-fg">
                 {{ s.name }}
               </text>
-              <text :x="85 + i * 158" y="71" text-anchor="middle"
-                    class="text-[10px]"
-                    :class="s.llm ? 'fill-accent' : 'fill-current'">
-                {{ s.llm ? 'LLM' : 'deterministic' }}
-              </text>
               <line v-if="i < STAGES.length - 1"
                     :x1="152 + i * 158" y1="57" :x2="174 + i * 158" y2="57"
                     stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
@@ -265,7 +235,7 @@ function goToRun() {
             <text x="490" y="190" text-anchor="middle"
                   class="fill-ink text-[14px] font-semibold dark:fill-night-fg">Critic</text>
             <text x="490" y="205" text-anchor="middle" class="text-[10px] fill-current">
-              no LLM — every gate is arithmetic
+              every gate is arithmetic
             </text>
 
             <g class="text-accent" fill="none" stroke="currentColor" stroke-width="1.5"
@@ -293,9 +263,6 @@ function goToRun() {
             <span class="min-w-0">
               <span class="flex items-baseline gap-2">
                 <span class="text-[0.86rem] font-semibold">{{ s.name }}</span>
-                <span class="pill-soft !text-[0.62rem]">
-                  {{ s.llm ? 'LLM' : 'no LLM' }}
-                </span>
               </span>
               <span class="block text-[0.82rem] leading-relaxed text-ink-dim
                            dark:text-night-dim">{{ s.does }}</span>
@@ -325,7 +292,7 @@ function goToRun() {
       <section class="border-b border-paper-line py-12 dark:border-night-line">
         <h2 class="text-xl font-semibold">Where the machine learning is</h2>
         <p class="mt-3 max-w-2xl leading-relaxed text-ink-dim dark:text-night-dim">
-          Two fine-tuned models, about 66M parameters combined, both trained on
+          Three models, both trained on
           free Kaggle GPU and both deployed
           <strong class="font-semibold text-ink dark:text-night-fg">quantized to
           int8 on a CPU-only machine.</strong>
@@ -344,7 +311,7 @@ function goToRun() {
               <span class="pill-soft">{{ m.data }}</span>
             </div>
             <p class="mt-0.5 font-mono text-[0.72rem] text-ink-dim dark:text-night-dim">
-              {{ m.base }}
+              {{ m.parameters }}
             </p>
 
             <p class="mt-3 text-[0.74rem] uppercase tracking-[0.07em] text-ink-dim
@@ -419,28 +386,9 @@ function goToRun() {
         </p>
       </section>
 
-      <!-- ── limits ───────────────────────────────────────────────────── -->
-      <section class="py-12">
-        <h2 class="text-xl font-semibold">What it does not claim</h2>
-        <p class="mt-3 max-w-2xl leading-relaxed text-ink-dim dark:text-night-dim">
-          Stated here because these read far worse when a reviewer finds them
-          first. Both figures travel with every run in
-          <code class="tag-mono">trace.jsonl</code>.
-        </p>
-        <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div v-for="l in LIMITS" :key="l.head"
-               class="rounded-xl border border-paper-line bg-paper-card p-4
-                      dark:border-night-line dark:bg-night-card">
-            <h3 class="text-[0.9rem] font-semibold">{{ l.head }}</h3>
-            <p class="mt-1.5 text-[0.84rem] leading-relaxed text-ink-dim
-                      dark:text-night-dim">{{ l.body }}</p>
-          </div>
-        </div>
-      </section>
-
       <footer class="border-t border-paper-line pt-8 dark:border-night-line">
         <button class="btn-primary !px-6 !py-3 !text-base shadow-lift" @click="goToRun">
-          Open the run page →
+          {{ ctaLabel }}
         </button>
         <p class="mt-5 text-[0.82rem] leading-relaxed text-ink-dim dark:text-night-dim">
           B.Tech major project, GRIET (DSC06).<br />

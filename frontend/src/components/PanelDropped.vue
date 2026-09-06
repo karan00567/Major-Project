@@ -24,7 +24,7 @@
 import { computed, ref } from 'vue'
 import { artifactUrl } from '../api.js'
 import { marked } from 'marked'
-import { pct } from '../lib/format.js'
+import { chunkLabel, pct } from '../lib/format.js'
 
 const props = defineProps({
   runId: { type: String, default: '' },
@@ -194,7 +194,7 @@ const VERDICT_CLS = {
                              dark:border-night-line dark:bg-night-card">
             {{ e.quote }}
             <code class="mt-1 block font-mono text-[0.66rem] text-ink-faint
-                         dark:text-night-faint">{{ e.chunk_id }}</code>
+                         dark:text-night-faint">{{ chunkLabel(e.chunk_id) }}</code>
           </blockquote>
         </details>
 

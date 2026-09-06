@@ -29,6 +29,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Index,
@@ -37,6 +38,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.mutable import MutableDict, MutableList
@@ -49,6 +51,67 @@ STATUSES = ("pending", "running", "completed", "failed")
 
 class Base(DeclarativeBase):
     pass
+
+
+class User(Base):
+    """An account. Added T-614 alongside the chat-style UI.
+
+    ⚠️ **This table breaks the "runs with no database" property, and only for
+    itself.** `T-625` guarantees the *pipeline* runs with no Postgres, and that
+    still holds — nothing under ``agents/``, ``graph/`` or ``core/`` imports
+    this module. But identity has no filesystem fallback: there is nowhere else
+    to check a password, so the API's authenticated routes require the registry
+    to be up. That is a deliberate narrowing, documented here rather than
+    discovered at a login prompt.
+
+    Passwords are stored as a bcrypt hash and never in clear text; ``bcrypt``
+    carries its own per-password salt inside the hash string, so there is no
+    separate salt column.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    #: Stored lower-cased. The uniqueness of an account must not depend on how
+    #: the user happened to capitalise it when they typed it.
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    #: T-614 — an admin sees the T-612 manual scoring sheet; an ordinary account
+    #: does not. Deliberately NOT settable through any API: there is no
+    #: "promote" route and ``update_profile`` cannot reach this column, so the
+    #: only way to grant it is ``scripts/seed_accounts.py`` or psql. A
+    #: self-service privilege escalation is the failure mode worth designing
+    #: out, and a project with one admin does not need a UI for it.
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), default=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("ix_users_email", "email"),)
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<User {self.email}>"
+
+    def as_public(self) -> dict[str, Any]:
+        """What the API is allowed to send back. ``password_hash`` is not in
+        this dict, and that is the whole point of having the method."""
+        return {
+            "id": str(self.id),
+            "email": self.email,
+            "display_name": self.display_name,
+            "is_admin": bool(self.is_admin),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class Run(Base):
@@ -69,6 +132,16 @@ class Run(Base):
     #: key between this row and the artefacts on disk.
     run_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     research_question: Mapped[str] = mapped_column(Text, nullable=False)
+
+    #: Who started it. NULLABLE and carrying no foreign key, for the same
+    #: reason ``paper_scores.run_id`` carries none: the registry is best-effort,
+    #: so a run can exist on disk having never been registered, and every run
+    #: made before T-614 predates accounts entirely. A NOT NULL column here
+    #: would make the pipeline fail when Postgres is down, which inverts T-625.
+    #: An unowned run belongs to nobody and is listed to nobody.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
 
     config: Mapped[dict[str, Any]] = mapped_column(
         MutableDict.as_mutable(JSONB), nullable=False, default=dict
@@ -99,6 +172,9 @@ class Run(Base):
         # GIN over the artefact array, so "which run produced this file?" does
         # not become a sequential scan once there are hundreds of rows.
         Index("ix_runs_artefacts", artefacts, postgresql_using="gin"),
+        # Every authenticated list is "this user's runs, newest first", so the
+        # index carries the sort with it rather than making Postgres re-sort.
+        Index("ix_runs_user_id_created", "user_id", created_at.desc()),
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
@@ -110,6 +186,7 @@ class Run(Base):
         return {
             "run_id": self.run_id,
             "status": self.status,
+            "user_id": str(self.user_id) if self.user_id else None,
             "question": self.research_question,
             "started": self.created_at.isoformat() if self.created_at else None,
             "papers": (self.metrics or {}).get("papers"),
@@ -225,5 +302,5 @@ class ArtefactScore(Base):
                 "note": self.note, "reviewer": self.reviewer}
 
 
-__all__ = ["Base", "Run", "STATUSES", "PaperScore", "ArtefactScore",
+__all__ = ["Base", "Run", "User", "STATUSES", "PaperScore", "ArtefactScore",
            "SCORE_MIN", "SCORE_MAX", "DEFAULT_REVIEWER"]

@@ -133,10 +133,12 @@ const STATUS_CLS = {
         <span class="w-4 shrink-0 font-mono text-[0.7rem] text-ink-faint
                      dark:text-night-faint">{{ i + 1 }}</span>
         <span class="w-16 shrink-0 text-[0.8rem] font-semibold">{{ s.label }}</span>
-        <span class="w-32 shrink-0 font-mono text-[0.78rem] tabular-nums
+        <!-- The detail column is gone: it carried the internals of each stage
+             ("184 source queries · 5,188 chunks · 0 failed", the planner's
+             facet list) which describe how the machinery worked, not what the
+             run produced. The rail now reads as six stages and six outcomes. -->
+        <span class="min-w-0 flex-1 font-mono text-[0.78rem] tabular-nums
                      text-ink dark:text-night-fg">{{ s.value || '—' }}</span>
-        <span class="min-w-0 flex-1 truncate text-[0.76rem] text-ink-dim
-                     dark:text-night-dim" :title="s.detail">{{ s.detail }}</span>
       </li>
     </ol>
 

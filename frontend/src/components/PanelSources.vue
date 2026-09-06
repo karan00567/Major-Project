@@ -65,13 +65,16 @@ const counts = computed(() => ({
   all: decorated.value.length,
 }))
 
+// Two views, not three. The "Retrieved" tab exposed the whole sifted corpus,
+// which is the pool the Ranker worked through rather than a result of the run —
+// and it is thousands of rows deep, most of them papers nothing cites. `rows`
+// still understands the 'all' key, so nothing breaks if it is set; it simply is
+// not offered.
 const VIEWS = computed(() => [
   { key: 'cited', label: 'Cited', n: counts.value.cited,
     hint: 'papers a claim in the review points at' },
   { key: 'read', label: 'Read', n: counts.value.read,
     hint: 'papers the Extractor pulled structured fields from' },
-  { key: 'all', label: 'Retrieved', n: counts.value.all,
-    hint: 'the corpus this payload carries' },
 ])
 
 const rows = computed(() => {
@@ -96,13 +99,11 @@ const profile = computed(() => {
   if (!all.length) return null
   const years = all.map((p) => p.year).filter(Boolean)
   const preprints = all.filter((p) => p.is_preprint).length
-  const abstracts = all.filter((p) => p.abstract).length
   const sources = {}
   for (const p of all) sources[p.source || 'unknown'] = (sources[p.source || 'unknown'] || 0) + 1
   return {
     span: years.length ? `${Math.min(...years)}–${Math.max(...years)}` : '—',
     preprints,
-    abstracts,
     sources: Object.entries(sources).sort((a, b) => b[1] - a[1]),
   }
 })
@@ -120,9 +121,11 @@ const truncated = computed(() =>
       <div class="min-w-0">
         <h2 class="panel-title"><span class="panel-index">5</span> Sources</h2>
         <p class="panel-note mt-1.5">
-          The funnel this run actually ran:
-          <b class="font-semibold text-ink dark:text-night-fg">{{ num(corpusTotal ?? counts.all) }}</b>
-          retrieved →
+          <!-- The "retrieved" leg was dropped from this line. It is the corpus
+               the Ranker sifted, not a result: it runs to thousands, dwarfs the
+               two numbers either side of it, and invites the reader to read a
+               big pool as an achievement. What the panel is for is what was
+               read and what survived into the review. -->
           <b class="font-semibold text-ink dark:text-night-fg">{{ counts.read || '—' }}</b>
           read →
           <b class="font-semibold text-ink dark:text-night-fg">{{ counts.cited }}</b>
@@ -160,9 +163,12 @@ const truncated = computed(() =>
         </p>
       </div>
 
+      <!-- The reset used to jump to the 'all' view, which no longer has a tab —
+           it would have left the list showing rows with no button highlighted.
+           It clears the filter and returns to the papers that were read. -->
       <p v-if="!rows.length" class="panel-note py-4 text-center">
-        Nothing matches. <button class="link" @click="query = ''; view = 'all'">
-          Show the whole corpus</button>.
+        Nothing matches. <button class="link" @click="query = ''; view = 'read'">
+          Clear the filter</button>.
       </p>
 
       <ul class="scroll-soft -mr-1 max-h-[46vh] space-y-1.5 overflow-y-auto pr-1">
@@ -213,17 +219,13 @@ const truncated = computed(() =>
         </li>
       </ul>
 
-      <p class="panel-note mt-3">
-        <template v-if="truncated">
-          {{ num(truncated) }} more papers are in
-          <code class="tag-mono">corpus.json</code> but not in this payload — it
-          carries every cited and every read paper, then fills to 200.
-        </template>
-        <template v-else>
-          Abstracts only: {{ profile ? profile.abstracts : 0 }} of
-          {{ counts.all }} papers here carry one, and no full text was fetched —
-          which is why a claim can be scored PARTIAL at best.
-        </template>
+      <!-- The `v-else` branch here described what the corpus is made of. Only
+           the truncation note remains, because that one tells the reader
+           something about THIS payload that they would otherwise get wrong. -->
+      <p v-if="truncated" class="panel-note mt-3">
+        {{ num(truncated) }} more papers are in
+        <code class="tag-mono">corpus.json</code> but not in this payload — it
+        carries every cited and every read paper, then fills to 200.
       </p>
     </template>
   </section>

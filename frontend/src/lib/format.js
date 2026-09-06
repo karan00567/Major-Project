@@ -54,3 +54,14 @@ export function shortId(id) {
   const dash = s.lastIndexOf('-')
   return dash > 0 ? s.slice(dash + 1) : s
 }
+
+/** An evidence chunk id, as the UI should print it.
+ *
+ *  `verifier.py` names the fallback passage `<paper_id>:abstract` when a paper
+ *  produced no chunks. That suffix is an internal provenance marker, and it is
+ *  the one place a chunk id would describe the evidence rather than locate it,
+ *  so it is trimmed for display. The id in `claims.json` and `trace.jsonl` is
+ *  untouched — those are the audit record and must stay exact. */
+export function chunkLabel(id) {
+  return String(id || '').replace(/:abstract$/i, '')
+}

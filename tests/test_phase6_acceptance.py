@@ -458,28 +458,42 @@ def test_t611_every_offered_size_is_accepted_by_the_api():
         ReviewRequest(question=question, max_papers=0)
 
 
-def test_t611_the_panel_offers_exactly_those_sizes():
+def test_t611_the_picker_offers_exactly_those_sizes():
     """The picker is the contract the test above checks. Read it from the
-    component so the two cannot say different things."""
+    component so the two cannot say different things.
+
+    ⚠️ **Reads Composer.vue, not PanelRun.vue.** T-614 moved the question box
+    into the bottom composer and PanelRun.vue stopped being imported. This test
+    went on passing against the orphan for as long as the file existed, which
+    means it was verifying a component nobody could see while the one that ships
+    was unchecked — the quiet way an assertion stops being worth anything.
+    PanelRun.vue has since been deleted.
+    """
     import pathlib
     import re
 
     repo = pathlib.Path(__file__).resolve().parents[1]
-    panel = (repo / "frontend" / "src" / "components" / "PanelRun.vue").read_text(
+    panel = (repo / "frontend" / "src" / "components" / "Composer.vue").read_text(
         encoding="utf-8")
     match = re.search(r"const PAPER_OPTIONS = \[([0-9,\s]+)\]", panel)
-    assert match, "PanelRun.vue must declare PAPER_OPTIONS for this to be checkable"
+    assert match, "Composer.vue must declare PAPER_OPTIONS for this to be checkable"
     offered = tuple(int(n) for n in match.group(1).replace(" ", "").strip(",").split(","))
     assert offered == MAX_PAPER_OPTIONS
 
 
-def test_t612_the_score_panel_is_gated_to_the_optimizer_path():
-    """The scoring sheet is reachable at /optimizer and nowhere else.
+def test_t612_the_score_panel_is_gated_to_administrators():
+    """The scoring sheet is visible to admins and to nobody else.
 
-    Asserted on the source because there is no JS test runner here: the panel
-    must be rendered behind a condition, not unconditionally. A gate that
-    quietly disappears would put a scoring form on the main demo page, which is
-    exactly what it was asked not to do.
+    ⚠️ **The gate MOVED in T-614 and this test moved with it.** It used to
+    assert a path gate (``/optimizer``); the sheet is now gated on the signed-in
+    account's ``is_admin`` flag, because a URL is not an access control — anyone
+    who read the nav could type it. The property being pinned is unchanged and
+    is the one that matters: the panel must be behind a condition, never
+    rendered unconditionally.
+
+    Asserted on the source because there is no JS test runner here. The
+    server-side half — that /scores answers a non-admin with 403 — is covered by
+    ``test_t614_auth.py``, and that is the half that is actually load-bearing.
     """
     import pathlib
     import re
@@ -487,10 +501,14 @@ def test_t612_the_score_panel_is_gated_to_the_optimizer_path():
     repo = pathlib.Path(__file__).resolve().parents[1]
     src = (repo / "frontend" / "src" / "App.vue").read_text(encoding="utf-8")
 
-    assert "'/optimizer'" in src, "the gate must name the path it opens on"
     assert re.search(r"<PanelScores\s+v-if=", src), (
         "PanelScores must be behind a v-if; rendering it unconditionally puts "
         "the score sheet on every page"
+    )
+    assert "isAdmin" in src, "the gate must be the admin flag, not a URL path"
+    assert "'/optimizer'" not in src, (
+        "the /optimizer path gate was replaced by the admin flag; leaving it "
+        "behind would reopen the sheet to anyone who types the URL"
     )
 
 
@@ -543,7 +561,10 @@ def test_t613_the_dashboard_cta_navigates_without_starting_a_run():
     view = (repo / "frontend" / "src" / "components" / "DashboardView.vue").read_text(
         encoding="utf-8")
 
-    assert "window.location.href = '/'" in view
+    # T-614 moved the destination: the dashboard became the landing page at "/"
+    # and the run page moved to "/run". The property under test is unchanged and
+    # is the important half — the CTA NAVIGATES, and cannot start a job.
+    assert "window.location.href = '/run'" in view
     for forbidden in ("startReview", "postScores", "/api/review"):
         assert forbidden not in view, (
             f"{forbidden} on the dashboard - the CTA must navigate, not run"
