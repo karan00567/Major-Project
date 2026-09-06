@@ -1,0 +1,8 @@
+{
+  "enabledPlugins": {
+    "academic-research-skills@academic-research-skills": true,
+    "superpowers@claude-plugins-official": true,
+    "drawio@drawio": true,
+    "document-skills@anthropic-agent-skills": true
+  }
+}

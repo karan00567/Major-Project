@@ -1,0 +1,1 @@
+- [ResearchGPT project state](researchgpt-review2-deck.md) — Phases 0-6B done, M1+M2 landed, pushed to GitHub as of 2026-08-29; ranking (not retrieval) is now the blocker; Phase 7 evals + Phase 8 report remain.

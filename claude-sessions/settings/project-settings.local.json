@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s --max-time 30 \"https://api.semanticscholar.org/graph/v1/paper/search?query=agentic%20retrieval%20augmented%20generation&year=2023-2026&limit=5&fields=title,year,venue,externalIds,publicationTypes\")",
+      "Bash(curl -s --max-time 30 \"https://api.crossref.org/works?query=agentic+retrieval+augmented+generation&rows=2&select=DOI,title,container-title,issued\")",
+      "Bash(curl -s --max-time 40 -H \"User-Agent: mailto:sreekaran005@gmail.com\" \"https://api.openalex.org/works?search=agentic%20retrieval%20augmented%20generation&filter=from_publication_date:2023-01-01,to_publication_date:2026-12-31&per-page=5&select=id,doi,title,publication_year,type,cited_by_count,primary_location\")",
+      "Bash(python -c ' *)",
+      "Bash(python sweep.py)",
+      "Bash(python sweep2.py)",
+      "Bash(python sweep3.py)",
+      "Bash(curl -s --max-time 30 \"https://api.crossref.org/works?query.author=Aytar&query.container-title=Natural+Language+Processing+Journal&rows=6&select=DOI,title,author,container-title,issued\")",
+      "Bash(export PYTHONIOENCODING=utf-8)",
+      "Bash(curl -s --max-time 40 \"https://api.crossref.org/works?query.author=Aytar&query.container-title=Natural+Language+Processing+Journal&rows=8&select=DOI,title,author,container-title,issued,abstract\")",
+      "Bash(python abstracts.py)",
+      "Bash(python -c *)",
+      "WebFetch(domain:aclanthology.org)",
+      "Bash(python refetch.py)",
+      "WebFetch(domain:www.sciencedirect.com)",
+      "Bash(python getpdfs.py)",
+      "Bash(curl -s --max-time 30 \"https://api.crossref.org/works/10.1162/tacl_a_00530?select=alternative-id,link,title\")",
+      "Bash(curl -s --max-time 40 -H \"User-Agent: Mozilla/5.0\" \"https://aclanthology.org/volumes/2023.tacl-1/\")",
+      "Bash(python -m pip --version)",
+      "Bash(python digest.py C1-04 C2-05 C2-06 C2-09)",
+      "Bash(python digest.py C3-10 C3-11 C4-13 C4-14 C4-15)",
+      "Bash(python digest.py C5-16 C5-17 C5-18 C5-20)",
+      "Bash(python digest.py C6-21 C6-22 C6-23 C6-25 C5-19)",
+      "Read(//c/Program Files/draw.io/**)",
+      "Read(//c/Users/Sreekaran/AppData/Local/Programs/draw.io/**)"
+    ]
+  }
+}
