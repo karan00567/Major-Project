@@ -19,8 +19,8 @@
 // retained, below min_papers=5000" is why the run replanned, and it is the
 // difference between demonstrating the loop and asserting it.
 import { computed } from 'vue'
-import { AGENTS, AGENT_ROLE, stages } from '../lib/runStats.js'
-import { ms, num, pct } from '../lib/format.js'
+import { AGENTS, AGENT_ROLE } from '../lib/runStats.js'
+import { num, pct } from '../lib/format.js'
 
 const props = defineProps({
   digest: { type: Object, required: true },
@@ -28,7 +28,6 @@ const props = defineProps({
 })
 
 const state = computed(() => props.digest.agents)
-const rail = computed(() => stages(props.digest))
 const decisions = computed(() => props.digest.decisions)
 
 /** The searches, grouped by the iteration that issued them. Two groups means
@@ -119,28 +118,14 @@ const STATUS_CLS = {
               :title="`ran ${state[a].runs} times — the Critic sent the graph back`">
           ×{{ state[a].runs }}
         </span>
-        <span v-if="state[a].elapsedMs"
-              class="font-mono text-[0.66rem] opacity-70">{{ ms(state[a].elapsedMs) }}</span>
       </li>
     </ol>
 
-    <!-- The stage rail: one line per stage, with the number that matters. -->
-    <ol v-if="digest.events" class="mt-4 space-y-1">
-      <li v-for="(s, i) in rail" :key="s.key"
-          class="flex items-baseline gap-3 rounded-lg px-2 py-1.5 transition
-                 hover:bg-paper-sunk dark:hover:bg-night-sunk"
-          :class="s.value ? '' : 'opacity-45'">
-        <span class="w-4 shrink-0 font-mono text-[0.7rem] text-ink-faint
-                     dark:text-night-faint">{{ i + 1 }}</span>
-        <span class="w-16 shrink-0 text-[0.8rem] font-semibold">{{ s.label }}</span>
-        <!-- The detail column is gone: it carried the internals of each stage
-             ("184 source queries · 5,188 chunks · 0 failed", the planner's
-             facet list) which describe how the machinery worked, not what the
-             run produced. The rail now reads as six stages and six outcomes. -->
-        <span class="min-w-0 flex-1 font-mono text-[0.78rem] tabular-nums
-                     text-ink dark:text-night-fg">{{ s.value || '—' }}</span>
-      </li>
-    </ol>
+    <!-- The numbered stage rail (Plan / Retrieve / Rank / Extract / Write /
+         Verify, each with its count) was removed. The agent chips above already
+         say which stages ran and which is running, and the counts it carried
+         are the same ones Panel 1 states as headline figures — so the rail was
+         a second, smaller copy of both. -->
 
     <!-- Critic decisions, with the arithmetic that produced each one. -->
     <div v-if="decisions.length" class="mt-4 border-t border-paper-hair pt-3

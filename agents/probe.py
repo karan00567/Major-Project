@@ -1,24 +1,3 @@
-"""Connectivity and fit probe - run this FIRST, before anything else here.
-
-    python -m agents.probe
-    python -m agents.probe --host http://192.168.1.7:8080 --model qwen2.5:3b-instruct
-
-Answers four questions in order, and stops at the first one that fails:
-
-  1. Is an Ollama server reachable at the host?
-  2. Does it hold the model we intend to use?
-  3. Does that model honour a long prompt? (the num_ctx trap - see below)
-  4. How fast is it, in tokens/second?
-
-Question 3 is the one worth the file. Ollama's default context is 2048 tokens
-and the extractor prompt is ~3,530 before any paper text. A model that silently
-truncates the prompt still returns confident JSON, so this probe plants a
-canary near the START of a long prompt and asks the model to repeat it back. If
-the canary comes back, the whole prompt survived. If it does not, num_ctx is
-too small and every extraction from this server is being answered from a
-half-read prompt.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -33,10 +12,6 @@ from agents.ollama_client import (
     OllamaError,
 )
 
-#: Rough q4_K_M weight footprints, for a 5 GB card. The KV cache for
-#: num_ctx 8192 adds roughly 0.3-0.8 GB on top of the weights, which is why the
-#: 7B row is marked tight rather than comfortable: it fits the card but not the
-#: card plus a useful context window.
 VRAM_GUIDE = [
     ("llama3.2:3b",             2.0, "comfortable at num_ctx 8192"),
     ("qwen2.5:3b-instruct",     1.9, "comfortable at num_ctx 8192  <- recommended"),
@@ -58,15 +33,8 @@ def _fmt_guide() -> str:
 
 
 def probe_context(client: OllamaClient, num_ctx: int) -> dict:
-    """Plant a canary at the front of a long prompt and ask for it back.
-
-    The filler sits BETWEEN the canary and the question, so the only way to
-    answer is to have read past roughly ``num_ctx`` tokens of input. A model
-    whose context silently truncated will have lost the canary and will make
-    something up - which is precisely the failure this detects.
-    """
     canary = uuid.uuid4().hex[:8]
-    # ~4 chars/token, filled to about 85% of the window so the answer has room.
+
     filler_tokens = int(num_ctx * 0.85)
     filler = ("The quick brown fox jumps over the lazy dog. " * (filler_tokens // 11))
 
@@ -97,7 +65,6 @@ def probe_context(client: OllamaClient, num_ctx: int) -> dict:
 
 
 def probe_speed(client: OllamaClient) -> dict:
-    """One short generation, timed. Tokens/sec is what decides feasibility."""
     prompt = (
         "In three sentences, explain what a cross-encoder reranker does "
         "in a retrieval pipeline."
@@ -129,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     client = OllamaClient(host=args.host, model=args.model, num_ctx=args.num_ctx)
     report: dict = {"host": client.host, "model": client.model, "num_ctx": client.num_ctx}
 
-    # 1. reachable ---------------------------------------------------------
+
     health = client.health()
     report["health"] = health
     if not health["ok"]:
@@ -145,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"                        {len(health['models'])} model(s): "
               f"{', '.join(health['models'][:6]) or '(none)'}")
 
-    # 2. model present -----------------------------------------------------
+
     if not health["model_present"]:
         report["model_present"] = False
         if args.json:
@@ -158,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.json:
         print(f"[2/4] model       OK    {client.model}")
 
-    # 3. context honoured --------------------------------------------------
+
     ctx = probe_context(client, client.num_ctx)
     report["context"] = ctx
     if not args.json:
@@ -178,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(report, indent=2))
             return 1
 
-    # 4. speed -------------------------------------------------------------
+
     speed = probe_speed(client)
     report["speed"] = speed
     if args.json:
@@ -193,8 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[4/4] speed       OK    ~{tps} tok/s "
           f"({speed['approx_output_tokens']} tokens in {speed['seconds']}s)")
 
-    # A full extraction is ~3,900 prompt tokens in and ~571 out (the measured
-    # median on the Groq arm). Output dominates on a local GPU.
+
     if tps:
         est = 571 / tps
         print(f"\n  Estimated per-paper extraction: ~{est:.0f}s "

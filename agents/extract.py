@@ -1,29 +1,3 @@
-"""Run the project's REAL extractor prompt against a local Ollama model.
-
-    python -m agents.extract --n 5
-    python -m agents.extract --run t410_cap25 --n 10 --model qwen2.5:3b-instruct
-    python -m agents.extract --n 5 --max-source-chars 12000    # local-only headroom
-
-Reuses ``core/prompts/extractor_v1.md`` and ``core.llm.extract_json`` verbatim,
-so what this measures is the MODEL, not a re-implementation of the prompt. Output
-lands in ``agents/out/extract_<model>_<ts>.json`` and never touches
-``outputs/runs/`` - a local-model artefact must not be mistakable for a
-pipeline run.
-
-ON PROMPT SIZE
---------------
-``agents/extractor.py`` caps the rendered prompt at ``MAX_PROMPT_CHARS = 18000``
-because **Groq returns HTTP 413 over ~20 KB**. That is a hosted-provider limit
-and it does not exist here. Locally the binding constraint is ``num_ctx`` and
-generation speed instead, so this script exposes ``--max-source-chars``:
-
-  * default **3904** - what the Groq arm actually gets after the 14,125-char
-    prompt template. Use this for any comparison against the hosted arm.
-  * higher - only meaningful locally. Note that num_ctx 8192 is roughly 32,000
-    characters total, and the template already spends 14,125 of them, so much
-    past ~15,000 needs ``--num-ctx 16384`` and the VRAM to back it.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -36,39 +10,26 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agents.ollama_client import DEFAULT_NUM_CTX, OllamaClient, OllamaError
-from researchgpt.core.llm import extract_json
-from researchgpt.core.models import PaperInsight
-from researchgpt.core.prompts import load, version
+from agents.tools import PaperInsight, extract_json, load, version
 
-#: The eight fields T-004 scores coverage over. Same tuple as
-#: ``agents/extractor.py::CONTENT_FIELDS`` - kept in sync by hand, because
-#: importing the pipeline extractor would drag in the graph state module.
 CONTENT_FIELDS = (
     "methodology", "advantages", "disadvantages", "critique",
     "datasets", "metrics", "results", "limitations",
 )
 
-#: Literal schema placeholders a model may echo instead of extracting. These
-#: are fabricated content in a pipeline graded on not fabricating - T-004
-#: disqualified an arm for producing them on 2 of 5 papers.
+
 PLACEHOLDERS = {
     "string", "string | null", "null", "none", "n/a", "na", "...",
     "example", "text", "value", "<string>",
 }
 
-#: What the hosted arm gets: MAX_PROMPT_CHARS 18000 minus the 14,125-char
-#: extractor_v1 template. Measured 2026-08-29.
+
 GROQ_EQUIVALENT_SOURCE_CHARS = 3_904
 
 OUT_DIR = pathlib.Path("agents/out")
 
 
 def load_papers(run: str | None, pool: str | None, limit: int) -> list[dict[str, Any]]:
-    """Papers from a run's corpus.json, else a cached eval pool.
-
-    Both are artefacts this repo already produces, so the script needs no
-    network and no API key to do useful work.
-    """
     if run:
         path = pathlib.Path("outputs/runs") / run / "corpus.json"
         if not path.is_file():
@@ -89,7 +50,6 @@ def load_papers(run: str | None, pool: str | None, limit: int) -> list[dict[str,
 
 
 def count_placeholders(insight: PaperInsight) -> int:
-    """How many fields came back as a literal schema placeholder."""
     hits = 0
     for field in CONTENT_FIELDS:
         value = getattr(insight, field, None)
@@ -102,7 +62,6 @@ def count_placeholders(insight: PaperInsight) -> int:
 
 
 def filled_fields(insight: PaperInsight) -> int:
-    """Of the eight content fields, how many carry real content."""
     n = 0
     for field in CONTENT_FIELDS:
         value = getattr(insight, field, None)
@@ -120,7 +79,6 @@ def extract_one(
     max_source_chars: int,
     max_tokens: int,
 ) -> dict[str, Any]:
-    """One paper through the real prompt. Never raises - failures are data."""
     text = (paper.get("abstract") or "").strip()
     truncated = 0
     if len(text) > max_source_chars:
@@ -155,7 +113,7 @@ def extract_one(
     try:
         obj = extract_json(raw)
     except ValueError as exc:
-        # A parse failure is the headline T-004 metric, so keep the evidence.
+
         record.update(ok=False, stage="parse", error=str(exc)[:200],
                       raw_head=raw[:300])
         return record
@@ -164,7 +122,7 @@ def extract_one(
         insight = PaperInsight(paper_id=str(paper.get("paper_id") or ""), **{
             k: v for k, v in obj.items() if k in PaperInsight.model_fields
         })
-    except Exception as exc:  # pydantic ValidationError, mostly
+    except Exception as exc:
         record.update(ok=False, stage="validate", error=str(exc)[:300],
                       parsed_keys=sorted(obj.keys())[:16])
         return record

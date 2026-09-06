@@ -144,14 +144,7 @@ function goToRun() {
         <div class="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <StatTile v-for="s in RUN" :key="s.label" v-bind="s" />
         </div>
-        <p class="mt-5 max-w-3xl rounded-xl border-l-4 border-accent bg-accent-soft
-                  px-5 py-4 leading-relaxed">
-          The replan is not cosmetic. The Critic read 271 papers against its
-          corpus gate, sent the run back, and the Planner produced
-          <strong class="font-semibold">12 new queries with zero repeats</strong>
-          — which doubled the corpus. That loop is the difference between an
-          agent and a pipeline, and you can watch it happen on the run page.
-        </p>
+        
       </section>
 
       <!-- ── the problem ──────────────────────────────────────────────── -->
@@ -270,15 +263,7 @@ function goToRun() {
           </li>
         </ol>
 
-        <p class="mt-6 max-w-3xl leading-relaxed text-ink-dim dark:text-night-dim">
-          <strong class="font-semibold text-ink dark:text-night-fg">Two components
-          are deterministic on purpose.</strong>
-          The Critic makes no model call — every gate is arithmetic, and a loop
-          that spends tokens deciding whether to spend tokens is the worst place
-          for a generative step. Claim decomposition is rule-based for the same
-          reason, plus a sharper one: a model in that seat can <em>invent</em> a
-          claim the draft never made.
-        </p>
+      
         <p class="mt-4 max-w-2xl leading-relaxed text-ink-dim dark:text-night-dim">
           Every claim the Writer makes is decomposed and scored against the paper
           it cites. Anything that cannot be grounded is

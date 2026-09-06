@@ -1,26 +1,3 @@
-"""T-004-shaped bake-off across local Ollama models, on the same papers.
-
-    python -m agents.bakeoff --models qwen2.5:3b-instruct llama3.2:3b phi3.5:3.8b
-    python -m agents.bakeoff --models qwen2.5:3b-instruct --n 5 --json
-
-Scores every arm on the four criteria T-004 used to pick ``gpt-oss-120b``, in
-the order that decided it:
-
-  1. **placeholder echo** - a field returned as the literal schema string
-     ("string", "null", ...). Disqualifying, not a deduction. It parses, it
-     validates, and it silently injects fabricated content into a pipeline
-     graded on not fabricating. This is what removed ``qwen3.6-27b`` from the
-     hosted allowlist despite the best field coverage in the field.
-  2. **clean parse rate** - JSON recovered without ``format: json`` help.
-  3. **field coverage** - mean of 8 content fields populated.
-  4. **latency** - per paper.
-
-The hosted baseline is printed alongside so the local arm is read against
-something real rather than in isolation. Those numbers are from
-``configs/default.yaml`` (T-004, 2026-08-25) and ``eval/metrics_evaluated.md``
-(2026-08-29), both measured on this repo.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -40,8 +17,7 @@ from agents.ollama_client import DEFAULT_NUM_CTX, OllamaClient
 
 OUT_DIR = pathlib.Path("agents/out")
 
-#: Measured on this repo, hosted arm. Printed for comparison only - never
-#: recomputed here, because a local run cannot re-measure a hosted provider.
+
 HOSTED_BASELINE = {
     "openai/gpt-oss-120b (Groq, T-004)": {
         "parse_rate": 1.00, "mean_fields": 4.6, "echoes": 0, "seconds": 26.6,
@@ -67,7 +43,6 @@ def run_arm(
     max_source_chars: int,
     max_tokens: int,
 ) -> dict[str, Any]:
-    """One model over every paper. A dead arm is a result, not a crash."""
     client = OllamaClient(host=host, model=model, num_ctx=num_ctx)
     health = client.health()
     if not health["ok"]:
@@ -97,7 +72,7 @@ def run_arm(
         "echo_papers": sum(1 for r in ok if r["placeholder_echoes"]),
         "median_seconds": round(statistics.median([r["seconds"] for r in ok]), 1) if ok else None,
         "median_extracted_chars": statistics.median([r["extracted_chars"] for r in ok]) if ok else 0,
-        # T-004's rule: an echo disqualifies regardless of every other number.
+
         "verdict": _verdict(len(ok), len(records), echoes),
         "records": records,
     }
@@ -131,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         print("No papers with abstracts found.", file=sys.stderr)
         return 1
 
-    #  Same papers for every arm, or the comparison means nothing.
+
     print(f"{len(papers)} paper(s), identical across arms, "
           f"source cap {args.max_source_chars:,} chars\n")
 
