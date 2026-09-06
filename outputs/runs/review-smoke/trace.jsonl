@@ -1,0 +1,2 @@
+{"ts": "2026-08-25T09:39:48.308021Z", "run_id": "review-smoke", "agent": "llm", "event": "request", "iteration": null, "payload": {"model": "gemma-4-31b-it", "prompt_hash": "05705efddb975c3a7ee5b9e16ff92e1e6d279d85f585a76149b54c0c0bc1f88d", "latency_ms": 84464, "attempt": 0}}
+{"ts": "2026-08-25T09:39:48.310715Z", "run_id": "review-smoke", "agent": "llm", "event": "cache_hit", "iteration": null, "payload": {"model": "gemma-4-31b-it", "prompt_hash": "05705efddb975c3a7ee5b9e16ff92e1e6d279d85f585a76149b54c0c0bc1f88d", "latency_ms": 0, "attempt": 0}}

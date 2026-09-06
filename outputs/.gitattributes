@@ -1,0 +1,2 @@
+# Run artefacts must round-trip byte-identically; no EOL rewriting.
+* -text

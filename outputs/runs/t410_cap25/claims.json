@@ -1,0 +1,371 @@
+{
+  "grounding_score": 0.7619047619047619,
+  "counts": {
+    "verified": 16,
+    "dropped": 5,
+    "supported": 0,
+    "partial": 16,
+    "contradicted": 0
+  },
+  "verified": [
+    {
+      "claim_id": "c0001",
+      "text": "In one recent study, the open\u2011source LLaMA\u20112 model was fine\u2011tuned to serve both as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA) within a multi\u2011stage ranking pipeline, achieving strong performance on MS\u202fMARCO and BEIR without the need for heuristic document segmentation .",
+      "paper_ids": [
+        "W4400526199"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.998206615447998,
+      "evidence": [
+        {
+          "chunk_id": "W4400526199:0000",
+          "quote": "Fine-Tuning LLaMA for Multi-Stage Text Retrieval\n\nWhile large language models (LLMs) have shown impressive NLP capabilities, existing IR applications mainly focus on prompting LLMs to generate query expansions or generating permutations for listwise reranking. In this study, we leverage LLMs directly to serve as components in the widely used multi-stage text ranking pipeline. Specifically, we fine-tune the open-source LLaMA-2 model as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA). This is performed for both passage and document retrieval tasks using the MS MARCO training da",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0002",
+      "text": "The authors argue that finetuned LLM retrieval models outperform smaller models, generalise better, and require only a straightforward training strategy, thereby simplifying deployment in real\u2011world retrieval settings .",
+      "paper_ids": [
+        "W4400526199"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9992589354515076,
+      "evidence": [
+        {
+          "chunk_id": "W4400526199:0000",
+          "quote": "Fine-Tuning LLaMA for Multi-Stage Text Retrieval\n\nWhile large language models (LLMs) have shown impressive NLP capabilities, existing IR applications mainly focus on prompting LLMs to generate query expansions or generating permutations for listwise reranking. In this study, we leverage LLMs directly to serve as components in the widely used multi-stage text ranking pipeline. Specifically, we fine-tune the open-source LLaMA-2 model as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA). This is performed for both passage and document retrieval tasks using the MS MARCO training da",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0003",
+      "text": "By generating weakly\u2011supervised training data through rule\u2011based transformations and jointly training a single model on consistency detection, span extraction, and inconsistency extraction, the proposed approach substantially outperforms prior models on factual consistency verification and aids human verification through auxiliary span\u2011extraction tasks .",
+      "paper_ids": [
+        "W2981456979"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9990319013595581,
+      "evidence": [
+        {
+          "chunk_id": "W2981456979:0001",
+          "quote": "that this highly scalable approach substantially outperforms previous models, including those trained with strong supervision using standard datasets for natural language inference and fact checking. Additionally, human evaluation shows that the auxiliary span extraction tasks provide useful assistance in the process of verifying factual consistency.",
+          "start_char": 0,
+          "end_char": 352
+        }
+      ]
+    },
+    {
+      "claim_id": "c0004",
+      "text": "The best\u2011performing LM system identified only 45\u202f% of the original ablations on average, revealing a significant gap to human performance and highlighting the need for more sophisticated planning capabilities .",
+      "paper_ids": [
+        "2507.08038v3"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.998958945274353,
+      "evidence": [
+        {
+          "chunk_id": "2507.08038v3:0000",
+          "quote": "AblationBench: Evaluating Automated Planning of Ablations in Empirical AI Research\n\nLanguage model agents are increasingly used to automate scientific research, yet evaluating their scientific contributions remains a challenge. A key mechanism to obtain such insights is through ablation experiments. To this end, we introduce AblationBench, a benchmark suite for evaluating agents on ablation planning tasks in empirical AI research. It includes two tasks: AuthorAblation, which helps authors propose ablation experiments based on a method section and contains 83 instances, and ReviewerAblation, wh",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0005",
+      "text": "The generative model selects informative data from other modalities to challenge a discriminative model, leading to improved retrieval accuracy as demonstrated on three widely used datasets .",
+      "paper_ids": [
+        "W2953037339"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9994263648986816,
+      "evidence": [
+        {
+          "chunk_id": "W2953037339:0002",
+          "quote": "ture the underlying manifold structure across different modalities so that data of different modalities but within the same manifold can have a smaller Hamming distance to promote retrieval accuracy. Extensive experiments compared with state-of-the-art methods on three widely used datasets verify the effectiveness of our proposed approach.",
+          "start_char": 0,
+          "end_char": 341
+        }
+      ]
+    },
+    {
+      "claim_id": "c0006",
+      "text": "These analyses revealed that the decoder is the primary component for successful retrieval, with query\u2011document interaction occurring only in the interaction stage of the retrieval pipeline .",
+      "paper_ids": [
+        "2503.19715v2"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9985827207565308,
+      "evidence": [
+        {
+          "chunk_id": "2503.19715v2:0001",
+          "quote": "monstrate that the decoder is the primary component responsible for successful retrieval. Our patching experiments reveal that not all components in the decoder are crucial for the retrieval process. More specifically, we find that a pass through the decoder can be divided into three stages: (I) the priming stage, which contributes important information for activating subsequent components in later layers; (II) the bridging stage, where cross-attention is primarily active to transfer query information from the encoder to the decoder; and (III) the interaction stage, where predominantly MLPs ar",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0007",
+      "text": "KGR retrofits initial draft responses by extracting, selecting, validating, and retrofitting factual statements from knowledge graphs, significantly improving performance on factual QA benchmarks, especially for complex reasoning tasks .",
+      "paper_ids": [
+        "W4393160124"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9993849992752075,
+      "evidence": [
+        {
+          "chunk_id": "W4393160124:0001",
+          "quote": ", select, validate, and retrofit factual statements within the model-generated responses, which enables an autonomous knowledge verifying and refining procedure without any additional manual efforts. Experiments show that KGR can significantly improve the performance of LLMs on factual QA benchmarks especially when involving complex reasoning processes, which demonstrates the necessity and effectiveness of KGR in mitigating hallucination and enhancing the reliability of LLMs.",
+          "start_char": 0,
+          "end_char": 480
+        }
+      ]
+    },
+    {
+      "claim_id": "c0008",
+      "text": "This incentive reduced the exponential cost of exploring the joint action space, improved coordination performance, and enabled agents to learn from experts present in the environment, outperforming a competitive centralized critic baseline across multiple environments .",
+      "paper_ids": [
+        "2104.07750v2"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9993430972099304,
+      "evidence": [
+        {
+          "chunk_id": "2104.07750v2:0000",
+          "quote": "Joint Attention for Multi-Agent Coordination and Social Learning\n\nJoint attention - the ability to purposefully coordinate attention with another agent, and mutually attend to the same thing -- is a critical component of human social cognition. In this paper, we ask whether joint attention can be useful as a mechanism for improving multi-agent coordination and social learning. We first develop deep reinforcement learning (RL) agents with a recurrent visual attention architecture. We then train agents to minimize the difference between the attention weights that they apply to the environment at",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0009",
+      "text": "By externalising structural reasoning to a structured retrieval layer, the architecture achieved consistent improvements in completeness, depth, and anticipatory coverage, with overall quality gains of up to 20\u202f% under mid\u2011scale models while reducing computational and latency footprints .",
+      "paper_ids": [
+        "2607.00013v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9991679191589355,
+      "evidence": [
+        {
+          "chunk_id": "2607.00013v1:0001",
+          "quote": "e generative stage to a structured retrieval layer, resolving structural ambiguity offline, enabling deployment on self-hosted lightweight models calibrated to closed-domain institutional vocabulary. Experiments across three model capacities: Mistral 24B, GPT OSS 120B, and Gemini 2.5 Flash show consistent improvements in completeness, depth, and anticipatory coverage, with overall quality gains of up to 20% under mid-scale models, indicating that retrieval architecture governs structural quality over model scale, reducing computational and latency footprint without dependence on proprietary sy",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0010",
+      "text": "The repLLaMA\u2011rankLLaMA pipeline achieved high effectiveness on the MS\u202fMARCO and BEIR benchmarks, demonstrating that finetuned LLM retrieval models outperform smaller models, generalise better, and can directly encode longer documents without heuristic segmentation .",
+      "paper_ids": [
+        "W4400526199"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9992616772651672,
+      "evidence": [
+        {
+          "chunk_id": "W4400526199:0001",
+          "quote": "es the strong potential for optimizing LLMs to enhance a variety of retrieval tasks. Furthermore, as LLMs are naturally pre-trained with longer contexts, they can directly represent longer documents. This eliminates the need for heuristic segmenting and pooling strategies to rank long documents. On the MS MARCO and BEIR datasets, our repLLaMA-rankLLaMA pipeline demonstrates a high level of effectiveness.",
+          "start_char": 0,
+          "end_char": 407
+        }
+      ]
+    },
+    {
+      "claim_id": "c0011",
+      "text": "This method substantially outperformed prior models on factual consistency verification, and the auxiliary span\u2011extraction tasks aid human verification of factual consistency .",
+      "paper_ids": [
+        "W2981456979"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9995261430740356,
+      "evidence": [
+        {
+          "chunk_id": "W2981456979:0001",
+          "quote": "that this highly scalable approach substantially outperforms previous models, including those trained with strong supervision using standard datasets for natural language inference and fact checking. Additionally, human evaluation shows that the auxiliary span extraction tasks provide useful assistance in the process of verifying factual consistency.",
+          "start_char": 0,
+          "end_char": 352
+        }
+      ]
+    },
+    {
+      "claim_id": "c0012",
+      "text": "The best\u2011performing LM system identifies only 45\u202f% of the original ablations on average, highlighting a gap to human performance and the need for better evaluation metrics in this domain .",
+      "paper_ids": [
+        "2507.08038v3"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9990196228027344,
+      "evidence": [
+        {
+          "chunk_id": "2507.08038v3:0000",
+          "quote": "AblationBench: Evaluating Automated Planning of Ablations in Empirical AI Research\n\nLanguage model agents are increasingly used to automate scientific research, yet evaluating their scientific contributions remains a challenge. A key mechanism to obtain such insights is through ablation experiments. To this end, we introduce AblationBench, a benchmark suite for evaluating agents on ablation planning tasks in empirical AI research. It includes two tasks: AuthorAblation, which helps authors propose ablation experiments based on a method section and contains 83 instances, and ReviewerAblation, wh",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0014",
+      "text": "KGR significantly improves performance on factual QA benchmarks, especially for complex reasoning tasks, suggesting that evaluation should include knowledge\u2011grounded reasoning metrics .",
+      "paper_ids": [
+        "W4393160124"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9995007514953613,
+      "evidence": [
+        {
+          "chunk_id": "W4393160124:0001",
+          "quote": ", select, validate, and retrofit factual statements within the model-generated responses, which enables an autonomous knowledge verifying and refining procedure without any additional manual efforts. Experiments show that KGR can significantly improve the performance of LLMs on factual QA benchmarks especially when involving complex reasoning processes, which demonstrates the necessity and effectiveness of KGR in mitigating hallucination and enhancing the reliability of LLMs.",
+          "start_char": 0,
+          "end_char": 480
+        }
+      ]
+    },
+    {
+      "claim_id": "c0015",
+      "text": "These results demonstrate that evaluation metrics should capture not only retrieval accuracy but also the quality of the generated content in terms of completeness and depth .",
+      "paper_ids": [
+        "2607.00013v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.8288305401802063,
+      "evidence": [
+        {
+          "chunk_id": "2607.00013v1:0001",
+          "quote": "e generative stage to a structured retrieval layer, resolving structural ambiguity offline, enabling deployment on self-hosted lightweight models calibrated to closed-domain institutional vocabulary. Experiments across three model capacities: Mistral 24B, GPT OSS 120B, and Gemini 2.5 Flash show consistent improvements in completeness, depth, and anticipatory coverage, with overall quality gains of up to 20% under mid-scale models, indicating that retrieval architecture governs structural quality over model scale, reducing computational and latency footprint without dependence on proprietary sy",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0017",
+      "text": "The Knowledge\u2011Graph\u2011Based Retrofitting (KGR) framework demonstrates significant gains on factual QA benchmarks, yet it is unclear how well it generalizes to complex, multi\u2011step reasoning tasks or to domains with sparse graph coverage .",
+      "paper_ids": [
+        "W4393160124"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9950997233390808,
+      "evidence": [
+        {
+          "chunk_id": "W4393160124:0000",
+          "quote": "Mitigating Large Language Model Hallucinations via Autonomous Knowledge Graph-Based Retrofitting\n\nIncorporating factual knowledge in knowledge graph is regarded as a promising approach for mitigating the hallucination of large language models (LLMs). Existing methods usually only use the user's input to query the knowledge graph, thus failing to address the factual hallucination generated by LLMs during its reasoning process. To address this problem, this paper proposes Knowledge Graph-based Retrofitting (KGR), a new framework that incorporates LLMs with KGs to mitigate factual hallucination d",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0021",
+      "text": "This policy highlights a broader issue: current AI systems lack mechanisms for accountability and traceability of generated content, which hampers their adoption in high\u2011stakes domains such as medical research .",
+      "paper_ids": [
+        "W4384398274"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.5828708410263062,
+      "evidence": [
+        {
+          "chunk_id": "W4384398274:0005",
+          "quote": "sisted technologies were used in the study and/or preparation of the manuscript. The use of AI or AI-assisted technology could include the use of LLMs, chatbots (such as ChatGPT), and image creators. Artificial intelligence or AI-assisted technologies do not qualify as authors and must not be listed authors or co-authors on a manuscript. Similarly, they should not be listed as authors or co-authors in references. Authors must declare and confirm that no part of their submission, which includes any content arising from AI or AI-assisted technology, is under consideration or has been submitted t",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    }
+  ],
+  "dropped": [
+    {
+      "claim_id": "c0013",
+      "text": "These insights inform the design of evaluation protocols that isolate the contribution of each component .",
+      "paper_ids": [
+        "2503.19715v2"
+      ],
+      "verdict": "UNSUPPORTED",
+      "support_score": 0.002829686040058732,
+      "evidence": [
+        {
+          "chunk_id": "2503.19715v2:0000",
+          "quote": "Reverse-Engineering the Retrieval Process in GenIR Models\n\nGenerative Information Retrieval (GenIR) is a novel paradigm in which a transformer encoder-decoder model predicts document rankings based on a query in an end-to-end fashion. These GenIR models have received significant attention due to their simple retrieval architecture while maintaining high retrieval effectiveness. However, in contrast to established retrieval architectures like cross-encoders or bi-encoders, their internal computations remain largely unknown. Therefore, this work studies the internal retrieval process of GenIR mo",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0016",
+      "text": "The abstract of the repLLaMA\u2011rankLLaMA study notes that the decoder is the primary component for successful retrieval, but it does not quantify the computational overhead or memory footprint required for large\u2011scale deployment .",
+      "paper_ids": [
+        "2503.19715v2"
+      ],
+      "verdict": "UNSUPPORTED",
+      "support_score": 0.34173986315727234,
+      "evidence": [
+        {
+          "chunk_id": "2503.19715v2:0000",
+          "quote": "Reverse-Engineering the Retrieval Process in GenIR Models\n\nGenerative Information Retrieval (GenIR) is a novel paradigm in which a transformer encoder-decoder model predicts document rankings based on a query in an end-to-end fashion. These GenIR models have received significant attention due to their simple retrieval architecture while maintaining high retrieval effectiveness. However, in contrast to established retrieval architectures like cross-encoders or bi-encoders, their internal computations remain largely unknown. Therefore, this work studies the internal retrieval process of GenIR mo",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0018",
+      "text": "The study does not explore whether incorporating external knowledge bases or structured reasoning modules could bridge this gap .",
+      "paper_ids": [
+        "2507.08038v3"
+      ],
+      "verdict": "UNSUPPORTED",
+      "support_score": 0.0023180937860161066,
+      "evidence": [
+        {
+          "chunk_id": "2507.08038v3:0001",
+          "quote": " the original ablations on average, below human-level performance. We observe an inverse performance trend between the author and reviewer tasks, which we attribute to differences in model grounding. Lastly, we analyze the limitations of current LMs on these tasks, and find that chain-of-thought prompting outperforms an agent-based approach. Our data is available on https://huggingface.co/collections/ai-coscientist/ablationbench, and our code is available on https://github.com/ai-scientist-bench/ablation-bench .",
+          "start_char": 0,
+          "end_char": 517
+        }
+      ]
+    },
+    {
+      "claim_id": "c0019",
+      "text": "The lack of quantitative benchmarks for multimodal hallucination detection remains a critical limitation .",
+      "paper_ids": [
+        "W3047631920"
+      ],
+      "verdict": "UNSUPPORTED",
+      "support_score": 0.07241102308034897,
+      "evidence": [
+        {
+          "chunk_id": "W3047631920:0000",
+          "quote": "A Review of Multimodal Hallucinations: Categorization, Assessment, Theoretical Perspectives, and Clinical Recommendations\n\nHallucinations can occur in different sensory modalities, both simultaneously and serially in time. They have typically been studied in clinical populations as phenomena occurring in a single sensory modality. Hallucinatory experiences occurring in multiple sensory systems-multimodal hallucinations (MMHs)-are more prevalent than previously thought and may have greater adverse impact than unimodal ones, but they remain relatively underresearched. Here, we review and discuss",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0020",
+      "text": "The scalability of this governance framework to larger, more heterogeneous knowledge graphs is yet to be demonstrated .",
+      "paper_ids": [
+        "2607.00013v1"
+      ],
+      "verdict": "UNSUPPORTED",
+      "support_score": 0.002269221004098654,
+      "evidence": [
+        {
+          "chunk_id": "2607.00013v1:0000",
+          "quote": "GRACE-RAG: Governed Retrieval Architecture for Canonical Evidence Synthesis, Enabling Lightweight Deployment in Closed-Domain Institutional Settings\n\nRetrieval-Augmented Generation (RAG) systems are widely used in institutional question answering settings where responses must be grounded in authoritative documentation (Gao et al., 2023). In entity-dense domains where relevant information is distributed across heterogeneous documents, vector-only retrieval often produces fragmented evidence and increases dependence on inference-time reasoning (Zhao et al., 2024). This paper introduces GRACE-RAG",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    }
+  ]
+}

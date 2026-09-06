@@ -1,0 +1,3 @@
+model=openai/gpt-oss-20b provider=None max_per_source=100 max_papers=10
+The tokenizer you are loading from 'data\models\verifier-onnx' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+DONE in 4448s  papers=8347 insights=0

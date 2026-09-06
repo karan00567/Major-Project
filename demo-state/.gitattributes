@@ -1,0 +1,2 @@
+# psql COPY blocks reject a literal carriage return in the data.
+* -text

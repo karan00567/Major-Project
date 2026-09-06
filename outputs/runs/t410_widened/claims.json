@@ -1,0 +1,302 @@
+{
+  "grounding_score": 1.0,
+  "counts": {
+    "verified": 17,
+    "dropped": 0,
+    "supported": 0,
+    "partial": 17,
+    "contradicted": 0
+  },
+  "verified": [
+    {
+      "claim_id": "c0001",
+      "text": "Fine\u2011tuning the open\u2011source LLaMA\u20112 model as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA) yields a repLLaMA\u2011rankLLaMA pipeline that performs competitively on MS\u202fMARCO and BEIR, demonstrating that a single fine\u2011tuned LLM can replace a collection of smaller, hand\u2011crafted retrieval components while directly handling long documents without heuristic segmentation .",
+      "paper_ids": [
+        "W4400526199"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9982774257659912,
+      "evidence": [
+        {
+          "chunk_id": "W4400526199:0000",
+          "quote": "Fine-Tuning LLaMA for Multi-Stage Text Retrieval\n\nWhile large language models (LLMs) have shown impressive NLP capabilities, existing IR applications mainly focus on prompting LLMs to generate query expansions or generating permutations for listwise reranking. In this study, we leverage LLMs directly to serve as components in the widely used multi-stage text ranking pipeline. Specifically, we fine-tune the open-source LLaMA-2 model as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA). This is performed for both passage and document retrieval tasks using the MS MARCO training da",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0002",
+      "text": "This multi\u2011task formulation substantially outperforms prior models on factual consistency verification, and the auxiliary span\u2011extraction tasks aid human verification .",
+      "paper_ids": [
+        "W2981456979"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9995747208595276,
+      "evidence": [
+        {
+          "chunk_id": "W2981456979:0001",
+          "quote": "that this highly scalable approach substantially outperforms previous models, including those trained with strong supervision using standard datasets for natural language inference and fact checking. Additionally, human evaluation shows that the auxiliary span extraction tasks provide useful assistance in the process of verifying factual consistency.",
+          "start_char": 0,
+          "end_char": 352
+        }
+      ]
+    },
+    {
+      "claim_id": "c0003",
+      "text": "By expressing mechanisms in UML diagrams, the framework enables systematic comparison and integration of theory families, facilitating empirical testing of social explanations within agent\u2011based models .",
+      "paper_ids": [
+        "W3034602597"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9990000128746033,
+      "evidence": [
+        {
+          "chunk_id": "W3034602597:0000",
+          "quote": "A Software Architecture for Mechanism-Based Social Systems Modelling in Agent-Based Simulation Models\n\nThis paper introduces the MBSSM (Mechanism-Based Social Systems Modelling) software architecture that is designed for expressing mechanisms of social theories with individual behaviour components in a unified way and implementing these mechanisms in an agent-based simulation model. The MBSSM architecture is based on a middle-range theory approach most recently expounded by analytical sociology and is designed in the object-oriented programming paradigm with Unified Modelling Language diagrams",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0004",
+      "text": "By assigning unique bounding\u2011box IDs to text regions, DLaVA preserves spatial context without iterative OCR or chain\u2011of\u2011thought reasoning, yielding lower computational complexity and improved interpretability and trustworthiness .",
+      "paper_ids": [
+        "W4405032692"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.999347984790802,
+      "evidence": [
+        {
+          "chunk_id": "W4405032692:0000",
+          "quote": "DLaVA: Document Language and Vision Assistant for Answer Localization with Enhanced Interpretability and Trustworthiness\n\nDocument Visual Question Answering (VQA) demands robust integration of text detection, recognition, and spatial reasoning to interpret complex document layouts. In this work, we introduce DLaVA, a novel, training-free pipeline that leverages Multimodal Large Language Models (MLLMs) for zero-shot answer localization in order to improve trustworthiness, interpretability, and explainability. By leveraging an innovative OCR-free approach that organizes text regions with unique ",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0005",
+      "text": "Results show that even state\u2011of\u2011the\u2011art LLMs retrieve only a fraction of expert\u2011cited papers and fail to match the depth of expert taxonomies, highlighting the need to calibrate hierarchy metrics before comparing models .",
+      "paper_ids": [
+        "2601.12369v5"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9989232420921326,
+      "evidence": [
+        {
+          "chunk_id": "2601.12369v5:0001",
+          "quote": "Bottom-Up runs reaches the experts' average depth of 4.86. A controlled probe shows that models which match this depth do so by fragmenting the taxonomy, reducing alignment with the expert reference. We further find that raw Sem-Path remains near a no-organization floor even when a newer model generation gains 3.68 pp ARI; after depth matching, humans lead on all 10 matched surveys by 13.27 pp. These results identify retrieval and hierarchical organization as separate bottlenecks and show why hierarchy metrics must be calibrated before they are used to compare models.",
+          "start_char": 0,
+          "end_char": 574
+        }
+      ]
+    },
+    {
+      "claim_id": "c0006",
+      "text": "The RiDiC pipeline demonstrates how a configurable generator can produce multilingual entity sets with specified popularity distributions, enabling systematic probing of hallucination rates across entity fame levels .",
+      "paper_ids": [
+        "2604.00019v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.999278724193573,
+      "evidence": [
+        {
+          "chunk_id": "2604.00019v1:0000",
+          "quote": "The Chronicles of RiDiC: Generating Datasets with Controlled Popularity Distribution for Long-form Factuality Evaluation\n\nWe present a configurable pipeline for generating multilingual sets of entities with specified characteristics, such as domain, geographical location and popularity, using data from Wikipedia and Wikidata. These datasets are intended for evaluating the factuality of LLMs' long-form generation, thereby complementing evaluation based on short-form QA datasets. We present the RiDiC dataset as an example of this approach. RiDiC contains 3,000 entities from three domains -- rive",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0007",
+      "text": "Similarly, the SciFactCheck benchmark introduces a modular evaluation framework that spans five scientific domains and three hallucination types (unverifiability, overclaim, attribution) .",
+      "paper_ids": [
+        "2606.21359v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9992528557777405,
+      "evidence": [
+        {
+          "chunk_id": "2606.21359v1:0000",
+          "quote": "Finetuning with Scientific Data Increases Hallucinations: A Multi-domain Factuality Evaluation of LLMs\n\nLarge language models (LLMs) are increasingly used to communicate and explain scientific concepts, yet their tendency to hallucinate poses significant risks in this high stakes use-case. Prior hallucination evaluation work remains largely restricted to the biomedical domain, treats hallucination as a binary task, and has not examined the growing family of scientifically fine-tuned LLMs. We address these gaps with SciFactCheck, a benchmark of 2,500 prompts across five scientific domains, pair",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0008",
+      "text": "In the TaxoBench study, leaf\u2011level assignments are evaluated with Adjusted Rand Index (ARI) and V\u2011Measure, while hierarchy\u2011level structure is assessed via US\u2011TED, US\u2011NTED, and Sem\u2011Path .",
+      "paper_ids": [
+        "2601.12369v5"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9987177848815918,
+      "evidence": [
+        {
+          "chunk_id": "2601.12369v5:0000",
+          "quote": "Can Deep Research Agents Retrieve and Organize? Evaluating the Synthesis Gap with Expert Taxonomies\n\nDeep Research Agents increasingly automate survey writing, yet existing benchmarks do not jointly test whether they retrieve the papers experts consider essential and organize those papers into paper-grounded taxonomies. We introduce TaxoBench, a benchmark built from 72 highly cited LLM surveys, 3,815 cited papers, and their expert-authored taxonomies. TaxoBench evaluates systems in two settings: Deep Research mode measures end-to-end retrieval and organization from a topic, while Bottom-Up mod",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0009",
+      "text": "The repLLaMA\u2011rankLLaMA pipeline shows that fine\u2011tuned LLM retrieval models outperform smaller models and generalize better, while also handling longer documents without heuristic segmentation .",
+      "paper_ids": [
+        "W4400526199"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9981728792190552,
+      "evidence": [
+        {
+          "chunk_id": "W4400526199:0000",
+          "quote": "Fine-Tuning LLaMA for Multi-Stage Text Retrieval\n\nWhile large language models (LLMs) have shown impressive NLP capabilities, existing IR applications mainly focus on prompting LLMs to generate query expansions or generating permutations for listwise reranking. In this study, we leverage LLMs directly to serve as components in the widely used multi-stage text ranking pipeline. Specifically, we fine-tune the open-source LLaMA-2 model as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA). This is performed for both passage and document retrieval tasks using the MS MARCO training da",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0010",
+      "text": "A weakly\u2011supervised, model\u2011based approach that jointly trains on consistency detection and span extraction has been shown to outperform prior models on factual consistency verification, and the auxiliary span tasks aid human verification .",
+      "paper_ids": [
+        "W2981456979"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9994729161262512,
+      "evidence": [
+        {
+          "chunk_id": "W2981456979:0001",
+          "quote": "that this highly scalable approach substantially outperforms previous models, including those trained with strong supervision using standard datasets for natural language inference and fact checking. Additionally, human evaluation shows that the auxiliary span extraction tasks provide useful assistance in the process of verifying factual consistency.",
+          "start_char": 0,
+          "end_char": 352
+        }
+      ]
+    },
+    {
+      "claim_id": "c0011",
+      "text": "The SciFactCheck benchmark reveals that scientifically fine\u2011tuned models exhibit degraded factual reliability across all hallucination types, and that human agreement with automated fact\u2011checking tools is only modest .",
+      "paper_ids": [
+        "2606.21359v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9988762736320496,
+      "evidence": [
+        {
+          "chunk_id": "2606.21359v1:0001",
+          "quote": "fine-tuned models exhibit degraded factual reliability across all hallucination types and scientific domains, and 2. Fine-tuned models are internally less confident yet linguistically more assertive. A human pilot study further reveals that current fact-checking tools show only modest agreement with expert judgments on scientific content, and that defining scientifically check-worthy claims remains contested even among human annotators. Our findings fundamentally challenge current methods of domain-specific fine-tuning for factuality and call for developing improved verification infrastructure",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0012",
+      "text": "Moreover, the TaxoBench results show that even state\u2011of\u2011the\u2011art agents retrieve a small fraction of expert\u2011cited papers and fail to match expert taxonomy depth, indicating that retrieval and organization remain significant bottlenecks .",
+      "paper_ids": [
+        "2601.12369v5"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9857134819030762,
+      "evidence": [
+        {
+          "chunk_id": "2601.12369v5:0000",
+          "quote": "Can Deep Research Agents Retrieve and Organize? Evaluating the Synthesis Gap with Expert Taxonomies\n\nDeep Research Agents increasingly automate survey writing, yet existing benchmarks do not jointly test whether they retrieve the papers experts consider essential and organize those papers into paper-grounded taxonomies. We introduce TaxoBench, a benchmark built from 72 highly cited LLM surveys, 3,815 cited papers, and their expert-authored taxonomies. TaxoBench evaluates systems in two settings: Deep Research mode measures end-to-end retrieval and organization from a topic, while Bottom-Up mod",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0013",
+      "text": "First, fine\u2011tuned dense retrievers such as repLLaMA and rankLLaMA, while outperforming smaller baselines, still exhibit a gap between their performance on benchmark datasets (MS\u202fMARCO, BEIR) and real\u2011world retrieval scenarios, particularly when documents vary widely in length and topicality .",
+      "paper_ids": [
+        "W4400526199"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9983250498771667,
+      "evidence": [
+        {
+          "chunk_id": "W4400526199:0000",
+          "quote": "Fine-Tuning LLaMA for Multi-Stage Text Retrieval\n\nWhile large language models (LLMs) have shown impressive NLP capabilities, existing IR applications mainly focus on prompting LLMs to generate query expansions or generating permutations for listwise reranking. In this study, we leverage LLMs directly to serve as components in the widely used multi-stage text ranking pipeline. Specifically, we fine-tune the open-source LLaMA-2 model as a dense retriever (repLLaMA) and a pointwise reranker (rankLLaMA). This is performed for both passage and document retrieval tasks using the MS MARCO training da",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0014",
+      "text": "Even weakly\u2011supervised models that jointly predict consistency and extract supporting spans outperform prior approaches, yet they still struggle with nuanced factual errors that require deep world knowledge or external verification .",
+      "paper_ids": [
+        "W2981456979"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.8399550914764404,
+      "evidence": [
+        {
+          "chunk_id": "W2981456979:0000",
+          "quote": "Evaluating the Factual Consistency of Abstractive Text Summarization\n\nCurrently used metrics for assessing summarization algorithms do not account for whether summaries are factually consistent with source documents. We propose a weakly-supervised, model-based approach for verifying factual consistency and identifying conflicts between source documents and a generated summary. Training data is generated by applying a series of rule-based transformations to the sentences of source documents. The factual consistency model is then trained jointly for three tasks: 1) identify whether sentences rem",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0015",
+      "text": "Third, the evaluation of LLM hallucinations in scientific domains reveals a paradox: models fine\u2011tuned on domain\u2011specific data exhibit *degraded* factual reliability across all hallucination types (unverifiability, overclaim, attribution) compared to their general\u2011purpose counterparts .",
+      "paper_ids": [
+        "2606.21359v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9583313465118408,
+      "evidence": [
+        {
+          "chunk_id": "2606.21359v1:0001",
+          "quote": "fine-tuned models exhibit degraded factual reliability across all hallucination types and scientific domains, and 2. Fine-tuned models are internally less confident yet linguistically more assertive. A human pilot study further reveals that current fact-checking tools show only modest agreement with expert judgments on scientific content, and that defining scientifically check-worthy claims remains contested even among human annotators. Our findings fundamentally challenge current methods of domain-specific fine-tuning for factuality and call for developing improved verification infrastructure",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0016",
+      "text": "The RiDiC pipeline demonstrates that even frontier models hallucinate when confronted with entities of varying popularity and multilingual contexts .",
+      "paper_ids": [
+        "2604.00019v1"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9992897510528564,
+      "evidence": [
+        {
+          "chunk_id": "2604.00019v1:0000",
+          "quote": "The Chronicles of RiDiC: Generating Datasets with Controlled Popularity Distribution for Long-form Factuality Evaluation\n\nWe present a configurable pipeline for generating multilingual sets of entities with specified characteristics, such as domain, geographical location and popularity, using data from Wikipedia and Wikidata. These datasets are intended for evaluating the factuality of LLMs' long-form generation, thereby complementing evaluation based on short-form QA datasets. We present the RiDiC dataset as an example of this approach. RiDiC contains 3,000 entities from three domains -- rive",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    },
+    {
+      "claim_id": "c0017",
+      "text": "TaxoBench shows that even state\u2011of\u2011the\u2011art agents retrieve only about 21\u202f% of expert\u2011cited papers and fail to achieve the depth of expert taxonomies, revealing that retrieval and hierarchical organization are distinct bottlenecks that current benchmarks and metrics do not fully disentangle .",
+      "paper_ids": [
+        "2601.12369v5"
+      ],
+      "verdict": "PARTIAL",
+      "support_score": 0.9976634979248047,
+      "evidence": [
+        {
+          "chunk_id": "2601.12369v5:0000",
+          "quote": "Can Deep Research Agents Retrieve and Organize? Evaluating the Synthesis Gap with Expert Taxonomies\n\nDeep Research Agents increasingly automate survey writing, yet existing benchmarks do not jointly test whether they retrieve the papers experts consider essential and organize those papers into paper-grounded taxonomies. We introduce TaxoBench, a benchmark built from 72 highly cited LLM surveys, 3,815 cited papers, and their expert-authored taxonomies. TaxoBench evaluates systems in two settings: Deep Research mode measures end-to-end retrieval and organization from a topic, while Bottom-Up mod",
+          "start_char": 0,
+          "end_char": 600
+        }
+      ]
+    }
+  ],
+  "dropped": []
+}
