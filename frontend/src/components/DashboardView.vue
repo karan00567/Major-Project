@@ -356,13 +356,7 @@ function goToRun() {
             <span class="text-[0.82rem] text-ink-dim dark:text-night-dim">{{ what }}</span>
           </li>
         </ul>
-        <p class="mt-5 max-w-3xl rounded-xl border-l-4 border-accent bg-accent-soft
-                  px-5 py-4 leading-relaxed">
-          <code class="tag-mono">trace.jsonl</code> is the single source of truth
-          for what happened. The live stream tails it, the human overrides append
-          to it, and every figure in the report is derived from it — so a browser
-          panel and a report figure cannot disagree.
-        </p>
+        
       </section>
 
       <footer class="border-t border-paper-line pt-8 dark:border-night-line">
