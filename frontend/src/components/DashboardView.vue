@@ -53,17 +53,22 @@ const MODELS = [
     parameters: '44M',
     data: 'SciFact',
     metric: 'held-out macro-F1',
-    stock: 0.516,
-    tuned: 0.873,
+    metric_value: 0.873,
   },
   {
     name: 'Cross-encoder reranker',
     parameters: '22M',
     data: 'SciReviewGen',
     metric: 'Recall@20, own bibliography',
-    stock: 0.4815,
-    tuned: 0.775,
+    metric_value: 0.775,
   },
+  {
+    name: 'Summarizer(Used across different agents)',
+    parameters: '200M',
+    data: 'CNN Daily mail & SciReviewGen',
+    metric: 'ROGUE-L',
+    metric_value: '30.81',
+  }
 ]
 
 const ARTEFACTS = [
@@ -101,16 +106,11 @@ function goToRun() {
     <main class="mx-auto max-w-5xl px-5 pb-20 pt-10 sm:px-6">
       <!-- ── hero ─────────────────────────────────────────────────────── -->
       <section class="border-b border-paper-line pb-12 dark:border-night-line">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="pill bg-accent-soft text-accent dark:text-accent-lite">
-            B.Tech major project · GRIET
-          </span>
-          <span class="pill-soft">six agents · LangGraph</span>
-          <span class="pill-soft">two fine-tuned models · 66M params</span>
-          <span class="pill-soft">$0, by construction</span>
-        </div>
-
-        <h1 class="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+        <!-- The badge row was removed. It front-loaded provenance and
+             implementation trivia — the institution, the framework, the
+             parameter count, the budget — before the reader had been told what
+             the thing does. The page now opens on the name and the claim. -->
+        <h1 class="text-4xl font-semibold tracking-tight sm:text-5xl">
           ResearchGPT
         </h1>
         <p class="mt-3 text-lg text-ink dark:text-night-fg">
@@ -292,8 +292,8 @@ function goToRun() {
       <section class="border-b border-paper-line py-12 dark:border-night-line">
         <h2 class="text-xl font-semibold">Where the machine learning is</h2>
         <p class="mt-3 max-w-2xl leading-relaxed text-ink-dim dark:text-night-dim">
-          Three models, both trained on
-          free Kaggle GPU and both deployed
+          Three models, trained on
+          Kaggle GPU and both deployed
           <strong class="font-semibold text-ink dark:text-night-fg">quantized to
           int8 on a CPU-only machine.</strong>
           The generative agents are deliberately <em>not</em> fine-tuned. The
@@ -310,52 +310,31 @@ function goToRun() {
               <h3 class="text-[0.95rem] font-semibold">{{ m.name }}</h3>
               <span class="pill-soft">{{ m.data }}</span>
             </div>
-            <p class="mt-0.5 font-mono text-[0.72rem] text-ink-dim dark:text-night-dim">
-              {{ m.parameters }}
-            </p>
+            
 
             <p class="mt-3 text-[0.74rem] uppercase tracking-[0.07em] text-ink-dim
                       dark:text-night-dim">{{ m.metric }}</p>
             <div class="mt-2 space-y-1.5">
               <div class="flex items-center gap-2">
-                <span class="w-16 shrink-0 text-[0.74rem] text-ink-dim
-                             dark:text-night-dim">stock</span>
                 <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-paper-sunk
                              dark:bg-night-sunk">
-                  <span class="block h-full rounded-full bg-ink-faint dark:bg-night-faint"
-                        :style="{ width: `${m.stock * 100}%` }" />
+                  <!-- `metric_value` is a 0-1 fraction for two of these and a
+                       0-100 score for the third, so the bar normalises before
+                       it draws and clamps, or a value like 30.81 would render
+                       as a 3081% wide fill. -->
+                  <span class="block h-full rounded-full bg-accent"
+                        :style="{ width: `${Math.min(100, Number(m.metric_value) <= 1
+                                    ? Number(m.metric_value) * 100
+                                    : Number(m.metric_value))}%` }" />
                 </span>
                 <span class="w-12 shrink-0 text-right font-mono text-[0.78rem]
-                             tabular-nums">{{ m.stock.toFixed(3) }}</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="w-16 shrink-0 text-[0.74rem] font-semibold">tuned</span>
-                <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-paper-sunk
-                             dark:bg-night-sunk">
-                  <span class="block h-full rounded-full bg-supported"
-                        :style="{ width: `${m.tuned * 100}%` }" />
-                </span>
-                <span class="w-12 shrink-0 text-right font-mono text-[0.78rem]
-                             font-semibold tabular-nums text-supported
-                             dark:text-supported-lite">{{ m.tuned.toFixed(3) }}</span>
+                             tabular-nums">{{ m.metric_value }}</span>
               </div>
             </div>
-            <p class="mt-2.5 text-[0.78rem] text-ink-dim dark:text-night-dim">
-              +{{ ((m.tuned - m.stock) * 100).toFixed(1) }} points over the stock
-              checkpoint on the same held-out data.
-            </p>
           </div>
         </div>
 
-        <p class="mt-6 max-w-3xl rounded-xl border-l-4 border-supported
-                  bg-supported/10 px-5 py-4 leading-relaxed">
-          <strong class="font-semibold">$0 by construction.</strong>
-          Only free, open-weight models, enforced in code rather than by
-          discipline: <code class="tag-mono">core/llm.py</code> checks an
-          <code class="tag-mono">ALLOWED_MODELS</code> constant before any HTTP
-          request is even constructed. There is no second line of defence, and
-          that is intentional — a second one would make the first optional.
-        </p>
+        
       </section>
 
       <!-- ── what a run leaves behind ─────────────────────────────────── -->
