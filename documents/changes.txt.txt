@@ -1,0 +1,11 @@
+I've changed somethings in the rev-3 main ppt file.
+
+what are needed to be done:
+1. remove paper 13 "[13] X. Li, Y. Lee and J. Ouyang, "Cited Text Spans for Citation Text Generation," 4th Workshop on Scholarly Document Processing, ACL 2024", paper 22. remove the dedicated slides and from the table as well.
+2. the dataset details slide 67, has some empty space, fill it with a bullet point summarizing the table that is displayed on that slide.
+3. in slide 76, i.e significance of proporsed work, the guideline was to include 4-6 bullent points, not more than that, and should address the ques "Why does this project matter?"
+4. "advantages of the proposed work" again same exceeding the points mentioned.
+5. in the MCD explantion 7 points were used, explain it in 6 points maximum. use simple and easily understandable language.
+6. same problem with arch diagram description as well.
+7. problem statement has complex language, use simply language and precise points for easy understandability.
+8. diagrams in the presentation are of utmost importance, once again go through them and their desciptions.

@@ -21,6 +21,7 @@ import PanelDropped from './components/PanelDropped.vue'
 import PanelSources from './components/PanelSources.vue'
 import PanelScores from './components/PanelScores.vue'
 import DashboardView from './components/DashboardView.vue'
+import ModelsView from './components/ModelsView.vue'
 import HistoryView from './components/HistoryView.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import { digest } from './lib/runStats.js'
@@ -49,13 +50,19 @@ const sidebarOpen = ref(false)
 //
 //   /            the landing page (public) — CTA is "Log in" or "Run a review"
 //   /dashboard   the same page, kept so existing links and the footer still work
+//   /models      the three trained models and their architectures (public)
 //   /run         the question box and the results (needs a session)
 //
-// Still a pathname check rather than vue-router: three static routes and a full
+// Still a pathname check rather than vue-router: four static routes and a full
 // page load between them is not worth a router, and the SPA fallback in Vite
 // already serves index.html for /run.
+//
+// /models is public for the same reason the landing page is: it explains what
+// was built, and asking someone to sign in before they may read that gets the
+// order backwards. It calls no endpoint, so it needs no session either.
 const route = window.location.pathname.replace(/\/+$/, '') || '/'
 const onDashboard = ref(route === '/' || route === '/dashboard')
+const onModels = ref(route === '/models')
 const showHistory = ref(false)
 
 const stats = computed(() => digest(events.value))
@@ -190,12 +197,14 @@ async function onAuthed() {
 // The landing page is static and public: it reads nothing from the API, so it
 // must not call it. Booting there would fire /api/runs without a token, take a
 // 401, and log a scary error behind a page that is working perfectly.
-onMounted(() => { if (!onDashboard.value && authed.value) boot() })
+onMounted(() => { if (!onDashboard.value && !onModels.value && authed.value) boot() })
 onUnmounted(stopStream)
 </script>
 
 <template>
   <DashboardView v-if="onDashboard" />
+
+  <ModelsView v-else-if="onModels" />
 
   <AuthView v-else-if="!authed" @authed="onAuthed" />
 

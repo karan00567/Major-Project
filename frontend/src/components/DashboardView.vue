@@ -45,7 +45,7 @@ const RUN = [
   { value: '4', label: 'critic decisions', sub: 'two loops, then write' },
 ]
 
-// Two fine-tuned models, ~66M parameters combined, both trained on free Kaggle
+// Two trained models, ~66M parameters combined, both trained on free Kaggle
 // GPU and both deployed quantized to int8 on a CPU-only machine.
 const MODELS = [
   {
@@ -67,7 +67,7 @@ const MODELS = [
     parameters: '200M',
     data: 'CNN Daily mail & SciReviewGen',
     metric: 'ROGUE-L',
-    metric_value: '30.81',
+    metric_value: '29.44',
   }
 ]
 
@@ -281,7 +281,7 @@ function goToRun() {
           Kaggle GPU and both deployed
           <strong class="font-semibold text-ink dark:text-night-fg">quantized to
           int8 on a CPU-only machine.</strong>
-          The generative agents are deliberately <em>not</em> fine-tuned. The
+          The generative agents are deliberately <em>not</em> trained. The
           thesis is Valsci's — architecture beats model scale — so the training
           went to the two real bottlenecks: retrieval quality and claim
           grounding.
@@ -305,8 +305,8 @@ function goToRun() {
                              dark:bg-night-sunk">
                   <!-- `metric_value` is a 0-1 fraction for two of these and a
                        0-100 score for the third, so the bar normalises before
-                       it draws and clamps, or a value like 30.81 would render
-                       as a 3081% wide fill. -->
+                       it draws and clamps, or a value like 29.44 would render
+                       as a 2944% wide fill. -->
                   <span class="block h-full rounded-full bg-accent"
                         :style="{ width: `${Math.min(100, Number(m.metric_value) <= 1
                                     ? Number(m.metric_value) * 100
