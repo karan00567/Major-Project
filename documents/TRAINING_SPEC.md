@@ -12,8 +12,9 @@
 
 | Component | Trained? | Base model | Data | Runs on |
 |---|---|---|---|---|
-| Planner, Extractor, Critic, Writer | ❌ **prompted** | `openai/gpt-oss-120b` (free tier) | — | Groq API |
+| Planner, Critic | ❌ **prompted** | `openai/gpt-oss-120b` (free tier) | — | Groq API |
 | Embeddings | ❌ frozen | `BAAI/bge-small-en-v1.5` (~33M) | — | local CPU |
+|Extractor, writer| trained| facebook\bart |CNN daily mail & scireviewgen| local CPU (ONXX int8)
 | **Claim verifier** | ✅ **fine-tuned** | `microsoft/deberta-v3-small` (~44M) | **SciFact** | local CPU (ONNX int8) |
 | **Cross-encoder reranker** | ✅ **fine-tuned** | `cross-encoder/ms-marco-MiniLM-L-6-v2` (~22M) | **SciReviewGen** | local CPU (ONNX int8) |
 

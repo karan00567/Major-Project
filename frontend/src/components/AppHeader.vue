@@ -29,6 +29,7 @@ const props = defineProps({
 // still pass their tests, and only the way in from the nav has gone.
 const NAV = [
   { path: '/', label: 'Overview', hint: 'what the project is, and why' },
+  { path: '/models', label: 'Models', hint: 'the three trained models, drawn' },
   { path: '/run', label: 'Run', hint: 'ask a question, watch the agents' },
 ]
 

@@ -170,3 +170,51 @@ body {
    scrollbars onto a page the reader has forced light. */
 .dark .scroll-soft { scrollbar-color: theme('colors.night.line') transparent; }
 .dark .scroll-soft::-webkit-scrollbar-thumb { background: theme('colors.night.line'); }
+
+/* Model-architecture diagrams (/models).
+   Real CSS rather than @apply + fill-* utilities: these are SVG paint
+   properties on hand-positioned geometry, and writing them out means the
+   diagram cannot silently lose its colours if a utility name changes. Every
+   value comes from the same tokens the rest of the app uses. */
+@layer components {
+  .arch-box        { fill: theme('colors.paper.card'); stroke: theme('colors.paper.line'); }
+  .arch-box-muted  { fill: theme('colors.paper.sunk'); stroke: theme('colors.paper.line'); }
+  .arch-box-accent { fill: rgb(47 111 237 / 0.09);  stroke: theme('colors.accent.DEFAULT'); }
+  .arch-box-good   { fill: rgb(47 158 95 / 0.10);   stroke: theme('colors.supported.DEFAULT'); }
+  .arch-box-warn   { fill: rgb(201 138 46 / 0.11);  stroke: theme('colors.partial.DEFAULT'); }
+  .arch-box-bad    { fill: rgb(217 83 79 / 0.10);   stroke: theme('colors.unsupported.DEFAULT'); }
+  .arch-box-alt    { fill: rgb(142 68 173 / 0.09);  stroke: theme('colors.contradicted.DEFAULT'); }
+
+  .dark .arch-box        { fill: theme('colors.night.card'); stroke: theme('colors.night.line'); }
+  .dark .arch-box-muted  { fill: theme('colors.night.sunk'); stroke: theme('colors.night.line'); }
+  .dark .arch-box-accent { fill: rgb(123 166 255 / 0.14); stroke: theme('colors.accent.lite'); }
+  .dark .arch-box-good   { fill: rgb(94 203 140 / 0.14);  stroke: theme('colors.supported.lite'); }
+  .dark .arch-box-warn   { fill: rgb(229 176 98 / 0.14);  stroke: theme('colors.partial.lite'); }
+  .dark .arch-box-bad    { fill: rgb(240 138 134 / 0.14); stroke: theme('colors.unsupported.lite'); }
+  .dark .arch-box-alt    { fill: rgb(192 138 216 / 0.14); stroke: theme('colors.contradicted.lite'); }
+
+  .arch-title { fill: theme('colors.ink.DEFAULT'); font-size: 13px; font-weight: 600; }
+  .arch-sub   { fill: theme('colors.ink.dim');     font-size: 10.5px; }
+  .arch-mono  { fill: theme('colors.ink.dim');     font-size: 10.5px;
+                font-family: theme('fontFamily.mono'); }
+  .arch-cap   { fill: theme('colors.ink.faint');   font-size: 10px; }
+  .arch-lane  { fill: theme('colors.ink.dim'); font-size: 11px; font-weight: 600;
+                letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .dark .arch-title { fill: theme('colors.night.fg'); }
+  .dark .arch-sub,
+  .dark .arch-mono,
+  .dark .arch-lane  { fill: theme('colors.night.dim'); }
+  .dark .arch-cap   { fill: theme('colors.night.faint'); }
+
+  .arch-line { stroke: theme('colors.ink.dim'); fill: none; stroke-width: 1.5; }
+  .arch-line-soft { stroke: theme('colors.paper.line'); fill: none; stroke-width: 1.5; }
+  .dark .arch-line { stroke: theme('colors.night.dim'); }
+  .dark .arch-line-soft { stroke: theme('colors.night.line'); }
+  .arch-arrowhead { fill: theme('colors.ink.dim'); }
+  .dark .arch-arrowhead { fill: theme('colors.night.dim'); }
+
+  /* The dotted frame that groups an encoder or decoder stack. */
+  .arch-group { fill: none; stroke: theme('colors.paper.line'); stroke-dasharray: 4 4; }
+  .dark .arch-group { stroke: theme('colors.night.line'); }
+}
